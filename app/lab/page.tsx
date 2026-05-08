@@ -42,6 +42,7 @@ export default function LabPage() {
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [memoryMetrics, setMemoryMetrics] = useState<MemoryMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [agentFilter, setAgentFilter] = useState('all');
@@ -49,30 +50,33 @@ export default function LabPage() {
   const [sortBy, setSortBy] = useState<'newest' | 'fastest' | 'slowest'>('newest');
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const response = await fetch('/api/executions');
-        const data = await response.json();
-        setExecutions(data);
-        if (data.length > 0) {
-          setSelectedExecution(data[0]);
-        }
-
-        const mockMetrics: MemoryMetrics = {
-          total_memories: data.length,
-          recall_count: Math.floor(data.length * 0.7),
-          reuse_success_rate: 0.85,
-          planner_adaptation_rate: 0.6
-        };
-        setMemoryMetrics(mockMetrics);
-      } catch (error) {
-        console.error('加载数据失败:', error);
-      } finally {
-        setLoading(false);
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch('/api/executions');
+      const data = await response.json();
+      setExecutions(data);
+      if (data.length > 0) {
+        setSelectedExecution(data[0]);
       }
-    };
 
+      const mockMetrics: MemoryMetrics = {
+        total_memories: data.length,
+        recall_count: Math.floor(data.length * 0.7),
+        reuse_success_rate: 0.85,
+        planner_adaptation_rate: 0.6
+      };
+      setMemoryMetrics(mockMetrics);
+    } catch (err) {
+      console.error('加载数据失败:', err);
+      setError('加载执行数据失败，请检查网络连接后重试。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -135,6 +139,32 @@ export default function LabPage() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen py-16 px-4 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-[#FAFAFA] mb-3">加载失败</h2>
+          <p className="text-[#71717A] text-sm mb-4">{error}</p>
+          <div className="p-4 bg-[#1e293b] rounded-lg text-left mb-6">
+            <p className="text-[#71717A] text-xs mb-2">可能原因：</p>
+            <ul className="text-[#52525B] text-xs space-y-1">
+              <li>• 模型服务限流</li>
+              <li>• Supabase 未连接</li>
+            </ul>
+            <p className="text-[#71717A] text-xs mt-3">建议：重新执行 或 检查环境变量</p>
+          </div>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#60A5FA] transition-colors text-sm"
+          >
+            重新加载
+          </button>
         </div>
       </div>
     );

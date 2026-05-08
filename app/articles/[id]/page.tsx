@@ -11,16 +11,17 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Articles
+          返回文章列表
         </Link>
 
         <article>
           <div className="text-center py-20">
+            <div className="text-4xl mb-4">📄</div>
             <h1 className="text-4xl md:text-5xl font-extrabold text-[#f8fafc] mb-4">
-              Article Not Found
+              文章未找到
             </h1>
             <p className="text-[#94a3b8] text-lg mb-6">
-              The article you're looking for doesn't exist.
+              您访问的文章不存在或已被移除。
             </p>
             <Link 
               href="/"

@@ -18,10 +18,10 @@ export default function LineagePage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Lab
+            返回实验室
           </Link>
-          <h1 className="text-3xl font-bold text-[#f8fafc] mt-4">Execution Lineage</h1>
-          <p className="text-[#94a3b8]">View relationships between related executions</p>
+          <h1 className="text-3xl font-bold text-[#f8fafc] mt-4">执行谱系</h1>
+          <p className="text-[#94a3b8]">查看相关执行之间的关联关系</p>
         </div>
         
         <LineageGraph executionId={executionId} />

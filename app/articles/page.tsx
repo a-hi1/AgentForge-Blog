@@ -7,19 +7,23 @@ export default function ArticlesPage() {
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] text-[#818cf8] text-xs font-medium uppercase tracking-wider mb-4">
-            Content
+            内容
           </span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-[#f8fafc] mb-4">
-            Articles
+            技术文章
           </h1>
           <p className="text-[#94a3b8] text-lg max-w-2xl mx-auto">
-            Technical deep-dives and engineering notes.
+            技术深度解析与工程笔记。
           </p>
         </div>
 
         <div className="text-center py-20">
-          <p className="text-[#64748b] text-lg mb-6">
-            No articles found. Stay tuned!
+          <div className="text-4xl mb-4">📝</div>
+          <p className="text-[#64748b] text-lg mb-2">
+            暂无文章，敬请期待！
+          </p>
+          <p className="text-[#52525B] text-sm mb-6">
+            技术文章正在撰写中，即将上线。
           </p>
           <Link 
             href="/"

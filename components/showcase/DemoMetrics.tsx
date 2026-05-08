@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getExecutions, ExecutionRecord } from '@/lib/agent-runtime/storage';
+import { SkeletonMetrics } from '@/components/ui/Skeleton';
 
 export default function DemoMetrics() {
   const [metrics, setMetrics] = useState({
@@ -65,16 +66,7 @@ export default function DemoMetrics() {
   };
 
   if (metrics.loading) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="glass-card rounded-xl p-4 text-center">
-            <div className="h-8 bg-[rgba(24,24,27,0.72)] rounded animate-pulse mb-2" />
-            <div className="h-4 bg-[rgba(24,24,27,0.72)] rounded animate-pulse w-2/3 mx-auto" />
-          </div>
-        ))}
-      </div>
-    );
+    return <div className="mb-8"><SkeletonMetrics /></div>;
   }
 
   return (

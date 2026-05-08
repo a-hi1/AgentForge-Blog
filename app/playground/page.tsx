@@ -5,6 +5,10 @@ import Link from 'next/link';
 import AgentBadge from '@/components/agent/AgentBadge';
 import AgentStatus from '@/components/agent/AgentStatus';
 import MemoryPanel from '@/components/lab/MemoryPanel';
+import ArtifactsPanel from '@/components/artifacts/ArtifactsPanel';
+import DecisionGraph from '@/components/planner/DecisionGraph';
+import { generateArtifacts, artifactsToMarkdown, artifactsToScaffold, artifactsToApiSpec } from '@/lib/agent-runtime/artifactGenerator';
+import type { EngineeringArtifacts } from '@/lib/agent-runtime/artifactGenerator';
 
 interface Step {
   step: number;
@@ -67,6 +71,8 @@ export default function PlaygroundPage() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'templates' | 'execution' | 'intel'>('execution');
+  const [artifacts, setArtifacts] = useState<EngineeringArtifacts | null>(null);
+  const [lastPrompt, setLastPrompt] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -199,6 +205,15 @@ export default function PlaygroundPage() {
           }
         }
       }
+      setLastPrompt(text);
+      setMessages(prev => {
+        const exec = prev.find(m => m.id === executionMessage.id);
+        if (exec?.steps && exec.steps.length > 0) {
+          const outputs = exec.steps.map(s => s.output).filter(Boolean);
+          setArtifacts(generateArtifacts(text, outputs));
+        }
+        return prev;
+      });
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         setMessages(prev => [...prev, {
@@ -238,6 +253,37 @@ export default function PlaygroundPage() {
   const completedSteps = useMemo(() => {
     return lastExecution?.steps?.filter(s => s.status === 'completed') || [];
   }, [lastExecution]);
+
+  const handleExport = useCallback((type: 'techspec' | 'scaffold' | 'apispec' | 'prd') => {
+    if (!artifacts) return;
+    let content = '';
+    let filename = '';
+    switch (type) {
+      case 'techspec':
+        content = artifactsToMarkdown(artifacts, lastPrompt);
+        filename = 'tech-spec.md';
+        break;
+      case 'scaffold':
+        content = artifactsToScaffold(artifacts, lastPrompt);
+        filename = 'scaffold.txt';
+        break;
+      case 'apispec':
+        content = artifactsToApiSpec(artifacts);
+        filename = 'api-spec.yaml';
+        break;
+      case 'prd':
+        content = `# 产品需求文档\n\n> ${lastPrompt}\n\n` + artifactsToMarkdown(artifacts, lastPrompt);
+        filename = 'prd.md';
+        break;
+    }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [artifacts, lastPrompt]);
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex flex-col">
@@ -536,6 +582,25 @@ export default function PlaygroundPage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xs text-[#71717A] uppercase tracking-wider">决策链路</h3>
+                  <div className="p-3 rounded-lg bg-[rgba(24,24,27,0.5)] border border-[rgba(255,255,255,0.06)]">
+                    <DecisionGraph
+                      prompt={lastPrompt}
+                      steps={lastExecution.steps}
+                      memoryInfluenced={lastExecution.memoryInfluenced}
+                      memoryCount={lastExecution.memoriesUsed?.length}
+                    />
+                  </div>
+                </div>
+
+                {artifacts && completedSteps.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs text-[#71717A] uppercase tracking-wider">工程产物</h3>
+                    <ArtifactsPanel artifacts={artifacts} onExport={handleExport} />
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">

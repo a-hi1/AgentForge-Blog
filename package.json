@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "health-check": "node scripts/health-check.ts"
+    "health-check": "node scripts/health-check.ts",
+    "release": "node scripts/prepare-release.ts"
   },
   "keywords": [
     "ai",

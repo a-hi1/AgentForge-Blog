@@ -40,7 +40,7 @@ export default function LineageGraph({ executionId }: LineageGraphProps) {
     return (
       <div className="p-8 text-center">
         <div className="w-8 h-8 border-2 border-[#6366f1]/30 border-t-[#6366f1] rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-[#94a3b8]">Loading lineage...</p>
+        <p className="text-[#94a3b8]">加载执行谱系中...</p>
       </div>
     );
   }
@@ -49,15 +49,15 @@ export default function LineageGraph({ executionId }: LineageGraphProps) {
     return (
       <div className="p-8 text-center glass-card rounded-lg">
         <div className="text-4xl mb-4">📊</div>
-        <p className="text-[#94a3b8] mb-2">No lineage data available</p>
-        <p className="text-[#64748b] text-sm">Run more executions to see relationships</p>
+        <p className="text-[#94a3b8] mb-2">暂无谱系数据</p>
+        <p className="text-[#64748b] text-sm">多执行几次任务后，系统将自动展示执行间的关联关系。</p>
       </div>
     );
   }
   
   return (
     <div className="p-6 glass-card rounded-xl">
-      <h3 className="text-xl font-semibold text-[#f8fafc] mb-6">Execution Lineage</h3>
+      <h3 className="text-xl font-semibold text-[#f8fafc] mb-6">执行谱系</h3>
       
       <div className="relative">
         {lineage.map((exec, index) => (

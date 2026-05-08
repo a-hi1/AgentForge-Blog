@@ -59,9 +59,24 @@ function PipelineDiagram() {
   );
 }
 
+interface RecentExecution {
+  id: string;
+  prompt: string;
+  status: string;
+  timestamp: string;
+  memory_influenced?: boolean;
+}
+
 export default function Hero() {
   const [stats, setStats] = useState({ executions: 0, successRate: 0, memoryHit: 0, avgTime: 0 });
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [recentExecutions, setRecentExecutions] = useState<RecentExecution[]>([]);
+  const [systemHealth] = useState([
+    { label: 'Runtime', status: 'online', icon: '⚡' },
+    { label: 'Memory', status: 'active', icon: '🧠' },
+    { label: 'API', status: 'healthy', icon: '🌐' },
+    { label: 'Observability', status: 'ok', icon: '📊' },
+  ]);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -78,6 +93,7 @@ export default function Hero() {
             memoryHit: Math.round((memoryInfluenced / total) * 100),
             avgTime: 45,
           });
+          setRecentExecutions(data.slice(0, 3));
         } else {
           setStats({ executions: 0, successRate: 0, memoryHit: 0, avgTime: 0 });
         }
@@ -148,6 +164,18 @@ export default function Hero() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
               </Link>
             </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {systemHealth.map((item) => (
+                <div key={item.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[rgba(16,185,129,0.06)] border border-[rgba(16,185,129,0.15)]">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#10B981]" />
+                  </span>
+                  <span className="text-[10px] text-[#10B981] font-medium">{item.icon} {item.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="hidden lg:block">
@@ -169,6 +197,32 @@ export default function Hero() {
             </div>
           ))}
         </div>
+
+        {recentExecutions.length > 0 && (
+          <div className="mt-8 max-w-3xl">
+            <h3 className="text-xs text-[#52525B] uppercase tracking-wider mb-3">最近执行</h3>
+            <div className="space-y-2">
+              {recentExecutions.map((exec) => {
+                const time = new Date(exec.timestamp);
+                const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+                return (
+                  <div key={exec.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[rgba(24,24,27,0.5)] border border-[rgba(255,255,255,0.04)]">
+                    <span className="text-[10px] text-[#52525B] font-mono shrink-0">[{timeStr}]</span>
+                    <span className="text-xs text-[#A1A1AA] truncate flex-1">{exec.prompt.slice(0, 60)}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+                      exec.status === 'completed' ? 'bg-[rgba(16,185,129,0.1)] text-[#10B981]' : 'bg-[rgba(245,158,11,0.1)] text-[#F59E0B]'
+                    }`}>
+                      {exec.status === 'completed' ? '完成' : '执行中'}
+                    </span>
+                    {exec.memory_influenced && (
+                      <span className="text-[10px] text-[#60A5FA]">🧠</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

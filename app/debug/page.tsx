@@ -65,18 +65,22 @@ export default function DebugPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Lab
+            返回实验室
           </Link>
-          <h1 className="text-3xl font-bold text-[#f8fafc]">Debug Panel</h1>
+          <h1 className="text-3xl font-bold text-[#f8fafc]">调试面板</h1>
         </div>
         
         {loading ? (
-          <div className="text-[#94a3b8]">Loading...</div>
+          <div className="space-y-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-40 bg-[#1e293b] rounded-xl animate-pulse" />
+            ))}
+          </div>
         ) : (
           <div className="space-y-6">
             <div className="p-6 glass-card rounded-xl">
               <h2 className="text-xl font-semibold text-[#f8fafc] mb-4">
-                Environment Variables (Browser)
+                环境变量（浏览器）
               </h2>
               <pre className="bg-[#0f172a] p-4 rounded text-[#94a3b8] text-sm overflow-auto">
                 {JSON.stringify(debugInfo.envTest, null, 2)}
@@ -85,12 +89,12 @@ export default function DebugPage() {
 
             <div className="p-6 glass-card rounded-xl">
               <h2 className="text-xl font-semibold text-[#f8fafc] mb-4">
-                API Test: /api/executions
+                API 测试：/api/executions
               </h2>
               <div className={`mb-4 px-4 py-2 rounded-lg inline-block text-sm font-medium ${
                 debugInfo.apiTest?.success ? 'bg-[#10b981] text-white' : 'bg-[#ef4444] text-white'
               }`}>
-                {debugInfo.apiTest?.success ? '✅ Success' : '❌ Failed'} - Status {debugInfo.apiTest?.status}
+                {debugInfo.apiTest?.success ? '✅ 成功' : '❌ 失败'} - 状态 {debugInfo.apiTest?.status}
               </div>
               <pre className="bg-[#0f172a] p-4 rounded text-[#94a3b8] text-sm overflow-auto max-h-96">
                 {JSON.stringify(debugInfo.apiTest, null, 2)}
@@ -99,14 +103,14 @@ export default function DebugPage() {
 
             <div className="p-6 glass-card rounded-xl">
               <h2 className="text-xl font-semibold text-[#f8fafc] mb-4">
-                Data Count
+                数据统计
               </h2>
               <div className="text-2xl font-bold text-[#818cf8]">
-                {debugInfo.dataCount} records found
+                {debugInfo.dataCount} 条记录
               </div>
               {debugInfo.apiTest?.data && Array.isArray(debugInfo.apiTest.data) && debugInfo.apiTest.data.slice(0, 3) && (
                 <div className="mt-4">
-                  <h3 className="text-lg text-[#94a3b8] mb-2">First 3 records:</h3>
+                  <h3 className="text-lg text-[#94a3b8] mb-2">前 3 条记录：</h3>
                   <pre className="bg-[#0f172a] p-4 rounded text-[#94a3b8] text-sm overflow-auto">
                     {JSON.stringify(debugInfo.apiTest.data.slice(0, 3), null, 2)}
                   </pre>
@@ -119,13 +123,13 @@ export default function DebugPage() {
                 onClick={runTests}
                 className="px-4 py-2 bg-[#6366f1] text-white rounded-lg hover:bg-[#818cf8] transition-colors"
               >
-                Refresh Tests
+                刷新测试
               </button>
               <Link
                 href="/lab"
                 className="px-4 py-2 bg-[#1e293b] border border-[rgba(255,255,255,0.1)] text-[#94a3b8] rounded-lg hover:bg-[#334155] transition-colors inline-flex items-center"
               >
-                Go to Lab
+                前往实验室
               </Link>
             </div>
           </div>

@@ -6,61 +6,61 @@ export default function AboutPage() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] text-[#818cf8] text-xs font-medium uppercase tracking-wider mb-4">
-            Identity
+            关于我们
           </span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-[#f8fafc] mb-4">
-            About
+            关于 AgentForge
           </h1>
         </div>
 
         <div className="space-y-6">
           <GlassCard className="p-8">
             <h2 className="text-2xl font-bold text-[#f8fafc] mb-4">
-              AgentForge OS
+              AgentForge 智能工程系统
             </h2>
             <p className="text-[#94a3b8] leading-relaxed mb-4">
-              AgentForge OS is an AI engineering process visualization system. We showcase how AI agents participate in software development, from prompt to agent to build to deploy.
+              AgentForge 是一个 Memory-Augmented Adaptive Engineering OS，基于多智能体协作 + 记忆增强 + 实时可观测的 AI 工程操作系统。
             </p>
             <p className="text-[#94a3b8] leading-relaxed">
-              Our mission is to demonstrate the future of development where AI and human developers collaborate seamlessly.
+              我们的使命是展示 AI 与人类开发者无缝协作的未来开发模式。
             </p>
           </GlassCard>
 
           <GlassCard className="p-8">
             <h2 className="text-2xl font-bold text-[#f8fafc] mb-4">
-              What We Do
+              核心能力
             </h2>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-lg font-semibold text-[#f8fafc] mb-2">
-                  📝 Content Management
+                  🤖 多智能体协作
                 </h3>
                 <p className="text-[#94a3b8]">
-                  Leveraging Hexo for static content management of articles and documentation.
+                  Architect / Coding / Debug / Deploy 多智能体流水线，自适应动态编排。
                 </p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-[#f8fafc] mb-2">
-                  🧪 Process Visualization
+                  🧠 记忆增强
                 </h3>
                 <p className="text-[#94a3b8]">
-                  Showing AI engineering processes step by step through our Lab interface.
+                  历史经验检索、相似度匹配、经验复用，从每次执行中持续学习。
                 </p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-[#f8fafc] mb-2">
-                  🤖 Interactive Experience
+                  📊 可观测性
                 </h3>
                 <p className="text-[#94a3b8]">
-                  Providing a playground for users to interact with AI agents directly.
+                  实时日志、执行回放、对比分析，完整追踪每一次工程决策。
                 </p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-[#f8fafc] mb-2">
-                  📦 Project Showcase
+                  📦 工程产物生成
                 </h3>
                 <p className="text-[#94a3b8]">
-                  Displaying real products built with AI-powered development workflows.
+                  自动生成架构图、数据模型、API 接口、文件树和部署清单。
                 </p>
               </div>
             </div>
@@ -68,7 +68,7 @@ export default function AboutPage() {
 
           <GlassCard className="p-8">
             <h2 className="text-2xl font-bold text-[#f8fafc] mb-4">
-              Architecture
+              系统架构
             </h2>
             <div className="space-y-4">
               <div className="flex items-center gap-4">
@@ -77,10 +77,10 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-[#f8fafc]">
-                    Hexo Content Layer
+                    前端展示层
                   </h3>
                   <p className="text-[#94a3b8] text-sm">
-                    Static content management and Markdown rendering
+                    Next.js 14 App Router + Tailwind CSS + Glassmorphism
                   </p>
                 </div>
               </div>
@@ -90,10 +90,10 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-[#f8fafc]">
-                    Next.js Application Layer
+                    Agent 运行时层
                   </h3>
                   <p className="text-[#94a3b8] text-sm">
-                    Main application with dynamic pages and components
+                    多智能体协作 + 自适应规划 + 质量验证
                   </p>
                 </div>
               </div>
@@ -103,10 +103,10 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-[#f8fafc]">
-                    Agent Runtime Layer
+                    数据持久层
                   </h3>
                   <p className="text-[#94a3b8] text-sm">
-                    AI execution and automation (coming soon)
+                    Supabase PostgreSQL + 向量检索 + 记忆关系图谱
                   </p>
                 </div>
               </div>
