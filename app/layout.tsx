@@ -6,6 +6,9 @@ import Footer from "@/components/layout/Footer";
 export const metadata: Metadata = {
   title: "AgentForge OS",
   description: "AI工程执行过程可视化系统",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
