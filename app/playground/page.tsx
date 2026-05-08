@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import AgentBadge from '@/components/agent/AgentBadge';
 import AgentStatus from '@/components/agent/AgentStatus';
-import MemoryPanel from '@/components/lab/MemoryPanel';
-import ArtifactsPanel from '@/components/artifacts/ArtifactsPanel';
-import DecisionGraph from '@/components/planner/DecisionGraph';
 import { generateArtifacts, artifactsToMarkdown, artifactsToScaffold, artifactsToApiSpec } from '@/lib/agent-runtime/artifactGenerator';
 import type { EngineeringArtifacts } from '@/lib/agent-runtime/artifactGenerator';
+
+const MemoryPanel = dynamic(() => import('@/components/lab/MemoryPanel'), { ssr: false });
+const ArtifactsPanel = dynamic(() => import('@/components/artifacts/ArtifactsPanel'), { ssr: false });
+const DecisionGraph = dynamic(() => import('@/components/planner/DecisionGraph'), { ssr: false });
 
 interface Step {
   step: number;

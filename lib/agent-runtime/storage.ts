@@ -137,7 +137,6 @@ export async function completeExecution(
 
 export async function getExecutions(): Promise<ExecutionRecord[]> {
   if (!isSupabaseConfigured()) {
-    console.log('[Storage] Supabase not configured, no executions found');
     return [];
   }
 
@@ -145,8 +144,6 @@ export async function getExecutions(): Promise<ExecutionRecord[]> {
   if (!supabase) return [];
 
   try {
-    console.log('[Supabase] Fetching executions...');
-
     const { data, error } = await supabase
       .from('executions')
       .select(`
@@ -162,14 +159,9 @@ export async function getExecutions(): Promise<ExecutionRecord[]> {
       `)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('[Supabase] Query error:', error);
-      throw error;
-    }
+    if (error) throw error;
 
-    console.log('[Supabase] Found', (data || []).length, 'executions');
-
-    const transformed = (data || []).map(item => ({
+    return (data || []).map(item => ({
       id: item.id,
       prompt: item.prompt,
       status: item.status,
@@ -185,11 +177,8 @@ export async function getExecutions(): Promise<ExecutionRecord[]> {
           timestamp: step.created_at,
         })),
     }));
-
-    console.log('[Supabase] Transformed', transformed.length, 'records');
-    return transformed;
   } catch (e) {
-    console.error('[Supabase] getExecutions failed:', e);
+    console.error('[Storage] getExecutions failed:', e);
     return [];
   }
 }

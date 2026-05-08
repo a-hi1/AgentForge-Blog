@@ -11,19 +11,13 @@ export async function GET(request: NextRequest) {
       return await getLineage(lineageId);
     }
     
-    console.log('[API] Fetching executions...');
-    console.log('[Supabase] Debug:', getSupabaseDebugInfo());
-    console.log('[Supabase] Configured:', isSupabaseConfigured());
-    
     const executions = await getExecutions();
-    console.log('[API] Fetched', executions.length, 'executions');
-    
     return NextResponse.json(executions);
   } catch (error) {
-    console.error('[API] Failed to fetch executions:', error);
+    console.error('[API] 获取执行记录失败:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to fetch executions', 
+        error: '获取执行记录失败', 
         details: String(error),
         debug: getSupabaseDebugInfo()
       },

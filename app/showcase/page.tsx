@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import DemoRunner from '@/components/showcase/DemoRunner';
 import AgentPipeline from '@/components/showcase/AgentPipeline';
-import CapabilityStoryboard from '@/components/showcase/CapabilityStoryboard';
-import ArchitectureCanvas from '@/components/showcase/ArchitectureCanvas';
 import ScenarioSelector from '@/components/showcase/ScenarioSelector';
 import DemoMetrics from '@/components/showcase/DemoMetrics';
-import CapabilityComparison from '@/components/showcase/CapabilityComparison';
 import { downloadReport, ExecutionReport } from '@/lib/demo/reportExporter';
 import { Step } from '@/lib/types/execution';
+
+const CapabilityStoryboard = dynamic(() => import('@/components/showcase/CapabilityStoryboard'), { ssr: false });
+const ArchitectureCanvas = dynamic(() => import('@/components/showcase/ArchitectureCanvas'), { ssr: false });
+const CapabilityComparison = dynamic(() => import('@/components/showcase/CapabilityComparison'), { ssr: false });
 
 const scenarios = [
   { id: 'saas', name: 'SaaS 平台构建', prompt: 'Build a production-ready SaaS blog platform with authentication, CMS, and deployment pipeline' },

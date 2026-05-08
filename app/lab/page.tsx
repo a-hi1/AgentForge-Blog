@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import GlassCard from '@/components/shared/GlassCard';
 import AgentBadge from '@/components/agent/AgentBadge';
 import AgentStatus from '@/components/agent/AgentStatus';
-import AnalyticsPanel from '@/components/lab/AnalyticsPanel';
 import SearchBar from '@/components/lab/SearchBar';
 import Filters from '@/components/lab/Filters';
-import MemoryPanel from '@/components/lab/MemoryPanel';
-import QualityScorePanel from '@/components/lab/QualityScorePanel';
+
+const AnalyticsPanel = dynamic(() => import('@/components/lab/AnalyticsPanel'), { ssr: false });
+const MemoryPanel = dynamic(() => import('@/components/lab/MemoryPanel'), { ssr: false });
+const QualityScorePanel = dynamic(() => import('@/components/lab/QualityScorePanel'), { ssr: false });
 
 interface ExecutionStep {
   agent: string;
