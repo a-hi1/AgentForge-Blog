@@ -1,0 +1,66 @@
+{
+  "executions": [
+    {
+      "id": "exp-001",
+      "title": "Building a Blog System",
+      "description": "AI Agent构建博客系统的完整执行过程",
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Analyze Requirement",
+          "output": "User wants a blog system with AI capabilities, focusing on engineering process visualization.",
+          "type": "thinking",
+          "status": "completed",
+          "timestamp": "2024-05-07T10:00:00Z"
+        },
+        {
+          "id": "step-2",
+          "title": "Design Architecture",
+          "output": "Decided on Next.js + Hexo hybrid architecture. Next.js for interactive features, Hexo for static content management.",
+          "type": "design",
+          "status": "completed",
+          "timestamp": "2024-05-07T10:02:30Z"
+        },
+        {
+          "id": "step-3",
+          "title": "Generate Code",
+          "output": "Created components structure:\n- layout components (Header, Footer)\n- page components (Home, Projects, Lab)\n- shared components (GlassCard)",
+          "type": "code",
+          "status": "completed",
+          "timestamp": "2024-05-07T10:05:00Z"
+        },
+        {
+          "id": "step-4",
+          "title": "Setup Project",
+          "output": "Initialized Next.js project with TypeScript and Tailwind CSS. Configured build scripts.",
+          "type": "setup",
+          "status": "in_progress",
+          "timestamp": "2024-05-07T10:08:15Z"
+        }
+      ]
+    },
+    {
+      "id": "exp-002",
+      "title": "AI Code Review System",
+      "description": "开发代码审查Agent的执行记录",
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Analyze Codebase",
+          "output": "Identified key components: PR parser, code analyzer, reviewer agent.",
+          "type": "thinking",
+          "status": "completed",
+          "timestamp": "2024-05-06T14:00:00Z"
+        },
+        {
+          "id": "step-2",
+          "title": "Write Agent Logic",
+          "output": "Implemented LangChain-based agent with custom tools for code inspection.",
+          "type": "code",
+          "status": "completed",
+          "timestamp": "2024-05-06T14:15:00Z"
+        }
+      ]
+    }
+  ]
+}
