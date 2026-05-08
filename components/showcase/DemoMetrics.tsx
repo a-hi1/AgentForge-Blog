@@ -1,8 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getExecutions, ExecutionRecord } from '@/lib/agent-runtime/storage';
 import { SkeletonMetrics } from '@/components/ui/Skeleton';
+
+interface ExecutionRecord {
+  id: string;
+  status?: string;
+  steps?: any[];
+  memory_influenced?: boolean;
+  adaptation_reason?: string[];
+}
 
 export default function DemoMetrics() {
   const [metrics, setMetrics] = useState({
@@ -11,6 +18,7 @@ export default function DemoMetrics() {
     successRate: 0,
     avgStepsPerExecution: 0,
     loading: true,
+    dbConnected: true,
   });
 
   useEffect(() => {
@@ -19,8 +27,13 @@ export default function DemoMetrics() {
 
   const loadMetrics = async () => {
     try {
-      const executions = await getExecutions();
-      
+      const response = await fetch('/api/executions');
+      if (!response.ok) {
+        setMetrics(prev => ({ ...prev, loading: false, dbConnected: false }));
+        return;
+      }
+      const executions: ExecutionRecord[] = await response.json();
+
       if (executions.length === 0) {
         setMetrics({
           totalExecutions: 0,
@@ -28,22 +41,18 @@ export default function DemoMetrics() {
           successRate: 0,
           avgStepsPerExecution: 0,
           loading: false,
+          dbConnected: true,
         });
         return;
       }
 
       const totalExecutions = executions.length;
-      
-      const successfulExecutions = executions.filter(
-        (e: ExecutionRecord) => e.status === 'completed'
-      ).length;
-      
+      const successfulExecutions = executions.filter(e => e.status === 'completed').length;
       const adaptiveExecutions = executions.filter(
-        (e: ExecutionRecord) => e.memory_influenced || (e.adaptation_reason?.length ?? 0) > 0
+        e => e.memory_influenced || (e.adaptation_reason?.length ?? 0) > 0
       ).length;
-      
       const totalSteps = executions.reduce(
-        (sum: number, e: ExecutionRecord) => sum + (e.steps?.length || 0), 0
+        (sum, e) => sum + (e.steps?.length || 0), 0
       );
 
       setMetrics({
@@ -52,21 +61,24 @@ export default function DemoMetrics() {
         successRate: totalExecutions > 0 ? Math.round((successfulExecutions / totalExecutions) * 100) : 0,
         avgStepsPerExecution: totalExecutions > 0 ? Math.round(totalSteps / totalExecutions) : 0,
         loading: false,
+        dbConnected: true,
       });
     } catch (error) {
-      console.error('[Metrics] Failed to load:', error);
-      setMetrics({
-        totalExecutions: 0,
-        adaptiveRate: 0,
-        successRate: 0,
-        avgStepsPerExecution: 0,
-        loading: false,
-      });
+      console.error('[Metrics] 加载失败:', error);
+      setMetrics(prev => ({ ...prev, loading: false, dbConnected: false }));
     }
   };
 
   if (metrics.loading) {
     return <div className="mb-8"><SkeletonMetrics /></div>;
+  }
+
+  if (!metrics.dbConnected) {
+    return (
+      <div className="mb-8 p-4 glass-card rounded-xl border border-[#f59e0b]/30 bg-[#f59e0b]/5 text-center">
+        <p className="text-[#f59e0b] text-sm">数据库暂未连接，请检查部署配置</p>
+      </div>
+    );
   }
 
   return (

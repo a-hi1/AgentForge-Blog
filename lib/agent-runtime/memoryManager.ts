@@ -1,5 +1,4 @@
-import { supabaseServer, isSupabaseConfigured } from '../supabase/client';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServer, isSupabaseConfigured } from '../supabase/client';
 
 // ============================================
 // TYPES
@@ -204,14 +203,14 @@ ${JSON.stringify(executionData, null, 2)}
       return null;
     }
 
+    const supabase = getSupabaseServer();
+    if (!supabase) return null;
+
     try {
-      // Auto-generate tags
       const autoTags = tags || MemoryManager.extractTags(prompt, lessons);
-      
-      // Calculate importance score
       const importanceScore = MemoryManager.calculateImportance(lessons);
 
-      const { data, error } = await supabaseServer
+      const { data, error } = await supabase
         .from('agent_memory')
         .insert({
           execution_id: executionId,
@@ -246,9 +245,11 @@ ${JSON.stringify(executionData, null, 2)}
       return [];
     }
 
+    const supabase = getSupabaseServer();
+    if (!supabase) return [];
+
     try {
-      // Get recent memories
-      const { data: memories, error } = await supabaseServer
+      const { data: memories, error } = await supabase
         .from('agent_memory')
         .select('*')
         .order('importance_score', { ascending: false })
@@ -347,8 +348,11 @@ ${JSON.stringify(executionData, null, 2)}
   ): Promise<MemoryRelation | null> {
     if (!isSupabaseConfigured()) return null;
 
+    const supabase = getSupabaseServer();
+    if (!supabase) return null;
+
     try {
-      const { data, error } = await supabaseServer
+      const { data, error } = await supabase
         .from('memory_relations')
         .insert({
           source_execution_id: sourceExecutionId,
@@ -374,8 +378,11 @@ ${JSON.stringify(executionData, null, 2)}
   static async getExecutionLineage(executionId: string): Promise<string[]> {
     if (!isSupabaseConfigured()) return [];
 
+    const supabase = getSupabaseServer();
+    if (!supabase) return [];
+
     try {
-      const { data: relations, error } = await supabaseServer
+      const { data: relations, error } = await supabase
         .from('memory_relations')
         .select('*')
         .or(`source_execution_id.eq.${executionId},target_execution_id.eq.${executionId}`)
@@ -506,8 +513,13 @@ ${JSON.stringify(executionData, null, 2)}
       };
     }
 
+    const supabase = getSupabaseServer();
+    if (!supabase) {
+      return { total_memories: 0, recall_count: 0, reuse_success_rate: 0, planner_adaptation_rate: 0 };
+    }
+
     try {
-      const { count } = await supabaseServer
+      const { count } = await supabase
         .from('agent_memory')
         .select('*', { count: 'exact', head: true });
 

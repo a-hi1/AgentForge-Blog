@@ -1,50 +1,71 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const rawSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const cleanSupabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+let browserClient: SupabaseClient | null = null;
+let serverClient: SupabaseClient | null = null;
 
-const supabaseUrl = cleanSupabaseUrl;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-const PLACEHOLDER = 'placeholder-not-configured';
-
-function createBrowserClient(): SupabaseClient {
-  if (supabaseUrl && supabaseAnonKey) {
-    return createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return createClient('https://placeholder.supabase.co', PLACEHOLDER);
+function getEnv() {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  return { url, anonKey, serviceKey };
 }
 
-function createServerClient(): SupabaseClient {
-  if (supabaseUrl && supabaseServiceRoleKey) {
-    return createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-  }
-  return createClient('https://placeholder.supabase.co', PLACEHOLDER, {
-    auth: { autoRefreshToken: false, persistSession: false },
+function logEnvCheck() {
+  const { url, anonKey, serviceKey } = getEnv();
+  console.log('[ENV CHECK]', {
+    hasUrl: !!url,
+    hasKey: !!anonKey,
+    hasServiceKey: !!serviceKey,
   });
 }
 
-export const supabaseBrowser = createBrowserClient();
-export const supabaseServer = createServerClient();
+export function getSupabaseBrowser(): SupabaseClient | null {
+  if (browserClient) return browserClient;
 
-// Helper 函数：检查是否配置了 Supabase
-export function isSupabaseConfigured() {
-  const configured = !!supabaseUrl && !!supabaseServiceRoleKey;
+  const { url, anonKey } = getEnv();
+
+  if (!url || !anonKey) {
+    console.warn('[Supabase] Browser client: env missing');
+    logEnvCheck();
+    return null;
+  }
+
+  browserClient = createClient(url, anonKey);
+  return browserClient;
+}
+
+export function getSupabaseServer(): SupabaseClient | null {
+  if (serverClient) return serverClient;
+
+  const { url, serviceKey } = getEnv();
+
+  if (!url || !serviceKey) {
+    console.warn('[Supabase] Server client: env missing');
+    logEnvCheck();
+    return null;
+  }
+
+  serverClient = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return serverClient;
+}
+
+export function isSupabaseConfigured(): boolean {
+  const { url, serviceKey } = getEnv();
+  const configured = !!url && !!serviceKey;
   console.log('[Supabase] Configured:', configured, {
-    url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'missing',
-    hasServiceKey: !!supabaseServiceRoleKey,
+    url: url ? `${url.substring(0, 20)}...` : 'missing',
+    hasServiceKey: !!serviceKey,
   });
   return configured;
 }
 
-// 调试信息导出
 export function getSupabaseDebugInfo() {
+  const { url, anonKey, serviceKey } = getEnv();
   return {
-    url: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'missing',
-    hasAnonKey: !!supabaseAnonKey,
-    hasServiceKey: !!supabaseServiceRoleKey,
+    url: url ? `${url.substring(0, 30)}...` : 'missing',
+    hasAnonKey: !!anonKey,
+    hasServiceKey: !!serviceKey,
   };
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getExecutions } from '@/lib/agent-runtime/storage';
-import { getSupabaseDebugInfo, isSupabaseConfigured, supabaseServer } from '@/lib/supabase/client';
+import { getSupabaseDebugInfo, isSupabaseConfigured, getSupabaseServer } from '@/lib/supabase/client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,9 +37,15 @@ async function getLineage(executionId: string) {
     const executions = await getExecutions();
     return NextResponse.json({ lineage: executions });
   }
-  
+
+  const supabase = getSupabaseServer();
+  if (!supabase) {
+    const executions = await getExecutions();
+    return NextResponse.json({ lineage: executions });
+  }
+
   try {
-    const { data: relations, error: relError } = await supabaseServer
+    const { data: relations, error: relError } = await supabase
       .from('memory_relations')
       .select('*')
       .or(`source_execution_id.eq.${executionId},target_execution_id.eq.${executionId}`);
@@ -52,7 +58,7 @@ async function getLineage(executionId: string) {
       relatedIds.add(r.target_execution_id);
     });
     
-    const { data: executions, error: execError } = await supabaseServer
+    const { data: executions, error: execError } = await supabase
       .from('executions')
       .select('*')
       .in('id', Array.from(relatedIds))
