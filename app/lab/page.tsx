@@ -9,6 +9,7 @@ import AnalyticsPanel from '@/components/lab/AnalyticsPanel';
 import SearchBar from '@/components/lab/SearchBar';
 import Filters from '@/components/lab/Filters';
 import MemoryPanel from '@/components/lab/MemoryPanel';
+import QualityScorePanel from '@/components/lab/QualityScorePanel';
 
 interface ExecutionStep {
   agent: string;
@@ -284,6 +285,8 @@ export default function LabPage() {
                   <div className="mb-4 p-3 bg-[#111113] rounded-lg border border-[rgba(255,255,255,0.05)]">
                     <p className="text-[#FAFAFA] text-sm font-medium">{selectedExecution.prompt}</p>
                   </div>
+
+                  <QualityScorePanel steps={selectedExecution.steps} />
 
                   <div className="space-y-3 mb-6">
                     <h3 className="text-sm font-semibold text-[#FAFAFA]">执行步骤</h3>

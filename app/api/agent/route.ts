@@ -1,208 +1,181 @@
-import { NextRequest } from 'next/server';
-import { createPlan, MemoryAwarePlan } from '@/lib/agent-runtime/planner';
+import { NextResponse } from 'next/server';
 import { executeAgentStreaming } from '@/lib/agent-runtime/executor';
-import { formatStepStart, formatStepChunk, formatStepComplete, formatComplete, formatMemoryInfluence, formatMemoryStatus, encodeStreamEvent } from '@/lib/agent-runtime/formatter';
-import { createExecution, appendExecutionStep, completeExecution, getExecutionById, saveExecution, ExecutionRecord } from '@/lib/agent-runtime/storage';
-import MemoryManager from '@/lib/agent-runtime/memoryManager';
-import { rateLimiter } from '@/lib/rate-limiter';
+import { generatePlan } from '@/lib/agent-runtime/planner';
+import { MemoryManager } from '@/lib/agent-runtime/memoryManager';
+import { generateId } from '@/lib/agent-runtime/storage';
+import { validateOutput } from '@/lib/agent-runtime/outputValidator';
+import { analyzeDomain, buildDomainContext } from '@/lib/agent-runtime/domainAnalyzer';
+import type { ExecutionRecord } from '@/lib/agent-runtime/storage';
 
-export async function POST(request: NextRequest) {
-  // 1. Get client IP for rate limiting
-  const clientIp = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-
-  // 2. Check rate limit
-  if (rateLimiter.isRateLimited(clientIp)) {
-    const rateLimitInfo = rateLimiter.getRemaining(clientIp);
-    return new Response(JSON.stringify({
-      error: 'Too many requests',
-      message: 'Rate limit exceeded. Please try again later.',
-      resetTime: new Date(rateLimitInfo.resetTime).toISOString(),
-      remaining: rateLimitInfo.remaining
-    }), {
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-RateLimit-Remaining': rateLimitInfo.remaining.toString(),
-        'X-RateLimit-Reset': rateLimitInfo.resetTime.toString(),
-        'Retry-After': Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000).toString()
-      }
-    });
-  }
-
-  const { prompt } = await request.json();
-
-  if (!prompt) {
-    return new Response(JSON.stringify({ error: 'Prompt is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
+export async function POST(request: Request) {
   const encoder = new TextEncoder();
-  const stream = new TransformStream();
-  const writer = stream.writable.getWriter();
+  const stream = new ReadableStream({
+    async start(controller) {
+      let executionSteps: any[] = [];
+      let executionId: string | null = null;
+      let memoryInfluenced = false;
 
-  // Initialize executionId early for error handling
-  let executionId: string | undefined;
+      const encodeStreamEvent = (event: any) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
 
-  (async () => {
-    try {
-      console.log('[Agent] Starting memory-augmented execution');
-      
-      // 1. Create execution record
-      executionId = await createExecution(prompt);
-      console.log('[Agent] Execution ID:', executionId);
-      
-      if (!executionId) {
-        throw new Error('Failed to create execution ID');
-      }
-    } catch (error) {
-      console.error('[Agent] Execution error:', error);
-      if (executionId) {
-        await completeExecution(executionId, 'failed');
-      }
-      await writer.write(encoder.encode(
-        encodeStreamEvent(formatComplete())
-      ));
-      await writer.close();
-      return;
-    }
-    
-    const safeExecutionId: string = executionId!;
-    
-    try {
-      // 2. Retrieve relevant memories first
-      const relevantMemories = await MemoryManager.retrieveRelevantMemories(prompt);
-      console.log('[Agent] Retrieved', relevantMemories.length, 'relevant memories');
-      
-      // 3. Generate memory-aware plan
-      const memoryPlan: MemoryAwarePlan = await createPlan(prompt, relevantMemories);
-      console.log('[Agent] Plan influenced:', memoryPlan.memory_influenced);
-      
-      // 4. Send memory influence info to frontend first
-      if (relevantMemories.length > 0) {
-        await writer.write(encoder.encode(
-          encodeStreamEvent(formatMemoryInfluence({
-            memories_used: relevantMemories,
-            memory_influenced: memoryPlan.memory_influenced,
-            adaptations: memoryPlan.adaptations,
-            adaptation_reason: memoryPlan.adaptation_reason,
-            memory_influence_level: memoryPlan.memory_influence_level
-          }))
-        ));
-      } else {
-        await writer.write(encoder.encode(
-          encodeStreamEvent(formatMemoryStatus('未找到相关历史记忆'))
-        ));
-      }
-      
-      // 5. Execute plan with memory context injection
-      const steps = memoryPlan.steps;
-      const memoryContext = MemoryManager.formatMemoryContext(relevantMemories);
-      
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i];
-        const stepNumber = i + 1;
-        const startTime = Date.now();
+      try {
+        const { prompt } = await request.json();
 
-        console.log('[Agent] Executing step:', stepNumber, step.agent);
+        if (!prompt || typeof prompt !== 'string') {
+          encodeStreamEvent({
+            type: 'error',
+            message: '请提供有效的任务描述',
+          });
+          controller.close();
+          return;
+        }
 
-        await appendExecutionStep(safeExecutionId, i, {
-          agent: step.agent,
-          task: step.task,
-          output: '',
-          status: 'executing',
-          timestamp: new Date().toISOString(),
-          start_time: startTime,
+        executionId = generateId();
+        
+        const domainAnalysis = analyzeDomain(prompt);
+        const domainContext = buildDomainContext(domainAnalysis);
+
+        const retrievedMemories = await MemoryManager.retrieveRelevantMemories(prompt);
+        const memoryContext = MemoryManager.formatMemoryContext(retrievedMemories);
+
+        if (retrievedMemories.length > 0) {
+          memoryInfluenced = true;
+          encodeStreamEvent({
+            type: 'memory_status',
+            message: `已召回 ${retrievedMemories.length} 条相关记忆`,
+          });
+        }
+
+        encodeStreamEvent({
+          type: 'memory_influence',
+          memories: retrievedMemories.map(m => ({
+            prompt: m.memory.prompt.slice(0, 100),
+            relevance_score: m.relevance_score,
+            reason: m.relevance_reason,
+          })),
+          memory_influenced: memoryInfluenced,
         });
 
-        await writer.write(encoder.encode(
-          encodeStreamEvent(formatStepStart(stepNumber, step.agent, step.task))
-        ));
+        const planMemories = retrievedMemories.map(m => m.memory);
+        const plan = await generatePlan(prompt, { memories: planMemories as any });
+        memoryInfluenced = memoryInfluenced || plan.memoryInfluenced;
 
-        let fullOutput = '';
-        await executeAgentStreaming(
-          step.agent,
-          step.task,
-          prompt + memoryContext,
-          async (chunk) => {
-            fullOutput += chunk;
-            await appendExecutionStep(safeExecutionId, i, {
-              output: fullOutput,
-            });
-            await writer.write(encoder.encode(
-              encodeStreamEvent(formatStepChunk(stepNumber, chunk))
-            ));
-          }
-        );
+        const contextWithDomain = domainContext || '';
 
-        await appendExecutionStep(safeExecutionId, i, {
-          status: 'completed',
-          output: fullOutput,
-          timestamp: new Date().toISOString(),
-        });
-
-        await writer.write(encoder.encode(
-          encodeStreamEvent(formatStepComplete(stepNumber, fullOutput))
-        ));
-      }
-
-      console.log('[Agent] All steps complete, storing memory');
-      
-      // 6. Get full execution data and add adaptation metadata
-      const finalExecution = await getExecutionById(safeExecutionId);
-      
-      // 7. Store adaptation metadata
-      if (finalExecution) {
-        const executionWithMeta: ExecutionRecord = {
-          ...finalExecution,
-          adaptation_reason: memoryPlan.adaptation_reason,
-          memory_influence_level: memoryPlan.memory_influence_level,
-          memory_influenced: memoryPlan.memory_influenced
-        };
-        saveExecution(executionWithMeta);
-        
-        // 8. Extract and store memories
-        const lessons = await MemoryManager.extractExecutionLessons(finalExecution);
-        
-        // Store the memory
-        const storedMemory = await MemoryManager.storeExecutionMemory(
-          safeExecutionId,
-          prompt,
-          lessons
-        );
-        
-        if (storedMemory) {
-          console.log('[Agent] Memory stored successfully');
+        for (let i = 0; i < plan.steps.length; i++) {
+          const step = plan.steps[i];
           
-          // Link with previous memories
-          for (const prevMemory of relevantMemories) {
-            await MemoryManager.linkExecutionMemory(
-              safeExecutionId,
-              prevMemory.memory.execution_id,
-              prevMemory.relevance_score,
-              'improved_from'
-            );
+          encodeStreamEvent({
+            type: 'step_start',
+            step: step.step,
+            agent: step.agent,
+            task: step.task,
+          });
+
+          let fullOutput = '';
+          
+          const systemOverride = contextWithDomain 
+            ? `${step.agent}\n\n${contextWithDomain}`
+            : undefined;
+
+          await executeAgentStreaming(
+            step.agent,
+            step.task,
+            `${prompt}\n\n${memoryContext}`.trim(),
+            async (chunk: string) => {
+              fullOutput += chunk;
+              encodeStreamEvent({
+                type: 'step_chunk',
+                step: step.step,
+                agent: step.agent,
+                output: chunk,
+              });
+            },
+            systemOverride
+          );
+
+          const qualityValidation = validateOutput(fullOutput);
+          
+          encodeStreamEvent({
+            type: 'step_complete',
+            step: step.step,
+            agent: step.agent,
+            task: step.task,
+            output: fullOutput,
+            status: 'completed',
+            quality_score: qualityValidation.score,
+            chinese_ratio: Math.round(qualityValidation.chineseRatio * 100),
+          });
+
+          executionSteps.push({
+            ...step,
+            output: fullOutput,
+            status: 'completed',
+            quality_score: qualityValidation.score,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (executionId) {
+          const avgQuality = Math.round(
+            executionSteps.reduce((s, e) => s + (e.quality_score || 80), 0) / executionSteps.length
+          );
+
+          const record: ExecutionRecord = {
+            id: executionId,
+            prompt,
+            steps: executionSteps.map(s => ({
+              agent: s.agent,
+              task: s.task,
+              output: s.output,
+              status: s.status as 'completed',
+              timestamp: s.timestamp,
+            })),
+            status: 'completed',
+            memory_influenced: memoryInfluenced,
+            adaptation_reason: plan.adaptationReasons,
+            timestamp: new Date().toISOString(),
+          };
+
+          await import('@/lib/agent-runtime/storage').then(m => m.saveExecution(record));
+
+          try {
+            const lessons = await MemoryManager.extractExecutionLessons({
+              prompt,
+              steps: executionSteps,
+              status: 'completed',
+            });
+            await MemoryManager.storeExecutionMemory(executionId, prompt, lessons, `质量评分: ${avgQuality}/100`);
+          } catch (memErr) {
+            console.warn('[Agent API] Memory storage failed:', memErr);
           }
         }
+
+        encodeStreamEvent({
+          type: 'complete',
+          executionId: executionId,
+          memory_influenced: memoryInfluenced,
+          domain: domainAnalysis.domain,
+          total_steps: executionSteps.length,
+          avg_quality: Math.round(
+            executionSteps.reduce((s, e) => s + (e.quality_score || 80), 0) / executionSteps.length
+          ),
+        });
+
+      } catch (error) {
+        console.error('[Agent API] Error:', error);
+        encodeStreamEvent({
+          type: 'error',
+          message: error instanceof Error ? error.message : '系统处理异常，请稍后重试',
+        });
+      } finally {
+        controller.close();
       }
-      
-      // 9. Mark complete
-      await completeExecution(safeExecutionId, 'completed');
-
-      await writer.write(encoder.encode(encodeStreamEvent(formatComplete())));
-    } catch (error) {
-      console.error('[Agent] Execution error:', error);
-      await completeExecution(safeExecutionId, 'failed');
-      await writer.write(encoder.encode(
-        encodeStreamEvent(formatComplete())
-      ));
-    } finally {
-      await writer.close();
     }
-  })();
+  });
 
-  return new Response(stream.readable, {
+  return new NextResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

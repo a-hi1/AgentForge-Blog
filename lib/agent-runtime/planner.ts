@@ -1,159 +1,130 @@
-import { getAgentPrompt } from './prompts';
-import MemoryManager, { RetrievedMemory } from './memoryManager';
+import { getAgentDefaultTask } from './prompts';
+import { analyzeDomain, buildDomainContext } from './domainAnalyzer';
 
-export interface PlanStep {
+interface ExecutionStep {
+  step: number;
   agent: string;
   task: string;
+  output: string;
+  status: 'pending' | 'executing' | 'completed' | 'failed';
 }
 
-export interface MemoryAwarePlan {
-  steps: PlanStep[];
-  memory_influenced: boolean;
-  adaptations: string[];
-  adaptation_reason: string[];
-  memory_influence_level: number;
-  retrieved_memories?: RetrievedMemory[];
+interface ExecutionPlan {
+  steps: ExecutionStep[];
+  memoryInfluenced: boolean;
+  adaptationReasons: string[];
 }
 
-export async function createPlan(
-  userPrompt: string, 
-  memories?: RetrievedMemory[]
-): Promise<MemoryAwarePlan> {
-  try {
-    const retrievedMemories = memories || await MemoryManager.retrieveRelevantMemories(userPrompt);
-    
-    const adaptations: string[] = [];
-    const adaptationReason: string[] = [];
-    let memoryInfluenced = false;
-    let memoryInfluenceLevel = 0;
-    
-    const deploymentFailures = retrievedMemories.filter(m => 
-      m.memory.lessons?.failures?.some((f: string) => 
-        f.toLowerCase().includes('deploy') || 
-        f.toLowerCase().includes('deployment')
-      )
-    );
-    
-    if (deploymentFailures.length > 1) {
-      adaptations.push('EXTRA_DEBUG_PRE_DEPLOY');
-      adaptationReason.push(`因历史出现 ${deploymentFailures.length} 次部署失败，已插入额外调试审查步骤`);
+interface MemoryRecord {
+  id: string;
+  execution_id: string;
+  prompt: string;
+  summary: string;
+  lessons: any;
+  tags: string[];
+  importance_score: number;
+  created_at: string;
+}
+
+function classifyTask(prompt: string): string {
+  const lower = prompt.toLowerCase();
+
+  const optimizeKeywords = ['优化', '重构', 'refactor', '性能', '改善', '提速', '升级', '改进'];
+  if (optimizeKeywords.some(k => lower.includes(k))) {
+    return 'optimize';
+  }
+
+  const debugKeywords = ['排查', '修复', 'fix', 'debug', 'bug', '报错', '异常', '故障', '诊断', '问题定位'];
+  if (debugKeywords.some(k => lower.includes(k))) {
+    return 'debug';
+  }
+
+  return 'build';
+}
+
+function generateDynamicPlan(prompt: string, domainContext: string): ExecutionStep[] {
+  const taskType = classifyTask(prompt);
+
+  switch (taskType) {
+    case 'optimize':
+      return [
+        { step: 1, agent: '诊断 Agent', task: `诊断当前系统的性能瓶颈和架构问题：${prompt.slice(0, 60)}`, output: '', status: 'pending' },
+        { step: 2, agent: '架构优化 Agent', task: `设计优化方案，制定重构策略和技术选型`, output: '', status: 'pending' },
+        { step: 3, agent: '重构 Agent', task: `实施代码重构和性能优化，输出优化后的完整代码`, output: '', status: 'pending' },
+        { step: 4, agent: '验证 Agent', task: `验证优化效果，确保功能不变且性能提升`, output: '', status: 'pending' },
+      ];
+
+    case 'debug':
+      return [
+        { step: 1, agent: 'Debug Agent', task: `分析问题现象，收集错误信息和日志：${prompt.slice(0, 60)}`, output: '', status: 'pending' },
+        { step: 2, agent: 'Root Cause Agent', task: `深入分析根因，定位问题源头`, output: '', status: 'pending' },
+        { step: 3, agent: '实现 Agent', task: `实施修复方案，输出修复代码`, output: '', status: 'pending' },
+        { step: 4, agent: 'Regression Agent', task: `回归测试，确保修复不引入新问题`, output: '', status: 'pending' },
+      ];
+
+    case 'build':
+    default:
+      return [
+        { step: 1, agent: '产品分析 Agent', task: `分析业务需求，拆解功能模块${domainContext ? '，结合领域知识' : ''}：${prompt.slice(0, 60)}`, output: '', status: 'pending' },
+        { step: 2, agent: '架构设计 Agent', task: `设计系统架构，输出数据模型和技术方案`, output: '', status: 'pending' },
+        { step: 3, agent: '实现 Agent', task: `输出可运行的完整工程代码`, output: '', status: 'pending' },
+        { step: 4, agent: '测试 Agent', task: `设计测试方案，验证功能正确性`, output: '', status: 'pending' },
+        { step: 5, agent: '部署上线 Agent', task: `制定部署方案和发布流程`, output: '', status: 'pending' },
+      ];
+  }
+}
+
+export async function generatePlan(
+  prompt: string,
+  memories: { memories: MemoryRecord[] }
+): Promise<ExecutionPlan> {
+  const domainAnalysis = analyzeDomain(prompt);
+  const domainContext = buildDomainContext(domainAnalysis);
+  const steps = generateDynamicPlan(prompt, domainContext);
+
+  let memoryInfluenced = false;
+  const adaptationReasons: string[] = [];
+
+  if (memories.memories.length > 0) {
+    const relevantMemories = memories.memories.filter(m => {
+      const lessons = m.lessons;
+      if (lessons?.failures && lessons.failures.length > 0) {
+        return true;
+      }
+      return false;
+    });
+
+    if (relevantMemories.length > 0) {
       memoryInfluenced = true;
-      memoryInfluenceLevel += 0.4;
-    }
-    
-    const architectureSuccesses = retrievedMemories.filter(m => 
-      m.memory.lessons?.successes?.some((s: string) => 
-        s.toLowerCase().includes('architect') || 
-        s.toLowerCase().includes('architecture')
-      )
-    );
-    
-    if (architectureSuccesses.length > 0) {
-      adaptations.push('REDUCED_ARCHITECT');
-      adaptationReason.push('因历史相似任务架构设计成功，已精简架构分析环节');
-      memoryInfluenced = true;
-      memoryInfluenceLevel += 0.2;
-    }
-    
-    const codingIssues = retrievedMemories.filter(m => 
-      m.memory.lessons?.failures?.some((f: string) => 
-        f.toLowerCase().includes('code') || 
-        f.toLowerCase().includes('coding')
-      )
-    );
-    
-    if (codingIssues.length > 0) {
-      adaptations.push('EXTRA_CODING_REVIEW');
-      adaptationReason.push('因历史代码质量问题，已增加代码审查步骤');
-      memoryInfluenced = true;
-      memoryInfluenceLevel += 0.3;
-    }
-    
-    const hasOptimizations = retrievedMemories.some(m => 
-      m.memory.lessons?.optimizations && m.memory.lessons.optimizations.length > 0
-    );
-    
-    if (hasOptimizations) {
-      adaptations.push('ADD_OPTIMIZATION_AGENT');
-      adaptationReason.push('基于历史优化建议，已添加性能优化代理');
-      memoryInfluenced = true;
-      memoryInfluenceLevel += 0.25;
-    }
-    
-    memoryInfluenceLevel = Math.min(memoryInfluenceLevel, 1);
-    
-    let steps = generateAdaptivePlan(userPrompt, adaptations);
-    
-    return {
-      steps,
-      memory_influenced: memoryInfluenced,
-      adaptations,
-      adaptation_reason: adaptationReason,
-      memory_influence_level: memoryInfluenceLevel,
-      retrieved_memories: retrievedMemories
-    };
-  } catch (error) {
-    console.error('Planner error:', error);
-    return {
-      steps: getDefaultPlan(userPrompt),
-      memory_influenced: false,
-      adaptations: [],
-      adaptation_reason: [],
-      memory_influence_level: 0
-    };
-  }
-}
+      adaptationReasons.push(`基于 ${relevantMemories.length} 条历史经验调整执行策略`);
 
-function generateAdaptivePlan(userPrompt: string, adaptations: string[]): PlanStep[] {
-  let steps: PlanStep[] = [...getDefaultPlan(userPrompt)];
-  
-  if (adaptations.includes('EXTRA_DEBUG_PRE_DEPLOY')) {
-    const deployIndex = steps.findIndex(s => s.agent === 'Deploy Agent');
-    if (deployIndex !== -1) {
-      steps.splice(deployIndex, 0, {
-        agent: 'Debug Agent',
-        task: '部署前验证与质量检查'
-      });
+      const hasFailure = relevantMemories.some(m => m.lessons?.failures?.length > 0);
+      if (hasFailure) {
+        const lastStep = steps[steps.length - 1];
+        steps.splice(steps.length - 1, 0, {
+          step: steps.length,
+          agent: '调试诊断 Agent',
+          task: '基于历史失败案例，审查实现方案中的潜在问题',
+          output: '',
+          status: 'pending',
+        });
+        adaptationReasons.push('因历史执行中出现过问题，已插入额外的代码审查步骤');
+      }
     }
   }
-  
-  if (adaptations.includes('REDUCED_ARCHITECT')) {
-    const architectStep = steps.find(s => s.agent === 'Architect Agent');
-    if (architectStep) {
-      architectStep.task = '基于历史成功方案快速审查架构设计';
-    }
-  }
-  
-  if (adaptations.includes('EXTRA_CODING_REVIEW')) {
-    const codingIndex = steps.findIndex(s => s.agent === 'Coding Agent');
-    if (codingIndex !== -1) {
-      steps.splice(codingIndex + 1, 0, {
-        agent: 'Debug Agent',
-        task: '代码质量审查与规范验证'
-      });
-    }
-  }
-  
-  if (adaptations.includes('ADD_OPTIMIZATION_AGENT')) {
-    const debugIndex = steps.findIndex(s => s.agent === 'Debug Agent');
-    if (debugIndex !== -1) {
-      steps.splice(debugIndex + 1, 0, {
-        agent: 'Optimization Agent',
-        task: '应用历史优化建议进行性能优化'
-      });
-    }
-  }
-  
-  return steps;
-}
 
-function getDefaultPlan(userPrompt: string): PlanStep[] {
-  return [
-    { agent: 'Architect Agent', task: '分析业务需求并生成系统架构设计' },
-    { agent: 'Coding Agent', task: '实现核心功能模块与代码结构' },
-    { agent: 'Debug Agent', task: '审查实现质量并验证工程规范' },
-    { agent: 'Deploy Agent', task: '制定部署方案并完成最终优化' },
-  ];
-}
+  if (domainContext && steps.length > 0) {
+    steps[0].task += `\n\n${domainContext}`;
+    adaptationReasons.push(`已识别业务领域为「${domainAnalysis.domain}」，将结合领域知识进行分析`);
+  }
 
-export default createPlan;
+  steps.forEach((step, i) => {
+    step.step = i + 1;
+  });
+
+  return {
+    steps,
+    memoryInfluenced,
+    adaptationReasons,
+  };
+}

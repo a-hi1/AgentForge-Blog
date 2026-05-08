@@ -8,6 +8,7 @@ import CapabilityStoryboard from '@/components/showcase/CapabilityStoryboard';
 import ArchitectureCanvas from '@/components/showcase/ArchitectureCanvas';
 import ScenarioSelector from '@/components/showcase/ScenarioSelector';
 import DemoMetrics from '@/components/showcase/DemoMetrics';
+import CapabilityComparison from '@/components/showcase/CapabilityComparison';
 import { downloadReport, ExecutionReport } from '@/lib/demo/reportExporter';
 import { Step } from '@/lib/types/execution';
 
@@ -102,6 +103,8 @@ export default function ShowcasePage() {
           </div>
           <ArchitectureCanvas />
         </section>
+
+        <CapabilityComparison />
 
         {steps.length > 0 && (
           <section className="mb-12 text-center">
