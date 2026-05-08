@@ -14,7 +14,7 @@ interface ScenarioSelectorProps {
 
 export default function ScenarioSelector({ scenarios, selectedId, onSelect }: ScenarioSelectorProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
       {scenarios.map((scenario) => {
         const isSelected = scenario.id === selectedId;
         return (
@@ -23,14 +23,14 @@ export default function ScenarioSelector({ scenarios, selectedId, onSelect }: Sc
             onClick={() => onSelect(scenario.id)}
             className={`p-4 rounded-xl text-left transition-all ${
               isSelected
-                ? 'border-2 border-[#6366f1] bg-[rgba(99,102,241,0.08)] shadow-[0_0_20px_rgba(99,102,241,0.1)]'
-                : 'border border-[rgba(255,255,255,0.08)] bg-[#1e293b]/50 hover:border-[rgba(99,102,241,0.3)] hover:bg-[rgba(99,102,241,0.03)]'
+                ? 'border-2 border-[#3B82F6] bg-[rgba(59,130,246,0.08)]'
+                : 'border border-[rgba(255,255,255,0.06)] bg-[rgba(24,24,27,0.5)] hover:border-[rgba(59,130,246,0.3)] hover:bg-[rgba(59,130,246,0.03)]'
             }`}
           >
-            <h3 className={`font-semibold text-sm mb-2 ${isSelected ? 'text-[#818cf8]' : 'text-[#f8fafc]'}`}>
+            <h3 className={`font-semibold text-sm mb-2 ${isSelected ? 'text-[#60A5FA]' : 'text-[#FAFAFA]'}`}>
               {scenario.name}
             </h3>
-            <p className="text-[#64748b] text-xs line-clamp-3 leading-relaxed">
+            <p className="text-[#71717A] text-xs line-clamp-3 leading-relaxed">
               {scenario.prompt}
             </p>
           </button>

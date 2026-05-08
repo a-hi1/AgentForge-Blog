@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         ));
       } else {
         await writer.write(encoder.encode(
-          encodeStreamEvent(formatMemoryStatus('No relevant historical memory found'))
+          encodeStreamEvent(formatMemoryStatus('未找到相关历史记忆'))
         ));
       }
       

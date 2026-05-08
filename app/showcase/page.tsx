@@ -34,21 +34,19 @@ export default function ShowcasePage() {
       <div className="max-w-7xl mx-auto">
         
         <section className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.2)] text-[#818cf8] text-xs font-medium tracking-wider mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.2)] text-[#60A5FA] text-xs font-medium tracking-wider mb-6">
             工程能力中心
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-[#f8fafc] mb-3">
+          <h1 className="text-3xl md:text-4xl font-bold text-[#FAFAFA] mb-3">
             AI 智能工程能力展示
           </h1>
-          <p className="text-sm text-[#64748b] max-w-xl mx-auto mb-8">
+          <p className="text-sm text-[#71717A] max-w-xl mx-auto mb-8">
             实时观察多代理协同、记忆驱动决策和自适应规划的完整工程链路。
           </p>
           
-          {/* Live Metrics */}
           <DemoMetrics />
         </section>
 
-        {/* Scenario Selector */}
         <section className="mb-12">
           <ScenarioSelector 
             scenarios={scenarios} 
@@ -65,10 +63,7 @@ export default function ShowcasePage() {
           />
         </section>
 
-        {/* Main Demo Area */}
         <section className="grid lg:grid-cols-3 gap-8 mb-12">
-          
-          {/* Left: Live Execution */}
           <div className="lg:col-span-2 space-y-6">
             <DemoRunner 
               prompt={selectedScenario.prompt}
@@ -90,7 +85,6 @@ export default function ShowcasePage() {
             <AgentPipeline steps={steps} />
           </div>
 
-          {/* Right: Capability Storyboard */}
           <div>
             <CapabilityStoryboard 
               steps={steps} 
@@ -99,18 +93,16 @@ export default function ShowcasePage() {
               adaptations={adaptations}
             />
           </div>
-
         </section>
 
         <section className="mb-12">
           <div className="text-center mb-8">
-            <h2 className="text-xl font-semibold text-[#f8fafc] mb-2">系统架构</h2>
-            <p className="text-[#64748b] text-sm">点击节点探索组件详情</p>
+            <h2 className="text-xl font-semibold text-[#FAFAFA] mb-2">系统架构</h2>
+            <p className="text-[#71717A] text-sm">点击节点探索组件详情</p>
           </div>
           <ArchitectureCanvas />
         </section>
 
-        {/* Export Section */}
         {steps.length > 0 && (
           <section className="mb-12 text-center">
             <button
@@ -126,7 +118,7 @@ export default function ShowcasePage() {
                 };
                 downloadReport(report);
               }}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#1e293b] text-[#f8fafc] font-semibold border border-[rgba(255,255,255,0.15)] hover:bg-[#334155] hover:border-[#6366f1] transition-all"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[rgba(24,24,27,0.72)] text-[#FAFAFA] font-semibold border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(63,63,70,0.6)] hover:border-[#3B82F6] transition-all"
             >
               📥 导出执行报告
             </button>
@@ -134,29 +126,29 @@ export default function ShowcasePage() {
         )}
 
         <section className="glass-card rounded-xl p-8 mb-12">
-          <h2 className="text-xl font-semibold text-[#f8fafc] mb-6 text-center">
+          <h2 className="text-xl font-semibold text-[#FAFAFA] mb-6 text-center">
             工程能力验证
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#6366f1]/20 to-[#8b5cf6]/20 flex items-center justify-center text-lg">💾</div>
-              <h3 className="text-[#f8fafc] text-sm font-semibold mb-1">云存储持久性</h3>
-              <p className="text-[#64748b] text-xs">Supabase 实时数据持久化</p>
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#3B82F6]/20 to-[#8B5CF6]/20 flex items-center justify-center text-lg">💾</div>
+              <h3 className="text-[#FAFAFA] text-sm font-semibold mb-1">云存储持久性</h3>
+              <p className="text-[#71717A] text-xs">Supabase 实时数据持久化</p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#8b5cf6]/20 to-[#a78bfa]/20 flex items-center justify-center text-lg">🧠</div>
-              <h3 className="text-[#f8fafc] text-sm font-semibold mb-1">记忆系统</h3>
-              <p className="text-[#64748b] text-xs">基于向量检索的自适应记忆</p>
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#8B5CF6]/20 to-[#A78BFA]/20 flex items-center justify-center text-lg">🧠</div>
+              <h3 className="text-[#FAFAFA] text-sm font-semibold mb-1">记忆系统</h3>
+              <p className="text-[#71717A] text-xs">基于向量检索的自适应记忆</p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#10b981]/20 to-[#34d399]/20 flex items-center justify-center text-lg">🔄</div>
-              <h3 className="text-[#f8fafc] text-sm font-semibold mb-1">自适应规划</h3>
-              <p className="text-[#64748b] text-xs">记忆驱动的动态流程调整</p>
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#10B981]/20 to-[#34D399]/20 flex items-center justify-center text-lg">🔄</div>
+              <h3 className="text-[#FAFAFA] text-sm font-semibold mb-1">自适应规划</h3>
+              <p className="text-[#71717A] text-xs">记忆驱动的动态流程调整</p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#f59e0b]/20 to-[#fbbf24]/20 flex items-center justify-center text-lg">📊</div>
-              <h3 className="text-[#f8fafc] text-sm font-semibold mb-1">可观测性</h3>
-              <p className="text-[#64748b] text-xs">全链路执行追踪与分析</p>
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-[#F59E0B]/20 to-[#FBBF24]/20 flex items-center justify-center text-lg">📊</div>
+              <h3 className="text-[#FAFAFA] text-sm font-semibold mb-1">可观测性</h3>
+              <p className="text-[#71717A] text-xs">全链路执行追踪与分析</p>
             </div>
           </div>
         </section>
@@ -164,7 +156,7 @@ export default function ShowcasePage() {
         <section className="text-center">
           <Link
             href="/interview"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white font-semibold hover:shadow-lg hover:shadow-[rgba(99,102,241,0.35)] transition-all text-sm"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white font-semibold hover:-translate-y-0.5 transition-all text-sm"
           >
             查看系统完整说明
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>

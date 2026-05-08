@@ -48,28 +48,28 @@ const steps = [
 
 export default function Workflow() {
   return (
-    <section className="py-16 px-4 bg-[#0f172a]">
+    <section className="py-16 px-4 bg-[#111113]">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
-          <h2 className="text-2xl md:text-3xl font-bold text-[#f8fafc] mb-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-[#FAFAFA] mb-3">
             工程执行流程
           </h2>
-          <p className="text-[#64748b] text-sm max-w-xl mx-auto">
+          <p className="text-[#71717A] text-sm max-w-xl mx-auto">
             从需求到部署，AI 智能代理的完整工程链路。
           </p>
         </div>
 
         <div className="relative">
-          <div className="hidden md:block absolute top-8 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[rgba(99,102,241,0.3)] to-transparent" />
+          <div className="hidden md:block absolute top-8 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[rgba(59,130,246,0.3)] to-transparent" />
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-4">
             {steps.map((step, index) => (
               <div key={index} className="flex flex-col items-center text-center relative z-10 w-full md:w-auto">
-                <div className="w-14 h-14 rounded-full bg-[#1e293b] border border-[rgba(255,255,255,0.1)] flex items-center justify-center text-[#818cf8] mb-3 hover:border-[rgba(99,102,241,0.4)] hover:shadow-[0_0_16px_rgba(99,102,241,0.15)] transition-all">
+                <div className="w-14 h-14 rounded-full bg-[rgba(24,24,27,0.72)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center text-[#60A5FA] mb-3 hover:border-[rgba(59,130,246,0.4)] transition-all">
                   {step.icon}
                 </div>
-                <h3 className="text-sm font-semibold text-[#f8fafc] mb-1">{step.title}</h3>
-                <p className="text-[#64748b] text-xs">{step.description}</p>
+                <h3 className="text-sm font-semibold text-[#FAFAFA] mb-1">{step.title}</h3>
+                <p className="text-[#71717A] text-xs">{step.description}</p>
               </div>
             ))}
           </div>

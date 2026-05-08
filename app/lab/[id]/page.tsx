@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import ReplayPlayer from '@/components/lab/ReplayPlayer';
+import dynamic from 'next/dynamic';
 import ExportButton from '@/components/lab/ExportButton';
 import MemoryPanel from '@/components/lab/MemoryPanel';
 import AgentBadge from '@/components/agent/AgentBadge';
 import AgentStatus from '@/components/agent/AgentStatus';
+
+const ReplayPlayer = dynamic(() => import('@/components/lab/ReplayPlayer'), { ssr: false });
 
 interface ExecutionStep {
   agent: string;

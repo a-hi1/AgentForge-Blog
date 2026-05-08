@@ -121,16 +121,16 @@ export default function LabPage() {
       <div className="min-h-screen py-8 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-[#1e293b] rounded w-48" />
+            <div className="h-8 bg-[rgba(24,24,27,0.72)] rounded w-48" />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-24 bg-[#1e293b] rounded-xl" />
+                <div key={i} className="h-24 bg-[rgba(24,24,27,0.72)] rounded-xl" />
               ))}
             </div>
-            <div className="h-64 bg-[#1e293b] rounded-xl" />
+            <div className="h-64 bg-[rgba(24,24,27,0.72)] rounded-xl" />
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-32 bg-[#1e293b] rounded-xl" />
+                <div key={i} className="h-32 bg-[rgba(24,24,27,0.72)] rounded-xl" />
               ))}
             </div>
           </div>
@@ -143,8 +143,8 @@ export default function LabPage() {
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-[#f8fafc] mb-2">实验室</h1>
-          <p className="text-[#64748b] text-sm">
+          <h1 className="text-2xl font-bold text-[#FAFAFA] mb-2">实验室</h1>
+          <p className="text-[#71717A] text-sm">
             观察 AI 工程代理的工作流程、记忆影响和自适应规划行为。
           </p>
         </div>
@@ -179,7 +179,7 @@ export default function LabPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'newest' | 'fastest' | 'slowest')}
-              className="px-3 py-2 bg-[#0f172a] border border-[rgba(255,255,255,0.08)] rounded-lg text-sm text-[#f8fafc] focus:outline-none focus:border-[#6366f1] transition-all appearance-none cursor-pointer"
+              className="px-3 py-2 bg-[#111113] border border-[rgba(255,255,255,0.06)] rounded-lg text-sm text-[#FAFAFA] focus:outline-none focus:border-[#3B82F6] transition-all appearance-none cursor-pointer"
             >
               <option value="newest">最新优先</option>
               <option value="fastest">最快完成</option>
@@ -193,17 +193,17 @@ export default function LabPage() {
             {filteredExecutions.length === 0 ? (
               <GlassCard className="p-12 text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] flex items-center justify-center">
-                  <svg className="w-8 h-8 text-[#475569]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-[#71717A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zm3.75 11.625a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                   </svg>
                 </div>
-                <h3 className="text-[#f8fafc] font-medium mb-2">还没有执行记录</h3>
-                <p className="text-[#64748b] text-sm mb-6">
+                <h3 className="text-[#FAFAFA] font-medium mb-2">还没有执行记录</h3>
+                <p className="text-[#71717A] text-sm mb-6">
                   前往 Playground 启动第一次智能执行，此处将实时记录所有工程活动。
                 </p>
                 <Link
                   href="/playground"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white text-sm font-medium hover:shadow-lg hover:shadow-[rgba(99,102,241,0.3)] transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white text-sm font-medium hover:-translate-y-0.5 transition-all"
                 >
                   启动首次执行
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -218,7 +218,7 @@ export default function LabPage() {
                   onClick={() => setSelectedExecution(execution)}
                   className={`cursor-pointer transition-all rounded-xl ${
                     selectedExecution?.id === execution.id
-                      ? 'ring-2 ring-[#6366f1] bg-[rgba(99,102,241,0.05)]'
+                      ? 'ring-2 ring-[#3B82F6] bg-[rgba(59,130,246,0.05)]'
                       : 'hover:bg-[rgba(255,255,255,0.02)]'
                   }`}
                 >
@@ -226,28 +226,28 @@ export default function LabPage() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <AgentStatus status={(execution.status as any) || 'completed'} size="sm" />
-                        <span className="text-[#64748b] text-xs font-mono">
+                        <span className="text-[#71717A] text-xs font-mono">
                           {execution.id.substring(0, 8)}...
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         {execution.memory_influenced && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(99,102,241,0.2)] text-[#818cf8]">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(59,130,246,0.2)] text-[#60A5FA]">
                             🧠 记忆驱动
                           </span>
                         )}
                         {execution.planner_adapted && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.2)] text-[#a78bfa]">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.2)] text-[#A78BFA]">
                             🔄 自适应
                           </span>
                         )}
-                        <span className="text-[#64748b] text-xs">
+                        <span className="text-[#71717A] text-xs">
                           {new Date(execution.timestamp || execution.created_at || '').toLocaleString('zh-CN')}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-[#f8fafc] font-medium mb-3 line-clamp-2">
+                    <p className="text-[#FAFAFA] font-medium mb-3 line-clamp-2">
                       {execution.prompt}
                     </p>
 
@@ -256,7 +256,7 @@ export default function LabPage() {
                         <div key={index} className="flex items-center gap-1">
                           <AgentBadge agent={step.agent} size="sm" />
                           {step.status === 'completed' && (
-                            <span className="text-[#10b981] text-xs">✓</span>
+                            <span className="text-[#10B981] text-xs">✓</span>
                           )}
                         </div>
                       ))}
@@ -272,31 +272,31 @@ export default function LabPage() {
               <div className="sticky top-24">
                 <GlassCard className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-[#f8fafc]">执行详情</h2>
+                    <h2 className="text-lg font-semibold text-[#FAFAFA]">执行详情</h2>
                     <Link
                       href={`/lab/${selectedExecution.id}`}
-                      className="text-sm text-[#818cf8] hover:text-[#6366f1] transition-colors"
+                      className="text-sm text-[#60A5FA] hover:text-[#3B82F6] transition-colors"
                     >
                       查看完整报告 →
                     </Link>
                   </div>
 
-                  <div className="mb-4 p-3 bg-[#0f172a] rounded-lg border border-[rgba(255,255,255,0.05)]">
-                    <p className="text-[#f8fafc] text-sm font-medium">{selectedExecution.prompt}</p>
+                  <div className="mb-4 p-3 bg-[#111113] rounded-lg border border-[rgba(255,255,255,0.05)]">
+                    <p className="text-[#FAFAFA] text-sm font-medium">{selectedExecution.prompt}</p>
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    <h3 className="text-sm font-semibold text-[#f8fafc]">执行步骤</h3>
+                    <h3 className="text-sm font-semibold text-[#FAFAFA]">执行步骤</h3>
                     {selectedExecution.steps.map((step, index) => (
-                      <div key={index} className="p-4 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0f172a]">
+                      <div key={index} className="p-4 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#111113]">
                         <div className="flex items-center gap-3 mb-2">
-                          <span className="text-xs text-[#475569] font-mono">#{index + 1}</span>
+                          <span className="text-xs text-[#71717A] font-mono">#{index + 1}</span>
                           <AgentBadge agent={step.agent} size="sm" />
                           <AgentStatus status={step.status === 'executing' ? 'executing' : 'completed'} size="sm" />
                         </div>
-                        <p className="text-[#94a3b8] text-sm mb-2">{step.task}</p>
+                        <p className="text-[#A1A1AA] text-sm mb-2">{step.task}</p>
                         {step.output && (
-                          <pre className="text-[#64748b] text-xs font-mono whitespace-pre-wrap line-clamp-6 mt-2 p-3 bg-[rgba(0,0,0,0.2)] rounded border border-[rgba(255,255,255,0.03)]">
+                          <pre className="text-[#71717A] text-xs font-mono whitespace-pre-wrap line-clamp-6 mt-2 p-3 bg-[rgba(0,0,0,0.2)] rounded border border-[rgba(255,255,255,0.03)]">
                             {step.output}
                           </pre>
                         )}
@@ -307,7 +307,7 @@ export default function LabPage() {
                   <div className="flex flex-wrap gap-2">
                     <Link
                       href={`/lab/${selectedExecution.id}`}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:border-[rgba(255,255,255,0.2)] transition-all text-sm"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[rgba(24,24,27,0.72)] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[rgba(255,255,255,0.2)] transition-all text-sm"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -317,7 +317,7 @@ export default function LabPage() {
                     </Link>
                     <Link
                       href="/lab/compare"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e293b] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:border-[rgba(255,255,255,0.2)] transition-all text-sm"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[rgba(24,24,27,0.72)] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[rgba(255,255,255,0.2)] transition-all text-sm"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -330,12 +330,12 @@ export default function LabPage() {
             ) : (
               <GlassCard className="p-12 text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] flex items-center justify-center">
-                  <svg className="w-8 h-8 text-[#475569]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-[#71717A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                   </svg>
                 </div>
-                <h3 className="text-[#f8fafc] font-medium mb-2">选择一条执行记录</h3>
-                <p className="text-[#64748b] text-sm">
+                <h3 className="text-[#FAFAFA] font-medium mb-2">选择一条执行记录</h3>
+                <p className="text-[#71717A] text-sm">
                   点击左侧列表中的记录以预览详情。
                 </p>
               </GlassCard>

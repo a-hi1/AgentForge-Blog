@@ -51,7 +51,6 @@ export default function DemoRunner({
   const runDemo = async () => {
     if (isLoading || isRunning) return;
     
-    // Reset state
     setSteps([]);
     setMemoriesUsed([]);
     setMemoryInfluenced(false);
@@ -172,9 +171,9 @@ export default function DemoRunner({
 
   return (
     <div className="glass-card rounded-xl overflow-hidden">
-      <div className="p-5 border-b border-[rgba(255,255,255,0.08)]">
+      <div className="p-5 border-b border-[rgba(255,255,255,0.06)]">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-[#f8fafc]">
+          <h3 className="text-base font-semibold text-[#FAFAFA]">
             实时执行
           </h3>
           <div className="flex items-center gap-3">
@@ -184,7 +183,7 @@ export default function DemoRunner({
                   setIsLoading(false);
                   setIsRunning(false);
                 }}
-                className="px-4 py-2 bg-[#ef4444]/10 text-[#ef4444] rounded-lg text-xs font-medium hover:bg-[#ef4444]/20 transition-all border border-[rgba(239,68,68,0.2)]"
+                className="px-4 py-2 bg-[rgba(239,68,68,0.1)] text-[#ef4444] rounded-lg text-xs font-medium hover:bg-[rgba(239,68,68,0.2)] transition-all border border-[rgba(239,68,68,0.2)]"
               >
                 停止
               </button>
@@ -192,7 +191,7 @@ export default function DemoRunner({
               <button
                 onClick={runDemo}
                 disabled={isLoading}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-[rgba(99,102,241,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white rounded-lg text-sm font-medium hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? '执行中...' : '启动执行'}
               </button>
@@ -202,32 +201,30 @@ export default function DemoRunner({
       </div>
 
       <div className="p-6">
-        {/* Current Step Display */}
         {currentStep ? (
-          <div className="mb-6 p-4 bg-[#0f172a] rounded-lg border border-[rgba(99,102,241,0.2)]">
+          <div className="mb-6 p-4 bg-[#111113] rounded-lg border border-[rgba(59,130,246,0.2)]">
             <div className="flex items-center gap-3 mb-3">
               <AgentBadge agent={currentStep.agent} />
               <AgentStatus status="executing" size="sm" />
             </div>
-            <p className="text-[#94a3b8]">{currentStep.task}</p>
+            <p className="text-[#A1A1AA]">{currentStep.task}</p>
           </div>
         ) : lastCompletedStep ? (
-          <div className="mb-6 p-4 bg-[#0f172a] rounded-lg border border-[rgba(16,185,129,0.2)]">
+          <div className="mb-6 p-4 bg-[#111113] rounded-lg border border-[rgba(16,185,129,0.2)]">
             <div className="flex items-center gap-3 mb-3">
               <AgentBadge agent={lastCompletedStep.agent} />
               <AgentStatus status="completed" size="sm" />
             </div>
-            <p className="text-[#94a3b8]">{lastCompletedStep.task}</p>
+            <p className="text-[#A1A1AA]">{lastCompletedStep.task}</p>
           </div>
         ) : null}
 
-        {/* Logs */}
-        <div className="bg-[#0a0a0f] rounded-lg p-4 max-h-56 overflow-y-auto font-mono text-xs">
+        <div className="bg-[#09090B] rounded-lg p-4 max-h-56 overflow-y-auto font-mono text-xs">
           {logs.length === 0 ? (
-            <p className="text-[#475569]">选择场景后点击「启动执行」...</p>
+            <p className="text-[#71717A]">选择场景后点击「启动执行」...</p>
           ) : (
             logs.map((log, i) => (
-              <p key={i} className={`mb-1 ${log.includes('✅') ? 'text-[#10b981]' : 'text-[#94a3b8]'}`}>
+              <p key={i} className={`mb-1 ${log.includes('✅') ? 'text-[#10B981]' : 'text-[#A1A1AA]'}`}>
                 {log}
               </p>
             ))

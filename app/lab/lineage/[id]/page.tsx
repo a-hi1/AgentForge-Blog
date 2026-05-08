@@ -2,7 +2,9 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import LineageGraph from '@/components/lab/LineageGraph';
+import dynamic from 'next/dynamic';
+
+const LineageGraph = dynamic(() => import('@/components/lab/LineageGraph'), { ssr: false });
 
 export default function LineagePage() {
   const params = useParams();

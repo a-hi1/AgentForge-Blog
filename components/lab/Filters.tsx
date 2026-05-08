@@ -32,7 +32,7 @@ const DATE_OPTIONS = [
   { value: '30d', label: '近 30 天' },
 ];
 
-const selectClass = "px-3 py-2 bg-[#0f172a] border border-[rgba(255,255,255,0.08)] rounded-lg text-sm text-[#f8fafc] focus:outline-none focus:border-[#6366f1] transition-all appearance-none cursor-pointer";
+const selectClass = "px-3 py-2 bg-[#111113] border border-[rgba(255,255,255,0.06)] rounded-lg text-sm text-[#FAFAFA] focus:outline-none focus:border-[#3B82F6] transition-all appearance-none cursor-pointer";
 
 export default function Filters({
   statusFilter, agentFilter, dateFilter,

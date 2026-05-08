@@ -92,23 +92,23 @@ export class MemoryManager {
       for (const step of execution.steps) {
         if (step.status === 'completed') {
           if (step.agent === 'Architect Agent') {
-            lessons.successes.push('Architecture design completed successfully');
+            lessons.successes.push('架构设计方案完成，系统结构清晰');
           }
           if (step.agent === 'Coding Agent') {
-            lessons.successes.push('Code generation completed successfully');
+            lessons.successes.push('代码生成完成，核心模块实现就绪');
           }
         }
         
         // Check for issues in outputs
         if (step.output && step.output.toLowerCase().includes('error')) {
-          lessons.failures.push(`Potential issue in ${step.agent}: ${step.output.slice(0, 100)}`);
+          lessons.failures.push(`${step.agent} 执行过程中发现潜在问题: ${step.output.slice(0, 100)}`);
         }
       }
     }
 
     // Default lessons if none found
     if (lessons.successes.length === 0) {
-      lessons.successes.push('Execution completed without major issues');
+      lessons.successes.push('执行完成，未发现严重问题');
     }
 
     return lessons;
@@ -131,21 +131,21 @@ export class MemoryManager {
         status: execution.status
       };
 
-      const systemPrompt = `You are a senior engineering memory analyst. Analyze the execution and extract structured lessons.
-Return ONLY valid JSON with no additional text. Format:
+      const systemPrompt = `你是一名资深工程记忆分析师。分析执行记录并提取结构化经验教训。
+仅返回有效的 JSON，不要包含其他文本。格式如下：
 {
-  "successes": ["string"],
-  "failures": ["string"],
-  "optimizations": ["string"]
+  "successes": ["字符串"],
+  "failures": ["字符串"],
+  "optimizations": ["字符串"]
 }
-Do NOT include markdown or code blocks - just raw JSON.`;
+不要包含 Markdown 或代码块标记 - 仅返回原始 JSON。所有内容必须使用简体中文。`;
 
-      const userPrompt = `Analyze this engineering execution and extract lessons:
+      const userPrompt = `分析以下工程执行记录，提取经验教训：
 
-Execution Data:
+执行数据：
 ${JSON.stringify(executionData, null, 2)}
 
-Return structured JSON only.`;
+仅返回结构化 JSON。`;
 
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
@@ -324,15 +324,15 @@ Return structured JSON only.`;
         promptLower.includes(tag.toLowerCase())
       );
       if (overlappingTags.length > 0) {
-        reasons.push(`Similar tags: ${overlappingTags.slice(0, 2).join(', ')}`);
+        reasons.push(`相似标签: ${overlappingTags.slice(0, 2).join(', ')}`);
       }
     }
     
     if (memory.importance_score > 0.7) {
-      reasons.push('High importance memory');
+      reasons.push('高重要度记忆');
     }
     
-    return reasons.length > 0 ? reasons.join('; ') : 'Related context';
+    return reasons.length > 0 ? reasons.join('; ') : '相关历史上下文';
   }
 
   // ============================================
@@ -439,14 +439,14 @@ Return structured JSON only.`;
     const parts: string[] = [];
     
     if (lessons.successes.length > 0) {
-      parts.push(`Success: ${lessons.successes[0]}`);
+      parts.push(`成功经验: ${lessons.successes[0]}`);
     }
     
     if (lessons.failures.length > 0) {
-      parts.push(`Challenge: ${lessons.failures[0]}`);
+      parts.push(`遇到挑战: ${lessons.failures[0]}`);
     }
     
-    return parts.join(' | ') || 'Execution completed';
+    return parts.join(' | ') || '执行完成';
   }
 
   // ============================================
@@ -458,14 +458,14 @@ Return structured JSON only.`;
       return '';
     }
 
-    let context = '\n\n=== RELEVANT ENGINEERING MEMORY ===\n';
+    let context = '\n\n历史工程记忆参考\n';
     
-    context += 'SIMILAR TASKS:\n';
+    context += '相似任务:\n';
     memories.forEach((m, i) => {
       context += `${i + 1}. ${m.memory.prompt.slice(0, 100)}...\n`;
     });
 
-    context += '\nLESSONS:\n';
+    context += '\n经验教训:\n';
     const allLessons: string[] = [];
     memories.forEach(m => {
       if (m.memory.lessons?.successes) allLessons.push(...m.memory.lessons.successes);
@@ -477,7 +477,7 @@ Return structured JSON only.`;
       context += `- ${lesson}\n`;
     });
 
-    context += '\nAPPLY THESE INSIGHTS\n';
+    context += '\n请参考以上经验指导本次任务\n';
 
     // Truncate to max length
     if (context.length > MAX_TOKEN_LENGTH) {

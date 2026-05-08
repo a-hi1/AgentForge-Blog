@@ -1,4 +1,4 @@
-import { architecturePrompt, codingPrompt, debuggingPrompt, deployPrompt } from './prompts';
+import { getAgentPrompt } from './prompts';
 
 export interface ExecutionStep {
   agent: string;
@@ -8,27 +8,15 @@ export interface ExecutionStep {
   timestamp: string;
 }
 
-// Timeout in milliseconds for API calls
-const API_TIMEOUT = 30000; // 30 seconds
+const API_TIMEOUT = 30000;
 
-const agentPrompts = {
-  'Architect Agent': architecturePrompt,
-  'Coding Agent': codingPrompt,
-  'Debug Agent': debuggingPrompt,
-  'Deploy Agent': deployPrompt,
-};
-
-// Fallback responses per agent for when API times out or fails
 const fallbackResponses: Record<string, string> = {
-  'Architect Agent': 'Design complete. System architecture ready for implementation.',
-  'Coding Agent': 'Code generated successfully. Ready for review.',
-  'Debug Agent': 'Quality check completed. No critical issues found.',
-  'Deploy Agent': 'Deployment plan prepared. System ready for launch.',
+  'Architect Agent': '架构设计完成。系统架构方案已就绪，可进入实现阶段。',
+  'Coding Agent': '代码生成完成。核心模块实现方案已就绪，可进入审查阶段。',
+  'Debug Agent': '质量审查完成。未发现严重问题，代码质量达标。',
+  'Deploy Agent': '部署方案已制定。系统已满足上线条件。',
 };
 
-/**
- * Helper: Fetch with timeout
- */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
@@ -47,7 +35,7 @@ async function fetchWithTimeout(
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timeout');
+      throw new Error('请求超时');
     }
     throw error;
   }
@@ -64,11 +52,11 @@ export async function executeAgent(
     const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
     if (!apiKey) {
-      console.warn('OPENAI_API_KEY not configured, using fallback');
-      return fallbackResponses[agentName] || 'Agent execution completed';
+      console.warn('OPENAI_API_KEY 未配置，使用降级响应');
+      return fallbackResponses[agentName] || '智能代理执行完成';
     }
 
-    const systemPrompt = agentPrompts[agentName as keyof typeof agentPrompts] || architecturePrompt;
+    const systemPrompt = getAgentPrompt(agentName) + '\n\n重要：你必须始终使用简体中文回答。禁止输出英文标题。代码保留英文标识符，但所有解释和说明必须使用中文。';
 
     const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -80,7 +68,7 @@ export async function executeAgent(
         model: model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `User request: ${context}\n\nYour specific task: ${task}` },
+          { role: 'user', content: `用户需求：${context}\n\n你的具体任务：${task}` },
         ],
         temperature: 0.7,
         stream: true,
@@ -88,7 +76,7 @@ export async function executeAgent(
     }, API_TIMEOUT);
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API 请求失败: ${response.statusText}`);
     }
 
     const reader = response.body?.getReader();
@@ -114,18 +102,16 @@ export async function executeAgent(
               if (content) {
                 fullContent += content;
               }
-            } catch (e) {
-              // Ignore parse errors for individual chunks
-            }
+            } catch (e) {}
           }
         }
       }
     }
 
-    return fullContent || (fallbackResponses[agentName] || 'Agent execution completed');
+    return fullContent || (fallbackResponses[agentName] || '智能代理执行完成');
   } catch (error) {
-    console.warn(`Executor error for ${agentName}, using fallback:`, error);
-    return fallbackResponses[agentName] || `[Error executing ${agentName}]`;
+    console.warn(`执行器错误 ${agentName}，使用降级响应:`, error);
+    return fallbackResponses[agentName] || `[${agentName} 执行异常]`;
   }
 }
 
@@ -141,13 +127,13 @@ export async function executeAgentStreaming(
     const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
     if (!apiKey) {
-      console.warn('OPENAI_API_KEY not configured, using fallback');
-      const fallback = fallbackResponses[agentName] || 'Agent execution completed';
+      console.warn('OPENAI_API_KEY 未配置，使用降级响应');
+      const fallback = fallbackResponses[agentName] || '智能代理执行完成';
       onChunk(fallback);
       return fallback;
     }
 
-    const systemPrompt = agentPrompts[agentName as keyof typeof agentPrompts] || architecturePrompt;
+    const systemPrompt = getAgentPrompt(agentName) + '\n\n重要：你必须始终使用简体中文回答。禁止输出英文标题。代码保留英文标识符，但所有解释和说明必须使用中文。';
 
     const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -159,7 +145,7 @@ export async function executeAgentStreaming(
         model: model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `User request: ${context}\n\nYour specific task: ${task}` },
+          { role: 'user', content: `用户需求：${context}\n\n你的具体任务：${task}` },
         ],
         temperature: 0.7,
         stream: true,
@@ -167,7 +153,7 @@ export async function executeAgentStreaming(
     }, API_TIMEOUT);
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API 请求失败: ${response.statusText}`);
     }
 
     const reader = response.body?.getReader();
@@ -194,18 +180,16 @@ export async function executeAgentStreaming(
                 fullContent += content;
                 onChunk(content);
               }
-            } catch (e) {
-              // Ignore parse errors for individual chunks
-            }
+            } catch (e) {}
           }
         }
       }
     }
 
-    return fullContent || (fallbackResponses[agentName] || 'Agent execution completed');
+    return fullContent || (fallbackResponses[agentName] || '智能代理执行完成');
   } catch (error) {
-    console.warn(`Executor error for ${agentName}, using fallback:`, error);
-    const fallback = fallbackResponses[agentName] || `[Error executing ${agentName}]`;
+    console.warn(`执行器错误 ${agentName}，使用降级响应:`, error);
+    const fallback = fallbackResponses[agentName] || `[${agentName} 执行异常]`;
     onChunk(fallback);
     return fallback;
   }

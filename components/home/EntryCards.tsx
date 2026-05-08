@@ -39,10 +39,10 @@ export default function EntryCards() {
     <section className="py-16 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold text-[#f8fafc] mb-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-[#FAFAFA] mb-3">
             系统入口
           </h2>
-          <p className="text-[#64748b] text-sm max-w-xl mx-auto">
+          <p className="text-[#71717A] text-sm max-w-xl mx-auto">
             从不同维度探索 AI 智能代理的工程能力。
           </p>
         </div>
@@ -52,16 +52,16 @@ export default function EntryCards() {
             <Link key={entry.href} href={entry.href}>
               <GlassCard className="p-6 h-full">
                 <div className="flex flex-col h-full">
-                  <div className="w-10 h-10 rounded-lg bg-[rgba(99,102,241,0.08)] flex items-center justify-center text-[#818cf8] mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-[rgba(59,130,246,0.08)] flex items-center justify-center text-[#60A5FA] mb-4">
                     {entry.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-[#f8fafc] mb-2">
+                  <h3 className="text-lg font-semibold text-[#FAFAFA] mb-2">
                     {entry.title}
                   </h3>
-                  <p className="text-[#94a3b8] text-sm mb-4 flex-grow leading-relaxed">
+                  <p className="text-[#A1A1AA] text-sm mb-4 flex-grow leading-relaxed">
                     {entry.description}
                   </p>
-                  <div className="inline-flex items-center gap-1.5 text-[#818cf8] font-medium text-xs">
+                  <div className="inline-flex items-center gap-1.5 text-[#60A5FA] font-medium text-xs">
                     进入
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />

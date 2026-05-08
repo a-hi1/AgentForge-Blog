@@ -69,8 +69,8 @@ export default function DemoMetrics() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="glass-card rounded-xl p-4 text-center">
-            <div className="h-8 bg-[#1e293b] rounded animate-pulse mb-2" />
-            <div className="h-4 bg-[#1e293b] rounded animate-pulse w-2/3 mx-auto" />
+            <div className="h-8 bg-[rgba(24,24,27,0.72)] rounded animate-pulse mb-2" />
+            <div className="h-4 bg-[rgba(24,24,27,0.72)] rounded animate-pulse w-2/3 mx-auto" />
           </div>
         ))}
       </div>
@@ -80,31 +80,31 @@ export default function DemoMetrics() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
       <div className="glass-card rounded-xl p-4 text-center">
-        <div className="text-2xl font-bold text-[#f8fafc]">
+        <div className="text-2xl font-bold text-[#FAFAFA]">
           {metrics.totalExecutions}
         </div>
-        <div className="text-xs text-[#64748b] mt-0.5">总执行次数</div>
+        <div className="text-xs text-[#71717A] mt-0.5">总执行次数</div>
       </div>
 
       <div className="glass-card rounded-xl p-4 text-center">
-        <div className="text-2xl font-bold text-[#818cf8]">
+        <div className="text-2xl font-bold text-[#60A5FA]">
           {metrics.adaptiveRate}%
         </div>
-        <div className="text-xs text-[#64748b] mt-0.5">自适应率</div>
+        <div className="text-xs text-[#71717A] mt-0.5">自适应率</div>
       </div>
 
       <div className="glass-card rounded-xl p-4 text-center">
-        <div className="text-2xl font-bold text-[#10b981]">
+        <div className="text-2xl font-bold text-[#10B981]">
           {metrics.successRate}%
         </div>
-        <div className="text-xs text-[#64748b] mt-0.5">成功率</div>
+        <div className="text-xs text-[#71717A] mt-0.5">成功率</div>
       </div>
 
       <div className="glass-card rounded-xl p-4 text-center">
-        <div className="text-2xl font-bold text-[#f59e0b]">
+        <div className="text-2xl font-bold text-[#F59E0B]">
           {metrics.avgStepsPerExecution}
         </div>
-        <div className="text-xs text-[#64748b] mt-0.5">平均步骤数</div>
+        <div className="text-xs text-[#71717A] mt-0.5">平均步骤数</div>
       </div>
     </div>
   );

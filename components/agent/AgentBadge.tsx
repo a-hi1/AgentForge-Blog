@@ -1,8 +1,8 @@
 const agentColors = {
-  'Architect Agent': { bg: 'bg-[rgba(139,92,246,0.2)]', text: 'text-[#8b5cf6]', border: 'border-[rgba(139,92,246,0.3)]' },
-  'Coding Agent': { bg: 'bg-[rgba(16,185,129,0.2)]', text: 'text-[#10b981]', border: 'border-[rgba(16,185,129,0.3)]' },
-  'Debug Agent': { bg: 'bg-[rgba(245,158,11,0.2)]', text: 'text-[#f59e0b]', border: 'border-[rgba(245,158,11,0.3)]' },
-  'Deploy Agent': { bg: 'bg-[rgba(99,102,241,0.2)]', text: 'text-[#6366f1]', border: 'border-[rgba(99,102,241,0.3)]' },
+  'Architect Agent': { bg: 'bg-[rgba(139,92,246,0.2)]', text: 'text-[#8B5CF6]', border: 'border-[rgba(139,92,246,0.3)]' },
+  'Coding Agent': { bg: 'bg-[rgba(16,185,129,0.2)]', text: 'text-[#10B981]', border: 'border-[rgba(16,185,129,0.3)]' },
+  'Debug Agent': { bg: 'bg-[rgba(245,158,11,0.2)]', text: 'text-[#F59E0B]', border: 'border-[rgba(245,158,11,0.3)]' },
+  'Deploy Agent': { bg: 'bg-[rgba(59,130,246,0.2)]', text: 'text-[#3B82F6]', border: 'border-[rgba(59,130,246,0.3)]' },
 };
 
 const agentIcons = {

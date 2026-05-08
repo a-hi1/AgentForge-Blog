@@ -47,8 +47,8 @@ export default function RecentExecutions() {
       <section className="py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-[#1e293b] rounded w-48" />
-            <div className="h-40 bg-[#1e293b] rounded-xl" />
+            <div className="h-6 bg-[rgba(24,24,27,0.72)] rounded w-48" />
+            <div className="h-40 bg-[rgba(24,24,27,0.72)] rounded-xl" />
           </div>
         </div>
       </section>
@@ -61,17 +61,17 @@ export default function RecentExecutions() {
         <div className="max-w-6xl mx-auto">
           <GlassCard className="p-8 text-center">
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] flex items-center justify-center">
-              <svg className="w-7 h-7 text-[#475569]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-7 h-7 text-[#71717A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
               </svg>
             </div>
-            <h3 className="text-[#f8fafc] font-medium mb-2">系统已就绪，等待首次执行</h3>
-            <p className="text-[#64748b] text-sm mb-5 max-w-md mx-auto">
+            <h3 className="text-[#FAFAFA] font-medium mb-2">系统已就绪，等待首次执行</h3>
+            <p className="text-[#71717A] text-sm mb-5 max-w-md mx-auto">
               前往 Playground 启动第一次智能执行，系统将自动记录并展示工程活动。
             </p>
             <Link
               href="/playground"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white text-sm font-medium hover:shadow-lg hover:shadow-[rgba(99,102,241,0.3)] transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white text-sm font-medium hover:-translate-y-0.5 transition-all"
             >
               启动首次执行
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,12 +89,12 @@ export default function RecentExecutions() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-[#f8fafc]">最新执行记录</h2>
-            <p className="text-[#64748b] text-xs mt-0.5">
+            <h2 className="text-lg font-semibold text-[#FAFAFA]">最新执行记录</h2>
+            <p className="text-[#71717A] text-xs mt-0.5">
               {new Date(latestExecution.timestamp).toLocaleString('zh-CN')}
             </p>
           </div>
-          <Link href="/lab" className="text-[#818cf8] hover:text-[#6366f1] text-xs font-medium flex items-center gap-1 transition-colors">
+          <Link href="/lab" className="text-[#60A5FA] hover:text-[#3B82F6] text-xs font-medium flex items-center gap-1 transition-colors">
             查看全部
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -103,19 +103,19 @@ export default function RecentExecutions() {
         </div>
 
         <GlassCard className="p-5">
-          <h3 className="text-[#f8fafc] text-sm font-medium mb-4 line-clamp-1">
+          <h3 className="text-[#FAFAFA] text-sm font-medium mb-4 line-clamp-1">
             {latestExecution.prompt}
           </h3>
           <div className="space-y-2.5">
             {latestExecution.steps.slice(0, 3).map((step, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-[#0f172a] rounded-lg border border-[rgba(255,255,255,0.04)]">
-                <div className="text-[#475569] text-xs font-mono mt-0.5 shrink-0">{index + 1}</div>
+              <div key={index} className="flex items-start gap-3 p-3 bg-[#111113] rounded-lg border border-[rgba(255,255,255,0.04)]">
+                <div className="text-[#71717A] text-xs font-mono mt-0.5 shrink-0">{index + 1}</div>
                 <div className="flex-grow min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <AgentBadge agent={step.agent} size="sm" />
-                    <span className="text-[#94a3b8] text-xs truncate">{step.task}</span>
+                    <span className="text-[#A1A1AA] text-xs truncate">{step.task}</span>
                   </div>
-                  <p className="text-[#64748b] text-xs line-clamp-2 leading-relaxed">{step.output}</p>
+                  <p className="text-[#71717A] text-xs line-clamp-2 leading-relaxed">{step.output}</p>
                 </div>
               </div>
             ))}
