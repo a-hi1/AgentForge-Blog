@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { reasonProject } from '@/lib/prompt-orchestrator/reasoner';
 import type { ProjectReasoning } from '@/lib/prompt-orchestrator/reasoner';
@@ -36,7 +35,6 @@ const DEPTH_OPTIONS: { value: PromptDepth; label: string; desc: string; icon: st
 ];
 
 export default function PromptPage() {
-  const searchParams = useSearchParams();
   const [input, setInput] = useState('');
   const [depth, setDepth] = useState<PromptDepth>('standard');
   const [pack, setPack] = useState<CompiledPack | null>(null);
@@ -52,11 +50,14 @@ export default function PromptPage() {
   const [personalHint, setPersonalHint] = useState<string | null>(null);
 
   useEffect(() => {
-    const idea = searchParams.get('idea');
-    if (idea) {
-      setInput(idea);
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const idea = urlParams.get('idea');
+      if (idea) {
+        setInput(idea);
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!input.trim()) return;

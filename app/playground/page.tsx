@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AgentBadge from '@/components/agent/AgentBadge';
 import AgentStatus from '@/components/agent/AgentStatus';
@@ -64,7 +63,6 @@ const suggestions = [
 const STORAGE_KEY = 'agentforge-playground-messages';
 
 export default function PlaygroundPage() {
-  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [input, setInput] = useState('');
@@ -80,11 +78,14 @@ export default function PlaygroundPage() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    const prompt = searchParams.get('prompt');
-    if (prompt) {
-      setInput(prompt);
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const prompt = urlParams.get('prompt');
+      if (prompt) {
+        setInput(prompt);
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(taskTemplates.map(t => t.category)));
