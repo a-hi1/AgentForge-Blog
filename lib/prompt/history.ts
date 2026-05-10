@@ -1,4 +1,5 @@
 import { getSupabaseServer, getSupabaseBrowser, isSupabaseConfigured } from '../supabase/client';
+import { calculatePromptScore, PromptScore } from './scorer';
 
 export interface PromptHistoryRecord {
   id: string;
@@ -11,6 +12,12 @@ export interface PromptHistoryRecord {
   created_at: string;
   favorite: boolean;
   tags: string[];
+  version?: number;
+  parent_id?: string;
+  score?: number;
+  score_details?: PromptScore;
+  execution_success?: boolean;
+  feedback?: 'excellent' | 'average' | 'failed';
 }
 
 export function generatePromptId() {
@@ -50,7 +57,18 @@ export async function savePrompt(params: {
   input: string;
   output: string;
   tags?: string[];
+  version?: number;
+  parent_id?: string;
+  execution_success?: boolean;
+  feedback?: 'excellent' | 'average' | 'failed';
 }): Promise<PromptHistoryRecord> {
+  const scoreDetails = calculatePromptScore({
+    prompt: params.output,
+    projectType: params.project_type,
+    executionSuccess: params.execution_success,
+    userFeedback: params.feedback
+  });
+
   const record: PromptHistoryRecord = {
     id: generatePromptId(),
     title: params.title,
@@ -62,6 +80,12 @@ export async function savePrompt(params: {
     created_at: new Date().toISOString(),
     favorite: false,
     tags: params.tags || [],
+    version: params.version || 1,
+    parent_id: params.parent_id,
+    score: scoreDetails.score,
+    score_details: scoreDetails,
+    execution_success: params.execution_success,
+    feedback: params.feedback
   };
 
   if (isSupabaseConfigured()) {
@@ -90,6 +114,7 @@ export async function getPromptHistory(options?: {
   limit?: number;
   search?: string;
   onlyFavorites?: boolean;
+  sortBy?: 'smart' | 'score' | 'date' | 'favorite';
 }): Promise<PromptHistoryRecord[]> {
   let records: PromptHistoryRecord[] = [];
 
@@ -99,8 +124,7 @@ export async function getPromptHistory(options?: {
       try {
         let query = supabase
           .from('prompt_history')
-          .select('*')
-          .order('created_at', { ascending: false });
+          .select('*');
 
         if (options?.projectId) {
           query = query.eq('project_id', options.projectId);
@@ -119,6 +143,8 @@ export async function getPromptHistory(options?: {
             `title.ilike.%${options.search}%,input.ilike.%${options.search}%,output.ilike.%${options.search}%`
           );
         }
+
+        query = query.order('created_at', { ascending: false });
 
         const { data, error } = await query;
         if (!error && data) {
@@ -152,11 +178,34 @@ export async function getPromptHistory(options?: {
     );
   }
 
+  if (options?.sortBy === 'smart' || options?.sortBy === undefined) {
+    records = sortBySmart(records);
+  } else if (options?.sortBy === 'score') {
+    records = [...records].sort((a, b) => (b.score || 0) - (a.score || 0));
+  } else if (options?.sortBy === 'favorite') {
+    records = [...records].sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
+  }
+
   if (options?.limit) {
     records = records.slice(0, options.limit);
   }
 
   return records;
+}
+
+function sortBySmart(records: PromptHistoryRecord[]): PromptHistoryRecord[] {
+  return [...records].sort((a, b) => {
+    if (a.favorite && !b.favorite) return -1;
+    if (!a.favorite && b.favorite) return 1;
+    
+    const aScore = a.score || 50;
+    const bScore = b.score || 50;
+    if (aScore !== bScore) return bScore - aScore;
+    
+    const aDate = new Date(a.created_at).getTime();
+    const bDate = new Date(b.created_at).getTime();
+    return bDate - aDate;
+  });
 }
 
 export async function toggleFavorite(id: string, favorite?: boolean): Promise<void> {
@@ -234,4 +283,117 @@ export async function getPromptById(id: string): Promise<PromptHistoryRecord | n
 
   const history = getLocalStorageFallback();
   return history.find((r: PromptHistoryRecord) => r.id === id) || null;
+}
+
+export async function updatePromptFeedback(
+  id: string, 
+  feedback: 'excellent' | 'average' | 'failed'
+): Promise<void> {
+  const prompt = await getPromptById(id);
+  if (!prompt) return;
+
+  const newScore = calculatePromptScore({
+    prompt: prompt.output,
+    projectType: prompt.project_type,
+    executionSuccess: prompt.execution_success,
+    userFeedback: feedback
+  });
+
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseServer() || getSupabaseBrowser();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('prompt_history')
+          .update({ 
+            feedback,
+            score: newScore.score,
+            score_details: newScore
+          })
+          .eq('id', id);
+        if (!error) return;
+      } catch (e) {
+        console.warn('[PromptHistory] Supabase feedback update failed');
+      }
+    }
+  }
+
+  const history = getLocalStorageFallback();
+  const idx = history.findIndex((r: PromptHistoryRecord) => r.id === id);
+  if (idx !== -1) {
+    history[idx] = {
+      ...history[idx],
+      feedback,
+      score: newScore.score,
+      score_details: newScore
+    };
+    saveToLocalStorage(history);
+  }
+}
+
+export async function updateExecutionSuccess(id: string, success: boolean): Promise<void> {
+  const prompt = await getPromptById(id);
+  if (!prompt) return;
+
+  const newScore = calculatePromptScore({
+    prompt: prompt.output,
+    projectType: prompt.project_type,
+    executionSuccess: success,
+    userFeedback: prompt.feedback
+  });
+
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseServer() || getSupabaseBrowser();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('prompt_history')
+          .update({ 
+            execution_success: success,
+            score: newScore.score,
+            score_details: newScore
+          })
+          .eq('id', id);
+        if (!error) return;
+      } catch (e) {
+        console.warn('[PromptHistory] Supabase execution update failed');
+      }
+    }
+  }
+
+  const history = getLocalStorageFallback();
+  const idx = history.findIndex((r: PromptHistoryRecord) => r.id === id);
+  if (idx !== -1) {
+    history[idx] = {
+      ...history[idx],
+      execution_success: success,
+      score: newScore.score,
+      score_details: newScore
+    };
+    saveToLocalStorage(history);
+  }
+}
+
+export async function savePromptVersion(
+  originalId: string,
+  improvedPrompt: string
+): Promise<PromptHistoryRecord> {
+  const original = await getPromptById(originalId);
+  if (!original) {
+    throw new Error('Original prompt not found');
+  }
+
+  const nextVersion = (original.version || 1) + 1;
+  
+  return await savePrompt({
+    title: original.title,
+    project_type: original.project_type,
+    phase: original.phase,
+    project_id: original.project_id,
+    input: original.input,
+    output: improvedPrompt,
+    tags: [...original.tags],
+    version: nextVersion,
+    parent_id: originalId
+  });
 }
