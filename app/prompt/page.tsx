@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { reasonProject } from '@/lib/prompt-orchestrator/reasoner';
 import type { ProjectReasoning } from '@/lib/prompt-orchestrator/reasoner';
 import { generateClarifications, mergeAnswersWithContext } from '@/lib/prompt-orchestrator/clarifier';
@@ -52,6 +53,7 @@ const STEP_INDICATORS = [
 ] as const;
 
 export default function PromptPage() {
+  const router = useRouter();
   const [input, setInput] = useState('');
   const [depth, setDepth] = useState<PromptDepth>('standard');
   const [pack, setPack] = useState<CompiledPack | null>(null);
@@ -271,6 +273,32 @@ export default function PromptPage() {
       setSaving(false);
     }
   }, [saveTitle, saveCategory, savePhase, saveProjectId, saveInput, saveCombinedOutput, saveTags, saveClarifications]);
+
+  const handleSaveAndExecute = useCallback(async () => {
+    if (!saveTitle.trim() || !saveCombinedOutput) return;
+    setSaving(true);
+    try {
+      const saved = await savePrompt({
+        title: saveTitle,
+        category: saveCategory,
+        phase: savePhase,
+        projectId: saveProjectId || undefined,
+        input: saveInput,
+        fullPrompt: saveCombinedOutput,
+        tags: saveTags,
+        clarifications: saveClarifications,
+      });
+      if (saved?.id) {
+        setSavedAssetId(saved.id);
+        setShowSaveDialog(false);
+        router.push(`/playground?prompt=${encodeURIComponent(saveCombinedOutput)}&assetId=${saved.id}`);
+      }
+    } catch (e) {
+      console.error('保存失败:', e);
+    } finally {
+      setSaving(false);
+    }
+  }, [saveTitle, saveCategory, savePhase, saveProjectId, saveInput, saveCombinedOutput, saveTags, saveClarifications, router]);
 
   return (
     <>
@@ -653,16 +681,26 @@ export default function PromptPage() {
           <div className="flex gap-3 mt-6">
             <button
               onClick={() => setShowSaveDialog(false)}
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA] transition-all"
+              className="px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA] transition-all"
             >
               跳过
             </button>
             <button
               onClick={handleSaveToLibrary}
               disabled={saving || !saveTitle.trim()}
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(139,92,246,0.3)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? '保存中...' : '保存到资产库'}
+            </button>
+            <button
+              onClick={handleSaveAndExecute}
+              disabled={saving || !saveTitle.trim()}
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {saving ? '保存中...' : '保存并执行'}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
             </button>
           </div>
         </div>

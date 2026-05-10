@@ -40,6 +40,17 @@ interface TaskTemplate {
   icon: string;
 }
 
+interface ExecutionSummary {
+  outcome: 'success' | 'partial' | 'failed';
+  successReason: string;
+  failureReason?: string;
+  promptUpgradeNeeded: boolean;
+  upgradeReason?: string;
+  nextStep: string;
+  completedSteps: number;
+  totalSteps: number;
+}
+
 const taskTemplates: TaskTemplate[] = [
   { id: 't1', category: 'Web 系统', name: '全栈 SaaS 平台', prompt: 'Build a production-ready SaaS blog platform with authentication, CMS, and deployment pipeline', icon: '🌐' },
   { id: 't2', category: 'Web 系统', name: '实时仪表板', prompt: 'Build a real-time analytics dashboard with WebSocket integration and data visualization', icon: '📊' },
@@ -83,6 +94,7 @@ export default function PlaygroundPage() {
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackNotes, setFeedbackNotes] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [executionSummary, setExecutionSummary] = useState<ExecutionSummary | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -232,6 +244,22 @@ export default function PlaygroundPage() {
         if (exec?.steps && exec.steps.length > 0) {
           const outputs = exec.steps.map(s => s.output).filter(Boolean);
           setArtifacts(generateArtifacts(text, outputs));
+
+          const total = exec.steps.length;
+          const done = exec.steps.filter((s: Step) => s.status === 'completed').length;
+          const failed = exec.steps.filter((s: Step) => s.status === 'failed').length;
+          const outcome: ExecutionSummary['outcome'] = failed > 0 ? 'failed' : done === total ? 'success' : 'partial';
+          const hasOutput = outputs.length > 0;
+          setExecutionSummary({
+            outcome,
+            successReason: outcome === 'success' ? `全部 ${total} 个步骤执行成功，产出了有效工程输出` : outcome === 'partial' ? `${done}/${total} 步骤完成，部分任务未完成` : `${failed} 个步骤执行失败`,
+            failureReason: outcome !== 'success' ? (failed > 0 ? '部分 Agent 执行出错，可能是 Prompt 指令不够精确' : '执行中断，可能需要更详细的上下文描述') : undefined,
+            promptUpgradeNeeded: outcome !== 'success' || done < total || !hasOutput,
+            upgradeReason: outcome !== 'success' ? '当前执行未完全成功，建议优化 Prompt 提高成功率' : !hasOutput ? '执行完成但未产出有效内容，建议补充更多细节' : undefined,
+            nextStep: outcome === 'success' ? '在实验室查看完整报告，或导出工程产物' : outcome === 'partial' ? '使用问题修复工具分析失败原因' : '优化 Prompt 后重新执行',
+            completedSteps: done,
+            totalSteps: total,
+          });
         }
         return prev;
       });
@@ -641,6 +669,44 @@ export default function PlaygroundPage() {
                     />
                   </div>
                 </div>
+
+                {executionSummary && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs text-[#71717A] uppercase tracking-wider">执行结果智能分析</h3>
+                    <div className={`p-3 rounded-lg border ${
+                      executionSummary.outcome === 'success' ? 'bg-[rgba(16,185,129,0.05)] border-[rgba(16,185,129,0.2)]' :
+                      executionSummary.outcome === 'partial' ? 'bg-[rgba(245,158,11,0.05)] border-[rgba(245,158,11,0.2)]' :
+                      'bg-[rgba(239,68,68,0.05)] border-[rgba(239,68,68,0.2)]'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-medium ${
+                          executionSummary.outcome === 'success' ? 'text-[#10B981]' :
+                          executionSummary.outcome === 'partial' ? 'text-[#F59E0B]' :
+                          'text-[#EF4444]'
+                        }`}>
+                          {executionSummary.outcome === 'success' ? '执行成功' : executionSummary.outcome === 'partial' ? '部分成功' : '执行失败'}
+                        </span>
+                        <span className="text-[10px] text-[#71717A]">{executionSummary.completedSteps}/{executionSummary.totalSteps} 步骤</span>
+                      </div>
+                      <p className="text-xs text-[#A1A1AA] mb-2">{executionSummary.successReason}</p>
+                      {executionSummary.failureReason && (
+                        <p className="text-xs text-[#EF4444] mb-2">原因：{executionSummary.failureReason}</p>
+                      )}
+                      {executionSummary.promptUpgradeNeeded && (
+                        <div className="mb-2 p-2 rounded-md bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.15)]">
+                          <p className="text-[10px] text-[#A78BFA]">Prompt 建议升级</p>
+                          {executionSummary.upgradeReason && <p className="text-[10px] text-[#71717A] mt-0.5">{executionSummary.upgradeReason}</p>}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                        <span className="text-xs text-[#60A5FA]">{executionSummary.nextStep}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {artifacts && completedSteps.length > 0 && (
                   <div className="space-y-2">

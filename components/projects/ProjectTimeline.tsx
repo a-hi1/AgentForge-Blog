@@ -14,6 +14,8 @@ interface TimelineNode {
   score?: number;
   feedback?: string;
   version?: number;
+  outcome?: 'success' | 'partial' | 'failed';
+  failureReason?: string;
 }
 
 const NODE_CONFIG: Record<TimelineNode['type'], { icon: string; color: string; bgColor: string }> = {
@@ -42,6 +44,11 @@ function buildTimeline(history: PromptAsset[]): TimelineNode[] {
     });
 
     if (asset.executionUsed) {
+      const execOutcome = asset.executionSuccess === false ? 'failed' :
+        asset.feedback === 'failed' ? 'failed' :
+        asset.feedback === 'average' ? 'partial' :
+        asset.feedback === 'excellent' ? 'success' :
+        asset.executionSuccess === true ? 'success' : undefined;
       nodes.push({
         id: `${asset.id}-executed`,
         type: 'executed',
@@ -50,6 +57,8 @@ function buildTimeline(history: PromptAsset[]): TimelineNode[] {
         timestamp: asset.createdAt,
         promptId: asset.id,
         score: asset.score,
+        outcome: execOutcome,
+        failureReason: execOutcome === 'failed' ? '执行未达到预期效果' : undefined,
       });
     }
 
@@ -163,8 +172,20 @@ export default function ProjectTimeline({ limit = 20 }: ProjectTimelineProps) {
                         {node.feedback === 'excellent' ? '优秀' : node.feedback === 'average' ? '一般' : '失败'}
                       </span>
                     )}
+                    {node.outcome && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        node.outcome === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                        node.outcome === 'partial' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                        'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}>
+                        {node.outcome === 'success' ? '✓ 成功' : node.outcome === 'partial' ? '◐ 部分' : '✗ 失败'}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 truncate">{node.description}</p>
+                  {node.failureReason && (
+                    <p className="text-xs text-red-400/70 mt-1 truncate">{node.failureReason}</p>
+                  )}
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] text-gray-500">
                       {new Date(node.timestamp).toLocaleDateString()} {new Date(node.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

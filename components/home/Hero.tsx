@@ -5,6 +5,62 @@ import { useState, useEffect } from 'react';
 import { generateDailyTask, DailyTask } from '@/lib/projects/recommendationEngine';
 import { getPromptHistory } from '@/lib/prompt/history';
 
+interface ResumeTask {
+  description: string;
+  suggestion: string;
+  href: string;
+  source: string;
+  timeAgo: string;
+}
+
+function getTimeAgo(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return `${mins} 分钟前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
+}
+
+function detectResumeTask(): ResumeTask | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('agentforge-playground-messages');
+    if (raw) {
+      const messages = JSON.parse(raw);
+      const lastExec = [...messages].reverse().find((m: any) => m.isExecution && m.steps && m.steps.length > 0);
+      if (lastExec) {
+        const hasRunning = lastExec.steps.some((s: any) => s.status === 'executing');
+        const allDone = lastExec.steps.every((s: any) => s.status === 'completed');
+        if (hasRunning || !allDone) {
+          const completedCount = lastExec.steps.filter((s: any) => s.status === 'completed').length;
+          return {
+            description: `Playground 执行中断 (${completedCount}/${lastExec.steps.length} 步骤完成)`,
+            suggestion: '继续完成未完成的执行任务',
+            href: '/playground',
+            source: 'Playground',
+            timeAgo: getTimeAgo(new Date(lastExec.timestamp)),
+          };
+        }
+        if (allDone && !lastExec.feedbackSubmitted) {
+          const userMsg = messages.find((m: any) => m.role === 'user' && new Date(m.timestamp) <= new Date(lastExec.timestamp));
+          return {
+            description: `执行完成但未提交反馈`,
+            suggestion: '提交执行结果反馈，优化 Prompt 质量',
+            href: '/playground',
+            source: 'Playground',
+            timeAgo: getTimeAgo(new Date(lastExec.timestamp)),
+          };
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
 const QUICK_LINKS = [
   { label: 'Prompt Studio', href: '/prompt', desc: '生成新 Prompt' },
   { label: '资产库', href: '/prompt/history', desc: '管理 Prompt 资产' },
@@ -17,8 +73,10 @@ export default function Dashboard() {
   const [dailyTask, setDailyTask] = useState<DailyTask | null>(null);
   const [recentPrompts, setRecentPrompts] = useState<any[]>([]);
   const [quickInput, setQuickInput] = useState('');
+  const [resumeTask, setResumeTask] = useState<ResumeTask | null>(null);
 
   useEffect(() => {
+    setResumeTask(detectResumeTask());
     getPromptHistory({ limit: 50 }).then(history => {
       setRecentPrompts(history.slice(0, 5));
       const task = generateDailyTask(history, '产品收敛重构');
@@ -141,6 +199,33 @@ export default function Dashboard() {
             </div>
           );
         })()}
+
+        {resumeTask && (
+          <div className="mb-6 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-emerald-400 font-medium">上次做到</span>
+                  <span className="text-[10px] text-gray-500">{resumeTask.timeAgo}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-gray-400">{resumeTask.source}</span>
+                </div>
+                <p className="text-sm text-gray-300 mb-1">{resumeTask.description}</p>
+                <p className="text-xs text-emerald-400/70">建议继续：{resumeTask.suggestion}</p>
+              </div>
+              <Link
+                href={resumeTask.href}
+                className="shrink-0 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 transition-all"
+              >
+                恢复
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
