@@ -28,6 +28,8 @@ export interface PromptAsset {
   createdAt: string;
   version?: number;
   parentId?: string;
+  mutationReason?: string;
+  diffSummary?: string;
   score?: number;
   scoreDetails?: PromptScore;
   feedback?: 'excellent' | 'average' | 'failed';
@@ -65,6 +67,8 @@ function migrateRecord(raw: any): PromptAsset {
       createdAt: raw.createdAt || new Date().toISOString(),
       version: raw.version,
       parentId: raw.parentId,
+      mutationReason: raw.mutationReason,
+      diffSummary: raw.diffSummary,
       score: raw.score,
       scoreDetails: raw.scoreDetails,
       feedback: raw.feedback,
@@ -89,6 +93,8 @@ function migrateRecord(raw: any): PromptAsset {
     createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
     version: raw.version,
     parentId: raw.parent_id || raw.parentId,
+    mutationReason: raw.mutation_reason || raw.mutationReason,
+    diffSummary: raw.diff_summary || raw.diffSummary,
     score: raw.score,
     scoreDetails: raw.score_details || raw.scoreDetails,
     feedback: raw.feedback,
@@ -133,6 +139,8 @@ function toSupabaseRow(asset: PromptAsset) {
     tags: asset.tags,
     version: asset.version,
     parent_id: asset.parentId,
+    mutation_reason: asset.mutationReason,
+    diff_summary: asset.diffSummary,
     score: asset.score,
     score_details: asset.scoreDetails,
     execution_success: asset.executionSuccess,
@@ -490,6 +498,8 @@ export async function savePrompt(params: {
   tags?: string[];
   version?: number;
   parentId?: string;
+  mutationReason?: string;
+  diffSummary?: string;
   source?: 'user-generated' | 'system-template';
   clarifications?: string[];
   executionSuccess?: boolean;
@@ -515,6 +525,8 @@ export async function savePrompt(params: {
     tags: params.tags || [],
     version: params.version || 1,
     parentId: params.parentId,
+    mutationReason: params.mutationReason,
+    diffSummary: params.diffSummary,
     score: scoreDetails.score,
     scoreDetails: scoreDetails,
     executionSuccess: params.executionSuccess,
@@ -898,7 +910,8 @@ export async function updateAssetExecutionResult(
 
 export async function savePromptVersion(
   originalId: string,
-  improvedPrompt: string
+  improvedPrompt: string,
+  mutationReason?: string
 ): Promise<PromptAsset> {
   const original = await getPromptById(originalId);
   if (!original) {
@@ -906,6 +919,7 @@ export async function savePromptVersion(
   }
 
   const nextVersion = (original.version || 1) + 1;
+  const diffSummary = computeDiffSummary(original.fullPrompt, improvedPrompt);
 
   return await savePrompt({
     title: original.title,
@@ -917,7 +931,139 @@ export async function savePromptVersion(
     tags: [...original.tags],
     version: nextVersion,
     parentId: originalId,
+    mutationReason: mutationReason || 'Prompt 优化迭代',
+    diffSummary,
     source: original.source,
     clarifications: [...original.clarifications],
   });
+}
+
+function computeDiffSummary(oldPrompt: string, newPrompt: string): string {
+  const oldLines = oldPrompt.split('\n').filter(l => l.trim());
+  const newLines = newPrompt.split('\n').filter(l => l.trim());
+  const added = newLines.filter(l => !oldLines.includes(l)).length;
+  const removed = oldLines.filter(l => !newLines.includes(l)).length;
+  const oldLen = oldPrompt.length;
+  const newLen = newPrompt.length;
+  const lenDiff = newLen - oldLen;
+  const parts: string[] = [];
+  if (lenDiff > 0) parts.push(`内容扩展 +${lenDiff} 字符`);
+  else if (lenDiff < 0) parts.push(`内容精简 ${lenDiff} 字符`);
+  if (added > 0) parts.push(`新增 ${added} 行`);
+  if (removed > 0) parts.push(`移除 ${removed} 行`);
+  return parts.join('，') || '格式优化';
+}
+
+export async function getVersionChain(id: string): Promise<PromptAsset[]> {
+  const chain: PromptAsset[] = [];
+  const visited = new Set<string>();
+
+  let current: PromptAsset | null = await getPromptById(id);
+  while (current && !visited.has(current.id)) {
+    chain.unshift(current);
+    visited.add(current.id);
+    if (current.parentId) {
+      current = await getPromptById(current.parentId);
+    } else {
+      break;
+    }
+  }
+
+  if (chain.length > 0) {
+    const root = chain[0];
+    const children = await getVersionChildren(root.id, visited);
+    for (const child of children) {
+      if (!chain.find(c => c.id === child.id)) {
+        chain.push(child);
+      }
+    }
+  }
+
+  return chain.sort((a, b) => (a.version || 1) - (b.version || 1));
+}
+
+async function getVersionChildren(
+  parentId: string,
+  visited: Set<string>
+): Promise<PromptAsset[]> {
+  const all = await getPromptHistory({ limit: 500 });
+  const children: PromptAsset[] = [];
+  for (const asset of all) {
+    if (asset.parentId === parentId && !visited.has(asset.id)) {
+      visited.add(asset.id);
+      children.push(asset);
+      const grandChildren = await getVersionChildren(asset.id, visited);
+      children.push(...grandChildren);
+    }
+  }
+  return children;
+}
+
+export async function rollbackToVersion(targetId: string): Promise<PromptAsset> {
+  const target = await getPromptById(targetId);
+  if (!target) throw new Error('Target version not found');
+
+  const chain = await getVersionChain(targetId);
+  const latestVersion = chain.reduce((max, c) => Math.max(max, c.version || 1), 0);
+
+  return await savePrompt({
+    title: target.title,
+    category: target.category,
+    phase: target.phase,
+    projectId: target.projectId,
+    input: target.input,
+    fullPrompt: target.fullPrompt,
+    tags: [...target.tags],
+    version: latestVersion + 1,
+    parentId: targetId,
+    mutationReason: `回滚到 v${target.version}`,
+    diffSummary: `基于 v${target.version} 的回滚版本`,
+    source: target.source,
+    clarifications: [...target.clarifications],
+  });
+}
+
+export async function suggestVersionUpgrade(id: string): Promise<{
+  shouldUpgrade: boolean;
+  reason: string;
+  suggestions: string[];
+}> {
+  const prompt = await getPromptById(id);
+  if (!prompt) return { shouldUpgrade: false, reason: 'Prompt 不存在', suggestions: [] };
+
+  const suggestions: string[] = [];
+  let shouldUpgrade = false;
+  let reason = '';
+
+  if (prompt.feedback === 'failed') {
+    shouldUpgrade = true;
+    reason = '执行失败，建议优化 Prompt 后生成新版本';
+    suggestions.push('检查 Prompt 指令是否明确');
+    suggestions.push('增加错误处理和边界条件描述');
+    suggestions.push('补充具体的输出格式要求');
+  } else if (prompt.feedback === 'average') {
+    shouldUpgrade = true;
+    reason = '执行效果一般，可以尝试优化';
+    suggestions.push('增加更详细的上下文信息');
+    suggestions.push('优化表述的精确度');
+    suggestions.push('添加验收标准');
+  } else if (prompt.score && prompt.score < 70) {
+    shouldUpgrade = true;
+    reason = 'Prompt 评分较低，建议优化';
+    suggestions.push('改进 Prompt 结构');
+    suggestions.push('增加角色定义');
+    suggestions.push('明确输出格式');
+  }
+
+  if (prompt.version && prompt.version > 1) {
+    const chain = await getVersionChain(id);
+    const prevVersion = chain.find(c => c.version === (prompt.version || 1) - 1);
+    if (prevVersion && prevVersion.feedback === 'failed' && prompt.feedback === 'failed') {
+      reason = '连续两版均失败，建议重新审视需求本身';
+      suggestions.push('检查原始需求是否合理');
+      suggestions.push('尝试将任务拆分为更小的子任务');
+    }
+  }
+
+  return { shouldUpgrade, reason, suggestions };
 }

@@ -7,6 +7,7 @@ import RecentActivity from '@/components/projects/RecentActivity';
 import NextActions from '@/components/projects/NextActions';
 import QuickLaunch from '@/components/projects/QuickLaunch';
 import RepoInsights from '@/components/projects/RepoInsights';
+import ProjectTimeline from '@/components/projects/ProjectTimeline';
 import Link from 'next/link';
 import { useState } from 'react';
 import { parseRepoUrl, fetchRepoMeta, fetchRepoTree } from '@/lib/github/importer';
@@ -177,6 +178,9 @@ export default function ProjectsPage() {
             <QuickLaunch />
             <RecentActivity activities={projectState.recentActivities} />
           </div>
+
+          {/* Timeline Section */}
+          <ProjectTimeline limit={15} />
 
           {/* Bottom Section: Progress + Next Actions */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -4,6 +4,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { generateFixPrompt } from '@/lib/prompt-orchestrator/fixGenerator';
 import type { FixPrompt } from '@/lib/prompt-orchestrator/fixGenerator';
 import CopyPromptButton from '@/components/prompt/CopyPromptButton';
+import PromptDebugger from '@/components/prompt/PromptDebugger';
+
+type AnalysisMode = 'category' | 'debugger';
 
 interface Category {
   id: string;
@@ -90,6 +93,7 @@ function saveHistory(entry: HistoryEntry) {
 }
 
 export default function FixPage() {
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('category');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -147,6 +151,38 @@ export default function FixPage() {
           <p className="text-gray-400 mt-1">选择问题类型，快速生成精准的修复提示词</p>
         </div>
 
+        <div className="mb-6 flex gap-2">
+          <button
+            onClick={() => setAnalysisMode('category')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              analysisMode === 'category'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-800 text-gray-400 hover:bg-slate-700 hover:text-gray-300'
+            }`}
+          >
+            分类修复
+          </button>
+          <button
+            onClick={() => setAnalysisMode('debugger')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              analysisMode === 'debugger'
+                ? 'bg-red-600 text-white'
+                : 'bg-slate-800 text-gray-400 hover:bg-slate-700 hover:text-gray-300'
+            }`}
+          >
+            🔍 Prompt Debugger
+          </button>
+        </div>
+
+        {analysisMode === 'debugger' ? (
+          <PromptDebugger
+            initialError={input}
+            onApplyFix={(fixedPrompt) => {
+              setInput(fixedPrompt);
+              setAnalysisMode('category');
+            }}
+          />
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-sm font-semibold text-gray-300 mb-3">问题分类</h2>
@@ -287,6 +323,7 @@ export default function FixPage() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

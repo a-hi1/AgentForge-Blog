@@ -10,6 +10,9 @@ import {
   deletePrompt,
   updatePromptFeedback,
   savePromptVersion,
+  getVersionChain,
+  rollbackToVersion,
+  suggestVersionUpgrade,
   PromptAsset,
   PromptPhase,
 } from '@/lib/prompt/history';
@@ -65,6 +68,14 @@ export default function PromptHistoryPage() {
   const [showFlowGuide, setShowFlowGuide] = useState(true);
   const [editSave, setEditSave] = useState<{ id: string; title: string } | null>(null);
   const [editSaveTitle, setEditSaveTitle] = useState('');
+  const [versionChain, setVersionChain] = useState<PromptAsset[]>([]);
+  const [showDiff, setShowDiff] = useState(false);
+  const [diffTarget, setDiffTarget] = useState<{ a: PromptAsset; b: PromptAsset } | null>(null);
+  const [upgradeSuggestion, setUpgradeSuggestion] = useState<{
+    shouldUpgrade: boolean;
+    reason: string;
+    suggestions: string[];
+  } | null>(null);
   const promptRef = useRef<HTMLPreElement>(null);
 
   const loadAssets = useCallback(async () => {
@@ -120,6 +131,16 @@ export default function PromptHistoryPage() {
     ? [...allAssets, ...systemTemplates].find(a => a.id === selectedId)
     : null;
 
+  useEffect(() => {
+    if (!selectedId || !selectedRecord || selectedRecord.source === 'system-template') {
+      setVersionChain([]);
+      setUpgradeSuggestion(null);
+      return;
+    }
+    getVersionChain(selectedId).then(chain => setVersionChain(chain)).catch(() => setVersionChain([]));
+    suggestVersionUpgrade(selectedId).then(s => setUpgradeSuggestion(s)).catch(() => setUpgradeSuggestion(null));
+  }, [selectedId, selectedRecord?.feedback, selectedRecord?.score]);
+
   const handleToggleFavorite = async (id: string, current: boolean) => {
     await toggleFavorite(id, !current);
     await loadAssets();
@@ -164,12 +185,22 @@ export default function PromptHistoryPage() {
   const handleSaveImproved = async () => {
     if (!selectedId || !refinementResult) return;
     try {
-      await savePromptVersion(selectedId, refinementResult.improvedPrompt);
+      await savePromptVersion(selectedId, refinementResult.improvedPrompt, '智能优化');
       setShowRefinement(false);
       setRefinementResult(null);
       await loadAssets();
     } catch (e) {
       console.error('[PromptSave] Failed:', e);
+    }
+  };
+
+  const handleRollback = async (targetId: string) => {
+    try {
+      const rolled = await rollbackToVersion(targetId);
+      setSelectedId(rolled.id);
+      await loadAssets();
+    } catch (e) {
+      console.error('[Rollback] Failed:', e);
     }
   };
 
@@ -637,6 +668,129 @@ export default function PromptHistoryPage() {
                     </div>
                   )}
 
+                  {upgradeSuggestion?.shouldUpgrade && (
+                    <div className="p-3 rounded-lg bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.2)]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-[#F59E0B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                        <h3 className="text-xs font-medium text-[#F59E0B]">版本升级建议</h3>
+                      </div>
+                      <p className="text-[11px] text-[#A1A1AA] mb-2">{upgradeSuggestion.reason}</p>
+                      <ul className="space-y-1 mb-3">
+                        {upgradeSuggestion.suggestions.map((s, i) => (
+                          <li key={i} className="text-[11px] text-[#71717A]">• {s}</li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={handleRefine}
+                        disabled={refining}
+                        className="w-full px-3 py-2 rounded-lg bg-[rgba(245,158,11,0.15)] border border-[rgba(245,158,11,0.25)] text-[#F59E0B] text-xs font-medium hover:bg-[rgba(245,158,11,0.25)] transition-all disabled:opacity-50"
+                      >
+                        {refining ? '生成中...' : '生成优化版本'}
+                      </button>
+                    </div>
+                  )}
+
+                  {versionChain.length > 1 && selectedRecord.source === 'user-generated' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-medium text-[#FAFAFA]">版本演化链</h3>
+                        {versionChain.length >= 2 && (
+                          <button
+                            onClick={() => {
+                              const sorted = [...versionChain].sort((a, b) => (a.version || 1) - (b.version || 1));
+                              if (sorted.length >= 2) {
+                                setDiffTarget({ a: sorted[sorted.length - 2], b: sorted[sorted.length - 1] });
+                                setShowDiff(true);
+                              }
+                            }}
+                            className="text-[10px] text-[#60A5FA] hover:text-[#93C5FD] transition-colors"
+                          >
+                            查看最新差异
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative pl-4">
+                        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[rgba(139,92,246,0.3)]" />
+                        {versionChain.map((v, i) => {
+                          const isCurrent = v.id === selectedRecord.id;
+                          return (
+                            <div key={v.id} className="relative flex items-start gap-3 pb-3 last:pb-0">
+                              <div className={`relative z-10 w-3.5 h-3.5 rounded-full border-2 shrink-0 mt-0.5 ${
+                                isCurrent
+                                  ? 'bg-[#8B5CF6] border-[#A78BFA]'
+                                  : 'bg-[#111113] border-[rgba(139,92,246,0.4)]'
+                              }`} />
+                              <div className={`flex-1 min-w-0 p-2 rounded-lg border transition-all cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-[rgba(139,92,246,0.08)] border-[rgba(139,92,246,0.3)]'
+                                  : 'bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.06)] hover:border-[rgba(139,92,246,0.3)]'
+                              }`} onClick={() => setSelectedId(v.id)}>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-medium text-[#A78BFA]">v{v.version || 1}</span>
+                                  {isCurrent && <span className="text-[9px] px-1 py-0.5 rounded bg-[rgba(139,92,246,0.2)] text-[#A78BFA]">当前</span>}
+                                  {v.score !== undefined && (
+                                    <span className={`text-[10px] ${getScoreColor(v.score)}`}>{v.score}分</span>
+                                  )}
+                                  {v.feedback && (
+                                    <span className={`text-[10px] ${
+                                      v.feedback === 'excellent' ? 'text-[#10B981]' :
+                                      v.feedback === 'average' ? 'text-[#F59E0B]' :
+                                      'text-[#EF4444]'
+                                    }`}>
+                                      {v.feedback === 'excellent' ? '✓' : v.feedback === 'average' ? '—' : '✗'}
+                                    </span>
+                                  )}
+                                </div>
+                                {v.mutationReason && (
+                                  <div className="text-[10px] text-[#71717A] mt-0.5 truncate">{v.mutationReason}</div>
+                                )}
+                                {v.diffSummary && (
+                                  <div className="text-[10px] text-[#52525B] mt-0.5 truncate">{v.diffSummary}</div>
+                                )}
+                              </div>
+                              {!isCurrent && (
+                                <div className="flex gap-1 shrink-0 mt-0.5">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const currentIdx = versionChain.findIndex(c => c.id === selectedRecord.id);
+                                      if (currentIdx > i) {
+                                        setDiffTarget({ a: v, b: versionChain[currentIdx] });
+                                      } else if (currentIdx < versionChain.length - 1) {
+                                        setDiffTarget({ a: v, b: versionChain[currentIdx] });
+                                      }
+                                      setShowDiff(true);
+                                    }}
+                                    className="p-1 rounded hover:bg-[rgba(59,130,246,0.15)] text-[#71717A] hover:text-[#60A5FA] transition-all"
+                                    title="查看差异"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRollback(v.id);
+                                    }}
+                                    className="p-1 rounded hover:bg-[rgba(245,158,11,0.15)] text-[#71717A] hover:text-[#F59E0B] transition-all"
+                                    title="回滚到此版本"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {selectedRecord.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {selectedRecord.tags.map(tag => (
@@ -791,6 +945,103 @@ export default function PromptHistoryPage() {
               <div className="flex gap-3 justify-end mt-5">
                 <button onClick={() => { setEditSave(null); setEditSaveTitle(''); }} className="px-4 py-2 rounded-lg bg-[#070707] border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#FAFAFA] text-sm transition-all">取消</button>
                 <button onClick={handleEditSave} className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white text-sm hover:shadow-lg transition-all">保存</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDiff && diffTarget && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#111113] rounded-xl border border-[rgba(255,255,255,0.06)] max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-5 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between shrink-0">
+                <h2 className="text-lg font-bold text-[#FAFAFA]">
+                  版本差异：v{diffTarget.a.version || 1} → v{diffTarget.b.version || 1}
+                </h2>
+                <button onClick={() => setShowDiff(false)} className="text-[#71717A] hover:text-[#FAFAFA]">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5">
+                {(() => {
+                  const aLines = diffTarget.a.fullPrompt.split('\n');
+                  const bLines = diffTarget.b.fullPrompt.split('\n');
+                  const maxLen = Math.max(aLines.length, bLines.length);
+                  const diffLines: { type: 'same' | 'added' | 'removed' | 'changed'; a: string; b: string; lineNum: number }[] = [];
+                  for (let i = 0; i < maxLen; i++) {
+                    const a = aLines[i] ?? '';
+                    const b = bLines[i] ?? '';
+                    let type: 'same' | 'added' | 'removed' | 'changed' = 'same';
+                    if (a === b) type = 'same';
+                    else if (!a && b) type = 'added';
+                    else if (a && !b) type = 'removed';
+                    else type = 'changed';
+                    diffLines.push({ type, a, b, lineNum: i + 1 });
+                  }
+                  const changedLines = diffLines.filter(d => d.type !== 'same');
+                  const displayLines = changedLines.length > 0 ? changedLines : diffLines.slice(0, 20);
+                  return (
+                    <div className="space-y-1">
+                      {diffTarget.a.diffSummary && (
+                        <div className="mb-3 p-2 rounded-lg bg-[rgba(139,92,246,0.05)] border border-[rgba(139,92,246,0.15)] text-[11px] text-[#A78BFA]">
+                          {diffTarget.a.diffSummary}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs font-medium text-[#EF4444] mb-2 flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                            </svg>
+                            v{diffTarget.a.version || 1}
+                          </div>
+                          <pre className="text-[11px] text-[#A1A1AA] whitespace-pre-wrap bg-[#070707] rounded-lg p-3 border border-[rgba(255,255,255,0.1)] max-h-[50vh] overflow-y-auto font-mono">
+                            {displayLines.map((d, i) => (
+                              <div key={i} className={`${d.type !== 'same' ? 'bg-[rgba(239,68,68,0.1)]' : ''} px-1`}>
+                                <span className="text-[#52525B] select-none mr-2 inline-block w-6 text-right">{d.lineNum}</span>
+                                {d.a || ' '}
+                              </div>
+                            ))}
+                          </pre>
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-[#10B981] mb-2 flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            v{diffTarget.b.version || 1}
+                          </div>
+                          <pre className="text-[11px] text-[#A1A1AA] whitespace-pre-wrap bg-[#070707] rounded-lg p-3 border border-[rgba(255,255,255,0.1)] max-h-[50vh] overflow-y-auto font-mono">
+                            {displayLines.map((d, i) => (
+                              <div key={i} className={`${d.type === 'added' || d.type === 'changed' ? 'bg-[rgba(16,185,129,0.1)]' : d.type === 'removed' ? 'bg-[rgba(239,68,68,0.05)]' : ''} px-1`}>
+                                <span className="text-[#52525B] select-none mr-2 inline-block w-6 text-right">{d.lineNum}</span>
+                                {d.type === 'removed' ? '' : d.b || ' '}
+                              </div>
+                            ))}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="p-4 border-t border-[rgba(255,255,255,0.06)] flex gap-3 justify-end shrink-0">
+                <button
+                  onClick={() => {
+                    handleRollback(diffTarget.a.id);
+                    setShowDiff(false);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-[rgba(245,158,11,0.15)] border border-[rgba(245,158,11,0.25)] text-[#F59E0B] text-sm hover:bg-[rgba(245,158,11,0.25)] transition-all"
+                >
+                  回滚到 v{diffTarget.a.version || 1}
+                </button>
+                <button
+                  onClick={() => setShowDiff(false)}
+                  className="px-4 py-2 rounded-lg bg-[#070707] border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#FAFAFA] text-sm transition-all"
+                >
+                  关闭
+                </button>
               </div>
             </div>
           </div>

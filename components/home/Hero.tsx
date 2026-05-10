@@ -2,54 +2,29 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { generateRecommendations, RecommendedTask } from '@/lib/projects/recommendationEngine';
+import { generateDailyTask, DailyTask } from '@/lib/projects/recommendationEngine';
 import { getPromptHistory } from '@/lib/prompt/history';
 
+const QUICK_LINKS = [
+  { label: 'Prompt Studio', href: '/prompt', desc: '生成新 Prompt' },
+  { label: '资产库', href: '/prompt/history', desc: '管理 Prompt 资产' },
+  { label: 'Playground', href: '/playground', desc: '执行测试' },
+  { label: '项目中心', href: '/projects', desc: '查看项目' },
+  { label: '问题修复', href: '/fix', desc: '分析失败任务' },
+];
+
 export default function Dashboard() {
-  const [tasks, setTasks] = useState<RecommendedTask[]>([]);
+  const [dailyTask, setDailyTask] = useState<DailyTask | null>(null);
   const [recentPrompts, setRecentPrompts] = useState<any[]>([]);
-  const [failedPrompts, setFailedPrompts] = useState<any[]>([]);
   const [quickInput, setQuickInput] = useState('');
-  const [promptCount, setPromptCount] = useState(0);
 
   useEffect(() => {
-    setTasks(generateRecommendations());
-    getPromptHistory({ limit: 6 }).then(history => {
-      setRecentPrompts(history);
-    });
     getPromptHistory({ limit: 50 }).then(history => {
-      const failed = history.filter(h => h.feedback === 'failed' || h.executionSuccess === false);
-      setFailedPrompts(failed.slice(0, 3));
-      setPromptCount(history.length);
-    });
+      setRecentPrompts(history.slice(0, 5));
+      const task = generateDailyTask(history, '产品收敛重构');
+      setDailyTask(task);
+    }).catch(() => {});
   }, []);
-
-  const stats = [
-    { label: '当前项目', value: 'AgentForge DevOS' },
-    { label: '当前阶段', value: '产品收敛重构' },
-    { label: '今日建议任务', value: String(tasks.length) },
-    { label: 'Prompt 资产总数', value: String(promptCount) },
-    { label: '待修复任务', value: String(failedPrompts.length) }
-  ];
-
-  const projects = [
-    {
-      id: '1',
-      name: 'AgentForge DevOS',
-      github: true,
-      stage: '产品收敛重构',
-      progress: 65,
-      blockers: 2
-    },
-    {
-      id: '2',
-      name: '校园服务平台',
-      github: false,
-      stage: 'MVP 开发',
-      progress: 35,
-      blockers: 1
-    }
-  ];
 
   const handleQuickInputSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,172 +33,117 @@ export default function Dashboard() {
     }
   };
 
+  const getPriorityConfig = (priority: DailyTask['priority']) => {
+    switch (priority) {
+      case 'critical':
+        return {
+          border: 'border-red-500/40',
+          bg: 'bg-red-500/5',
+          badge: 'bg-red-500/20 text-red-400',
+          label: '紧急',
+          iconColor: 'text-red-400',
+          button: 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500',
+        };
+      case 'high':
+        return {
+          border: 'border-yellow-500/40',
+          bg: 'bg-yellow-500/5',
+          badge: 'bg-yellow-500/20 text-yellow-400',
+          label: '重要',
+          iconColor: 'text-yellow-400',
+          button: 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500',
+        };
+      default:
+        return {
+          border: 'border-indigo-500/30',
+          bg: 'bg-indigo-500/5',
+          badge: 'bg-indigo-500/20 text-indigo-400',
+          label: '建议',
+          iconColor: 'text-indigo-400',
+          button: 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500',
+        };
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-80px)] py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* 顶部状态栏 */}
+      <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {stats.map((stat, i) => (
-              <div
-                key={i}
-                className="p-5 rounded-xl bg-slate-900/40 border border-slate-700/50"
-              >
-                <div className="text-xs text-gray-400 mb-1">{stat.label}</div>
-                <div className="text-lg font-bold text-white">{stat.value}</div>
-              </div>
-            ))}
-          </div>
+          <h1 className="text-2xl font-bold text-white mb-1">
+            AgentForge <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">DevOS</span>
+          </h1>
+          <p className="text-sm text-gray-400">Prompt 驱动的 AI 开发工作台</p>
         </div>
 
-        {/* 主内容区 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左侧主区 */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* 我的项目 */}
-            <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-bold text-white">我的项目</h2>
+        {dailyTask && (() => {
+          const cfg = getPriorityConfig(dailyTask.priority);
+          return (
+            <div className={`mb-8 p-6 rounded-xl ${cfg.bg} border ${cfg.border}`}>
+              <div className="flex items-center gap-2 mb-4">
+                <svg className={`w-5 h-5 ${cfg.iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h2 className="text-lg font-bold text-white">今日主任务</h2>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-gray-400">{dailyTask.category}</span>
+              </div>
+
+              <h3 className="text-xl font-semibold text-white mb-4">{dailyTask.title}</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-700/50">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-xs font-medium text-red-400">当前阻塞</span>
+                  </div>
+                  <p className="text-sm text-gray-300">{dailyTask.blocker}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-700/50">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <span className="text-xs font-medium text-green-400">完成收益</span>
+                  </div>
+                  <p className="text-sm text-gray-300">{dailyTask.benefit}</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-700/30 mb-4">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs font-medium text-blue-400">为什么做</span>
+                </div>
+                <p className="text-sm text-gray-400">{dailyTask.reason}</p>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400 flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  预计 {dailyTask.eta}
+                </span>
                 <Link
-                  href="/projects"
-                  className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                  href={dailyTask.actionHref}
+                  className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-white text-sm font-medium ${cfg.button} transition-all`}
                 >
-                  查看全部 →
+                  {dailyTask.actionLabel}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
                 </Link>
               </div>
-              <div className="space-y-4">
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="p-4 rounded-lg bg-slate-900/60 border border-slate-700/50 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                        <span className="text-white font-bold text-xs">{project.name[0]}</span>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white flex items-center gap-2">
-                          {project.name}
-                          {project.github && (
-                            <span className="text-xs text-gray-400">
-                              <svg className="w-3.5 h-3.5 inline" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.268 2.75 1.026A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.939.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-                              </svg>
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-400 mt-0.5">{project.stage}</div>
-                        <div className="mt-2 w-40">
-                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {project.blockers > 0 && (
-                        <div className="flex items-center gap-1.5 text-orange-400 text-sm">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                          {project.blockers} 个阻塞
-                        </div>
-                      )}
-                      <Link
-                        href="/projects"
-                        className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium transition-colors"
-                      >
-                        继续开发
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
+          );
+        })()}
 
-            {/* 失败任务恢复 */}
-            {failedPrompts.length > 0 && (
-              <div className="p-6 rounded-xl bg-slate-900/40 border border-red-500/20">
-                <div className="flex items-center gap-2 mb-4">
-                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <h2 className="text-lg font-bold text-white">失败任务恢复</h2>
-                </div>
-                <div className="space-y-3">
-                  {failedPrompts.map((p) => (
-                    <div key={p.id} className="p-4 rounded-lg bg-slate-900/60 border border-red-500/10">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-white text-sm truncate">{p.title}</div>
-                          <div className="text-xs text-gray-400 mt-1 truncate">{p.input}</div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
-                              {p.feedback === 'failed' ? '执行失败' : '未成功'}
-                            </span>
-                            <span className="text-xs text-gray-500">{p.category}</span>
-                          </div>
-                        </div>
-                        <Link
-                          href={`/fix?error=${encodeURIComponent(p.input || p.title)}`}
-                          className="ml-3 px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-xs font-medium transition-colors whitespace-nowrap"
-                        >
-                          生成修复 Prompt
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 今日推荐任务 */}
-            <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
-              <h2 className="text-lg font-bold text-white mb-5">今日推荐任务</h2>
-              <div className="space-y-4">
-                {tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="p-4 rounded-lg bg-slate-900/60 border border-slate-700/50"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            task.impact === 'high' ? 'bg-red-500/20 text-red-400' :
-                            task.impact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-blue-500/20 text-blue-400'
-                          }`}>
-                            {task.impact === 'high' ? '高影响' : task.impact === 'medium' ? '中影响' : '低影响'}
-                          </span>
-                          <span className="text-xs text-gray-400">{task.promptCategory}</span>
-                          <span className="text-xs text-gray-500">· {task.eta}</span>
-                        </div>
-                        <div className="font-semibold text-white mt-1.5">{task.title}</div>
-                        <div className="text-sm text-gray-400 mt-1">{task.reason}</div>
-                      </div>
-                      <Link
-                        href={`/prompt?category=${encodeURIComponent(task.promptCategory)}&title=${encodeURIComponent(task.title)}`}
-                        className="ml-4 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition-colors flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        生成 Prompt
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 右侧 */}
-          <div className="space-y-6">
-            {/* 快速输入 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
             <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
               <h3 className="text-sm font-semibold text-gray-300 mb-4">快速输入</h3>
               <form onSubmit={handleQuickInputSubmit} className="space-y-3">
@@ -231,7 +151,7 @@ export default function Dashboard() {
                   value={quickInput}
                   onChange={(e) => setQuickInput(e.target.value)}
                   placeholder="描述你现在想推进的事情…"
-                  className="w-full h-32 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                  className="w-full h-28 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
                 />
                 <button
                   type="submit"
@@ -243,14 +163,10 @@ export default function Dashboard() {
               </form>
             </div>
 
-            {/* 最近 Prompt */}
             <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-300">最近 Prompt</h3>
-                <Link
-                  href="/prompt/history"
-                  className="text-xs text-gray-400 hover:text-gray-300"
-                >
+                <Link href="/prompt/history" className="text-xs text-gray-400 hover:text-gray-300">
                   查看全部
                 </Link>
               </div>
@@ -261,28 +177,35 @@ export default function Dashboard() {
                     className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 hover:border-slate-600 transition-colors cursor-pointer"
                     onClick={() => window.location.href = `/prompt/history?id=${prompt.id}`}
                   >
-                    <div className="text-sm font-medium text-white truncate">{prompt.title}</div>
-                    <div className="text-xs text-gray-400 mt-1 truncate">{prompt.input}</div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-gray-500">
-                        {new Date(prompt.createdAt).toLocaleDateString()}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {prompt.favorite && (
-                          <svg className="w-3.5 h-3.5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                          </svg>
-                        )}
-                        {prompt.score && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${
-                            prompt.score >= 80 ? 'bg-green-500/20 text-green-400' :
-                            prompt.score >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-red-500/20 text-red-400'
-                          }`}>
-                            {prompt.score}分
-                          </span>
-                        )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{prompt.title}</div>
+                        <div className="text-xs text-gray-400 mt-1 truncate">{prompt.input}</div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-gray-500">{prompt.category}</span>
+                          {prompt.score !== undefined && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              prompt.score >= 80 ? 'bg-green-500/20 text-green-400' :
+                              prompt.score >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {prompt.score}分
+                            </span>
+                          )}
+                          {prompt.feedback && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              prompt.feedback === 'excellent' ? 'bg-green-500/20 text-green-400' :
+                              prompt.feedback === 'average' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {prompt.feedback === 'excellent' ? '优秀' : prompt.feedback === 'average' ? '一般' : '失败'}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <svg className="w-4 h-4 text-gray-500 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
                   </div>
                 )) : (
@@ -292,35 +215,29 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* 快捷入口 */}
+          <div className="space-y-6">
             <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
               <h3 className="text-sm font-semibold text-gray-300 mb-4">快捷入口</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <Link
-                  href="/projects"
-                  className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 hover:border-indigo-500/50 transition-colors text-center"
-                >
-                  <div className="text-sm font-medium text-white">项目中心</div>
-                </Link>
-                <Link
-                  href="/prompt"
-                  className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 hover:border-indigo-500/50 transition-colors text-center"
-                >
-                  <div className="text-sm font-medium text-white">Prompt Studio</div>
-                </Link>
-                <Link
-                  href="/prompt/history"
-                  className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 hover:border-indigo-500/50 transition-colors text-center"
-                >
-                  <div className="text-sm font-medium text-white">资产库</div>
-                </Link>
-                <Link
-                  href="/fix"
-                  className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 hover:border-indigo-500/50 transition-colors text-center"
-                >
-                  <div className="text-sm font-medium text-white">问题修复</div>
-                </Link>
+              <div className="space-y-2">
+                {QUICK_LINKS.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-800/60 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-300 group-hover:text-white transition-colors">{link.label}</div>
+                      <div className="text-xs text-gray-500">{link.desc}</div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
