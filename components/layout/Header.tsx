@@ -8,7 +8,7 @@ const navItems = [
   { href: '/', label: '工作台' },
   { href: '/projects', label: '项目中心' },
   { href: '/prompt', label: 'Prompt Studio' },
-  { href: '/vault', label: '资产库' },
+  { href: '/prompt/history', label: '资产库' },
   { href: '/lab', label: '执行实验室' },
   { href: '/fix', label: '问题修复' },
 ];

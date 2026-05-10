@@ -9,6 +9,7 @@ import ArtifactsPanel from '@/components/artifacts/ArtifactsPanel';
 import DecisionGraph from '@/components/planner/DecisionGraph';
 import { generateArtifacts, artifactsToMarkdown, artifactsToScaffold, artifactsToApiSpec } from '@/lib/agent-runtime/artifactGenerator';
 import type { EngineeringArtifacts } from '@/lib/agent-runtime/artifactGenerator';
+import { updateAssetExecutionResult } from '@/lib/prompt/history';
 
 interface Step {
   step: number;
@@ -76,6 +77,12 @@ export default function PlaygroundPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [assetId, setAssetId] = useState<string | null>(null);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState<'success' | 'partial' | 'failed'>('success');
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackNotes, setFeedbackNotes] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -83,6 +90,10 @@ export default function PlaygroundPage() {
       const prompt = urlParams.get('prompt');
       if (prompt) {
         setInput(prompt);
+      }
+      const aid = urlParams.get('assetId');
+      if (aid) {
+        setAssetId(aid);
       }
     }
   }, []);
@@ -224,6 +235,9 @@ export default function PlaygroundPage() {
         }
         return prev;
       });
+      if (assetId) {
+        setTimeout(() => setShowFeedbackDialog(true), 600);
+      }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         setMessages(prev => [...prev, {
@@ -295,7 +309,25 @@ export default function PlaygroundPage() {
     URL.revokeObjectURL(url);
   }, [artifacts, lastPrompt]);
 
+  const handleSubmitFeedback = useCallback(async () => {
+    if (!assetId || feedbackRating === 0) return;
+    setSubmittingFeedback(true);
+    try {
+      await updateAssetExecutionResult(assetId, {
+        success: feedbackSuccess,
+        rating: feedbackRating,
+        notes: feedbackNotes || undefined,
+      });
+      setShowFeedbackDialog(false);
+    } catch (e) {
+      console.error('Feedback submit failed:', e);
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  }, [assetId, feedbackSuccess, feedbackRating, feedbackNotes]);
+
   return (
+    <>
     <div className="min-h-[calc(100vh-80px)] flex flex-col">
       <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
@@ -638,5 +670,97 @@ export default function PlaygroundPage() {
         </aside>
       </div>
     </div>
+
+    {showFeedbackDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="w-full max-w-md mx-4 bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-2xl p-6 shadow-2xl">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-[#FAFAFA]">执行结果反馈</h3>
+            <button onClick={() => setShowFeedbackDialog(false)} className="text-[#71717A] hover:text-[#FAFAFA] transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs text-[#71717A] mb-2">本次执行是否成功？</label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'success' as const, label: '成功', color: '#10B981' },
+                  { value: 'partial' as const, label: '部分成功', color: '#F59E0B' },
+                  { value: 'failed' as const, label: '失败', color: '#EF4444' },
+                ]).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFeedbackSuccess(opt.value)}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all"
+                    style={feedbackSuccess === opt.value ? {
+                      borderColor: opt.color,
+                      backgroundColor: `${opt.color}15`,
+                      color: opt.color,
+                    } : {
+                      borderColor: 'rgba(255,255,255,0.1)',
+                      color: '#71717A',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-[#71717A] mb-2">评分</label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    onClick={() => setFeedbackRating(star)}
+                    className="p-1 transition-transform hover:scale-110"
+                  >
+                    <svg className={`w-7 h-7 ${star <= feedbackRating ? 'text-yellow-400' : 'text-[#52525B]'}`} fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  </button>
+                ))}
+                {feedbackRating > 0 && (
+                  <span className="ml-2 text-sm text-[#A1A1AA] self-center">{feedbackRating}/5</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-[#71717A] mb-1.5">备注（可选）</label>
+              <textarea
+                value={feedbackNotes}
+                onChange={e => setFeedbackNotes(e.target.value)}
+                placeholder="补充说明执行效果..."
+                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#3B82F6] resize-none"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-5">
+            <button
+              onClick={() => setShowFeedbackDialog(false)}
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA] transition-all"
+            >
+              跳过
+            </button>
+            <button
+              onClick={handleSubmitFeedback}
+              disabled={submittingFeedback || feedbackRating === 0}
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white hover:shadow-lg hover:shadow-[rgba(59,130,246,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submittingFeedback ? '提交中...' : '提交反馈'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

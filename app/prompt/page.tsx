@@ -13,7 +13,7 @@ import { scorePrompt } from '@/lib/prompt-orchestrator/scoring';
 import { recordGeneration, getPersonalizedHint } from '@/lib/prompt-orchestrator/memory';
 import type { PromptDepth } from '@/lib/prompt-orchestrator/templates';
 import type { CompiledPhase } from '@/lib/prompt-orchestrator/templates';
-import { savePrompt } from '@/lib/prompt/history';
+import { savePrompt, type PromptPhase } from '@/lib/prompt/history';
 import PromptPhaseCard from '@/components/prompt/PromptPhaseCard';
 import PromptOutput from '@/components/prompt/PromptOutput';
 import StrategySummary from '@/components/prompt/StrategySummary';
@@ -58,6 +58,16 @@ export default function PromptPage() {
   const [showClarification, setShowClarification] = useState(false);
   const [personalHint, setPersonalHint] = useState<string | null>(null);
   const [flowStep, setFlowStep] = useState<FlowStep>('input');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [saveProjectId, setSaveProjectId] = useState('');
+  const [saveTags, setSaveTags] = useState<string[]>([]);
+  const [savePhase, setSavePhase] = useState<PromptPhase>('idea');
+  const [saveCombinedOutput, setSaveCombinedOutput] = useState('');
+  const [saveClarifications, setSaveClarifications] = useState<string[]>([]);
+  const [saveInput, setSaveInput] = useState('');
+  const [saveCategory, setSaveCategory] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -101,6 +111,7 @@ export default function PromptPage() {
       }
 
       setFlowStep('generating');
+      setSaveClarifications([]);
       await buildPhases(projectReasoning, input, depth);
       setFlowStep('done');
     } catch (err) {
@@ -149,23 +160,15 @@ export default function PromptPage() {
       // memory recording is non-critical
     }
 
-    try {
-      const combinedOutput = scoredPhases
-        .map(p => `# ${p.name}\n\n${p.description}\n\n${p.prompt}`)
-        .join('\n\n---\n\n');
-      
-      await savePrompt({
-        title: projectReasoning.primaryTypeLabel || '未知项目',
-        project_type: projectReasoning.primaryType,
-        phase: undefined,
-        project_id: undefined,
-        input: userIdea,
-        output: combinedOutput,
-        tags: projectReasoning.secondaryTypes,
-      });
-    } catch {
-      // prompt history saving is non-critical
-    }
+    const combinedOutput = scoredPhases
+      .map(p => `# ${p.name}\n\n${p.description}\n\n${p.prompt}`)
+      .join('\n\n---\n\n');
+    setSaveCombinedOutput(combinedOutput);
+    setSaveTitle(projectReasoning.primaryTypeLabel || '未知项目');
+    setSaveCategory(projectReasoning.primaryType);
+    setSaveTags(projectReasoning.secondaryTypes || []);
+    setSaveInput(userIdea);
+    setShowSaveDialog(true);
   }, []);
 
   const handleConfirmClarification = useCallback(async () => {
@@ -179,6 +182,12 @@ export default function PromptPage() {
       ? mergeAnswersWithContext(input, answers, clarification.questions)
       : undefined;
 
+    const clarTexts = clarification?.questions.map(q => {
+      const ans = answers[q.id] || '未回答';
+      return `Q: ${q.question}\nA: ${ans}`;
+    }) || [];
+    setSaveClarifications(clarTexts);
+
     await buildPhases(reasoning, input, depth, mergedContext);
     setFlowStep('done');
     setLoading(false);
@@ -190,6 +199,7 @@ export default function PromptPage() {
     setShowClarification(false);
     setLoading(true);
     setFlowStep('generating');
+    setSaveClarifications([]);
     await buildPhases(reasoning, input, depth);
     setFlowStep('done');
     setLoading(false);
@@ -203,7 +213,30 @@ export default function PromptPage() {
     return pack ? pack.phases[selectedIndex] ?? null : null;
   }, [pack, selectedIndex]);
 
+  const handleSaveToLibrary = useCallback(async () => {
+    if (!saveTitle.trim() || !saveCombinedOutput) return;
+    setSaving(true);
+    try {
+      await savePrompt({
+        title: saveTitle,
+        category: saveCategory,
+        phase: savePhase,
+        projectId: saveProjectId || undefined,
+        input: saveInput,
+        fullPrompt: saveCombinedOutput,
+        tags: saveTags,
+        clarifications: saveClarifications,
+      });
+      setShowSaveDialog(false);
+    } catch (e) {
+      console.error('保存失败:', e);
+    } finally {
+      setSaving(false);
+    }
+  }, [saveTitle, saveCategory, savePhase, saveProjectId, saveInput, saveCombinedOutput, saveTags, saveClarifications]);
+
   return (
+    <>
     <div className="min-h-[calc(100vh-80px)] flex flex-col">
       <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
@@ -470,5 +503,89 @@ export default function PromptPage() {
         </main>
       </div>
     </div>
+
+    {showSaveDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="w-full max-w-lg mx-4 bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-2xl p-6 shadow-2xl">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-semibold text-[#FAFAFA]">保存到资产库</h3>
+            <button onClick={() => setShowSaveDialog(false)} className="text-[#71717A] hover:text-[#FAFAFA] transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs text-[#71717A] mb-1.5">标题</label>
+              <input
+                value={saveTitle}
+                onChange={e => setSaveTitle(e.target.value)}
+                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] focus:outline-none focus:border-[#8B5CF6]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-[#71717A] mb-1.5">所属项目</label>
+              <input
+                value={saveProjectId}
+                onChange={e => setSaveProjectId(e.target.value)}
+                placeholder="项目 ID（可选）"
+                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#8B5CF6]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-[#71717A] mb-1.5">阶段</label>
+              <select
+                value={savePhase}
+                onChange={e => setSavePhase(e.target.value as PromptPhase)}
+                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] focus:outline-none focus:border-[#8B5CF6]"
+              >
+                <option value="idea">💡 想法</option>
+                <option value="architecture">🏗️ 架构</option>
+                <option value="implementation">⚙️ 实现</option>
+                <option value="optimization">🚀 优化</option>
+                <option value="debug">🔍 调试</option>
+                <option value="deployment">📦 部署</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-[#71717A] mb-1.5">标签</label>
+              {saveTags.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {saveTags.map((tag, i) => (
+                    <span key={i} className="px-2 py-0.5 text-[10px] rounded bg-[rgba(139,92,246,0.15)] text-[#A78BFA] border border-[rgba(139,92,246,0.2)]">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[#52525B]">无标签</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => setShowSaveDialog(false)}
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA] transition-all"
+            >
+              跳过
+            </button>
+            <button
+              onClick={handleSaveToLibrary}
+              disabled={saving || !saveTitle.trim()}
+              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? '保存中...' : '保存到资产库'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

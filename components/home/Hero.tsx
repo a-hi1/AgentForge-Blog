@@ -205,7 +205,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-300">最近 Prompt</h3>
                 <Link
-                  href="/vault"
+                  href="/prompt/history"
                   className="text-xs text-gray-400 hover:text-gray-300"
                 >
                   查看全部
@@ -225,7 +225,7 @@ export default function Dashboard() {
                         {new Date(prompt.createdAt).toLocaleDateString()}
                       </span>
                       <div className="flex items-center gap-2">
-                        {prompt.starred && (
+                        {prompt.favorite && (
                           <svg className="w-3.5 h-3.5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                           </svg>
@@ -267,7 +267,7 @@ export default function Dashboard() {
                   <div className="text-sm font-medium text-white">Prompt Studio</div>
                 </Link>
                 <Link
-                  href="/vault"
+                  href="/prompt/history"
                   className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 hover:border-indigo-500/50 transition-colors text-center"
                 >
                   <div className="text-sm font-medium text-white">资产库</div>
