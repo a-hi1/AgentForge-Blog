@@ -5,14 +5,12 @@ import { usePathname } from 'next/navigation';
 import { useState, useCallback, useMemo } from 'react';
 
 const navItems = [
-  { href: '/', label: '首页' },
-  { href: '/showcase', label: '能力展示' },
-  { href: '/prompt', label: '提示词编排' },
-              { href: '/fix', label: '问题修复' },
-  { href: '/interview', label: '系统说明' },
-  { href: '/lab', label: '实验室' },
-  { href: '/playground', label: '智能交互' },
+  { href: '/', label: '工作台' },
   { href: '/projects', label: '项目中心' },
+  { href: '/prompt', label: '提示词编排' },
+  { href: '/prompt/history', label: '提示词历史' },
+  { href: '/fix', label: '问题诊断' },
+  { href: '/lab', label: '实验室' },
   { href: '/articles', label: '技术文章' },
 ];
 

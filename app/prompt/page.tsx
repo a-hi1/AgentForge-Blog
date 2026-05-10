@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { reasonProject } from '@/lib/prompt-orchestrator/reasoner';
 import type { ProjectReasoning } from '@/lib/prompt-orchestrator/reasoner';
@@ -13,6 +14,7 @@ import { scorePrompt } from '@/lib/prompt-orchestrator/scoring';
 import { recordGeneration, getPersonalizedHint } from '@/lib/prompt-orchestrator/memory';
 import type { PromptDepth } from '@/lib/prompt-orchestrator/templates';
 import type { CompiledPhase } from '@/lib/prompt-orchestrator/templates';
+import { savePrompt } from '@/lib/prompt/history';
 import PromptPhaseCard from '@/components/prompt/PromptPhaseCard';
 import PromptOutput from '@/components/prompt/PromptOutput';
 import StrategySummary from '@/components/prompt/StrategySummary';
@@ -34,6 +36,7 @@ const DEPTH_OPTIONS: { value: PromptDepth; label: string; desc: string; icon: st
 ];
 
 export default function PromptPage() {
+  const searchParams = useSearchParams();
   const [input, setInput] = useState('');
   const [depth, setDepth] = useState<PromptDepth>('standard');
   const [pack, setPack] = useState<CompiledPack | null>(null);
@@ -47,6 +50,13 @@ export default function PromptPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showClarification, setShowClarification] = useState(false);
   const [personalHint, setPersonalHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    const idea = searchParams.get('idea');
+    if (idea) {
+      setInput(idea);
+    }
+  }, [searchParams]);
 
   const handleGenerate = useCallback(async () => {
     if (!input.trim()) return;
@@ -122,6 +132,24 @@ export default function PromptPage() {
       });
     } catch {
       // memory recording is non-critical
+    }
+
+    try {
+      const combinedOutput = scoredPhases
+        .map(p => `# ${p.name}\n\n${p.description}\n\n${p.prompt}`)
+        .join('\n\n---\n\n');
+      
+      await savePrompt({
+        title: projectReasoning.primaryTypeLabel || '未知项目',
+        project_type: projectReasoning.primaryType,
+        phase: undefined,
+        project_id: undefined,
+        input: userIdea,
+        output: combinedOutput,
+        tags: projectReasoning.secondaryTypes,
+      });
+    } catch {
+      // prompt history saving is non-critical
     }
   }, []);
 
