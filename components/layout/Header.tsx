@@ -7,11 +7,10 @@ import { useState, useCallback, useMemo } from 'react';
 const navItems = [
   { href: '/', label: '工作台' },
   { href: '/projects', label: '项目中心' },
-  { href: '/prompt', label: '提示词编排' },
-  { href: '/prompt/history', label: '提示词历史' },
-  { href: '/fix', label: '问题诊断' },
-  { href: '/lab', label: '实验室' },
-  { href: '/articles', label: '技术文章' },
+  { href: '/prompt', label: 'Prompt Studio' },
+  { href: '/vault', label: '资产库' },
+  { href: '/lab', label: '执行实验室' },
+  { href: '/fix', label: '问题修复' },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -63,8 +62,14 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-[rgba(9,9,11,0.85)] backdrop-blur-xl border-b border-[rgba(255,255,255,0.06)]">
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] bg-clip-text text-transparent">
-            AgentForge 智能工程系统
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">AF</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold text-white">AgentForge DevOS</span>
+              <span className="text-xs text-gray-400 -mt-1">Prompt 驱动的个人开发操作系统</span>
+            </div>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
