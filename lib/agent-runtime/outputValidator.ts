@@ -1,3 +1,5 @@
+import { CHINESE_OUTPUT_INSTRUCTION_RETRY } from './constants';
+
 export interface ValidationResult {
   isValid: boolean;
   score: number;
@@ -99,9 +101,5 @@ export function buildRetryInstruction(issues: string[]): string {
 上一次输出存在以下问题：
 ${issues.map(i => `- ${i}`).join('\n')}
 
-请重新生成，要求：
-1. 全部使用简体中文（代码标识符除外）
-2. 使用 # 级标题组织内容
-3. 代码必须完整，包含实现逻辑
-4. 分析必须结合具体业务场景`;
+${CHINESE_OUTPUT_INSTRUCTION_RETRY}`;
 }

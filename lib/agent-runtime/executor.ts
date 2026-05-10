@@ -1,5 +1,6 @@
 import { getAgentPrompt, getAgentDefaultTask } from './prompts';
 import { validateOutput, buildRetryInstruction } from './outputValidator';
+import { CHINESE_OUTPUT_INSTRUCTION } from './constants';
 
 interface AgentConfig {
   name: string;
@@ -16,15 +17,6 @@ function getConfig(agentName: string, task: string): AgentConfig {
     maxTokens: 4000,
   };
 }
-
-const CHINESE_OUTPUT_INSTRUCTION = `
-
-【输出要求 - 必须严格遵守】
-1. 仅使用简体中文回答
-2. 标题、分析、解释必须使用中文
-3. 代码标识符（变量名、函数名）允许英文
-4. 代码注释必须使用中文
-5. 禁止输出英文段落或英文标题`;
 
 export async function executeAgent(
   agentName: string,

@@ -1,4 +1,5 @@
 import { getSupabaseServer, isSupabaseConfigured } from '../supabase/client';
+import { CHINESE_OUTPUT_INSTRUCTION_SIMPLE } from './constants';
 
 // ============================================
 // TYPES
@@ -137,7 +138,7 @@ export class MemoryManager {
   "failures": ["字符串"],
   "optimizations": ["字符串"]
 }
-不要包含 Markdown 或代码块标记 - 仅返回原始 JSON。所有内容必须使用简体中文。`;
+不要包含 Markdown 或代码块标记 - 仅返回原始 JSON。${CHINESE_OUTPUT_INSTRUCTION_SIMPLE}。`;
 
       const userPrompt = `分析以下工程执行记录，提取经验教训：
 
