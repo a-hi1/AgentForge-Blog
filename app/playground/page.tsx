@@ -2,15 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import AgentBadge from '@/components/agent/AgentBadge';
 import AgentStatus from '@/components/agent/AgentStatus';
+import MemoryPanel from '@/components/lab/MemoryPanel';
+import ArtifactsPanel from '@/components/artifacts/ArtifactsPanel';
+import DecisionGraph from '@/components/planner/DecisionGraph';
 import { generateArtifacts, artifactsToMarkdown, artifactsToScaffold, artifactsToApiSpec } from '@/lib/agent-runtime/artifactGenerator';
 import type { EngineeringArtifacts } from '@/lib/agent-runtime/artifactGenerator';
-
-const MemoryPanel = dynamic(() => import('@/components/lab/MemoryPanel'), { ssr: false });
-const ArtifactsPanel = dynamic(() => import('@/components/artifacts/ArtifactsPanel'), { ssr: false });
-const DecisionGraph = dynamic(() => import('@/components/planner/DecisionGraph'), { ssr: false });
 
 interface Step {
   step: number;
@@ -294,10 +292,15 @@ export default function PlaygroundPage() {
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
             <span className="text-[#A1A1AA] text-sm font-medium">AI 工程控制台</span>
-            <span className="text-[#71717A] text-xs">|</span>
-            <span className="text-[#71717A] text-xs">
-              {isLoading ? '执行中...' : '就绪'}
-            </span>
+            <span className="text-[#71717A] text-xs hidden sm:inline">|</span>
+            <div className="hidden sm:flex items-center gap-1 bg-[rgba(255,255,255,0.03)] rounded-lg p-0.5 border border-[rgba(255,255,255,0.06)]">
+              <span className="px-3 py-1 text-xs font-medium rounded-md bg-[rgba(59,130,246,0.15)] text-[#60A5FA]">
+                执行模式
+              </span>
+              <Link href="/prompt" className="px-3 py-1 text-xs font-medium rounded-md text-[#71717A] hover:text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)] transition-all">
+                提示词模式
+              </Link>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {messages.length > 0 && (
