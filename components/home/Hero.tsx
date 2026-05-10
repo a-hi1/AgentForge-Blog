@@ -8,21 +8,28 @@ import { getPromptHistory } from '@/lib/prompt/history';
 export default function Dashboard() {
   const [tasks, setTasks] = useState<RecommendedTask[]>([]);
   const [recentPrompts, setRecentPrompts] = useState<any[]>([]);
+  const [failedPrompts, setFailedPrompts] = useState<any[]>([]);
   const [quickInput, setQuickInput] = useState('');
+  const [promptCount, setPromptCount] = useState(0);
 
   useEffect(() => {
     setTasks(generateRecommendations());
     getPromptHistory({ limit: 6 }).then(history => {
       setRecentPrompts(history);
     });
+    getPromptHistory({ limit: 50 }).then(history => {
+      const failed = history.filter(h => h.feedback === 'failed' || h.executionSuccess === false);
+      setFailedPrompts(failed.slice(0, 3));
+      setPromptCount(history.length);
+    });
   }, []);
 
   const stats = [
     { label: '当前项目', value: 'AgentForge DevOS' },
     { label: '当前阶段', value: '产品收敛重构' },
-    { label: '今日建议任务', value: '3' },
-    { label: 'Prompt 资产总数', value: '42' },
-    { label: '最近执行成功率', value: '87%' }
+    { label: '今日建议任务', value: String(tasks.length) },
+    { label: 'Prompt 资产总数', value: String(promptCount) },
+    { label: '待修复任务', value: String(failedPrompts.length) }
   ];
 
   const projects = [
@@ -136,6 +143,42 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+
+            {/* 失败任务恢复 */}
+            {failedPrompts.length > 0 && (
+              <div className="p-6 rounded-xl bg-slate-900/40 border border-red-500/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <h2 className="text-lg font-bold text-white">失败任务恢复</h2>
+                </div>
+                <div className="space-y-3">
+                  {failedPrompts.map((p) => (
+                    <div key={p.id} className="p-4 rounded-lg bg-slate-900/60 border border-red-500/10">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white text-sm truncate">{p.title}</div>
+                          <div className="text-xs text-gray-400 mt-1 truncate">{p.input}</div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
+                              {p.feedback === 'failed' ? '执行失败' : '未成功'}
+                            </span>
+                            <span className="text-xs text-gray-500">{p.category}</span>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/fix?error=${encodeURIComponent(p.input || p.title)}`}
+                          className="ml-3 px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-xs font-medium transition-colors whitespace-nowrap"
+                        >
+                          生成修复 Prompt
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 今日推荐任务 */}
             <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">

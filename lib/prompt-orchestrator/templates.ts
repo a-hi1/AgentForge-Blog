@@ -28,6 +28,7 @@ export interface CompiledPhase {
   description: string;
   prompt: string;
   score?: number;
+  scoreFeedback?: string[];
 }
 
 const DEPTH_MODIFIERS: Record<PromptDepth, { rolePrefix: string; detailLevel: string; wordTarget: string }> = {

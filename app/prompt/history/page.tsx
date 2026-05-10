@@ -6,6 +6,7 @@ import {
   getPromptHistory,
   getSystemTemplates,
   toggleFavorite,
+  toggleArchive,
   deletePrompt,
   updatePromptFeedback,
   savePromptVersion,
@@ -32,6 +33,15 @@ const PHASE_LABELS: Record<string, string> = {
   optimization: '🚀 优化',
   debug: '🐛 调试',
   deployment: '🚢 部署',
+};
+
+const PHASE_USAGE_TIPS: Record<string, { suitable: string; notSuitable: string; prerequisite: string }> = {
+  idea: { suitable: '产品早期探索、验证方向可行性', notSuitable: '已有明确需求的直接开发', prerequisite: '无特殊要求' },
+  architecture: { suitable: '确定技术方案、规划系统架构、团队技术对齐', notSuitable: '简单页面修改、样式调整', prerequisite: '已完成需求分析' },
+  implementation: { suitable: '具体功能开发、MVP 构建、页面实现', notSuitable: '架构决策、性能调优', prerequisite: '已确定技术栈和架构方案' },
+  optimization: { suitable: '性能优化、代码重构、体验提升', notSuitable: '新功能开发、初次搭建', prerequisite: '已有可运行的代码基础' },
+  debug: { suitable: 'Bug 修复、错误排查、异常处理', notSuitable: '新功能开发、架构设计', prerequisite: '能复现问题或提供错误信息' },
+  deployment: { suitable: '生产环境部署、CI/CD 配置、域名 SSL', notSuitable: '本地开发、功能测试', prerequisite: '代码已通过测试' },
 };
 
 const FLOW_STEPS = [
@@ -112,6 +122,11 @@ export default function PromptHistoryPage() {
 
   const handleToggleFavorite = async (id: string, current: boolean) => {
     await toggleFavorite(id, !current);
+    await loadAssets();
+  };
+
+  const handleToggleArchive = async (id: string, current?: boolean) => {
+    await toggleArchive(id, !current);
     await loadAssets();
   };
 
@@ -566,6 +581,21 @@ export default function PromptHistoryPage() {
                     </pre>
                   </div>
 
+                  {(() => {
+                    const tips = PHASE_USAGE_TIPS[selectedRecord.phase];
+                    if (!tips) return null;
+                    return (
+                      <div className="p-3 rounded-lg bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.15)]">
+                        <h3 className="text-xs font-medium text-[#60A5FA] mb-2">使用建议</h3>
+                        <div className="space-y-1.5 text-[11px]">
+                          <p className="text-[#A1A1AA]"><span className="text-[#71717A]">适用于：</span>{tips.suitable}</p>
+                          <p className="text-[#A1A1AA]"><span className="text-[#71717A]">不适用于：</span>{tips.notSuitable}</p>
+                          <p className="text-[#A1A1AA]"><span className="text-[#71717A]">推荐前置：</span>{tips.prerequisite}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div>
                     <h3 className="text-xs font-medium text-[#FAFAFA] mb-2">使用记录</h3>
                     <div className="grid grid-cols-3 gap-2 text-xs">
@@ -639,7 +669,7 @@ export default function PromptHistoryPage() {
                         发送到 Playground
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <button
                         onClick={() => handleToggleFavorite(selectedRecord.id, selectedRecord.favorite)}
                         className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs transition-all ${
@@ -664,6 +694,19 @@ export default function PromptHistoryPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                         编辑另存
+                      </button>
+                      <button
+                        onClick={() => handleToggleArchive(selectedRecord.id, selectedRecord.archived)}
+                        className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs transition-all ${
+                          selectedRecord.archived
+                            ? 'bg-[rgba(59,130,246,0.15)] text-[#60A5FA] border-[rgba(59,130,246,0.25)]'
+                            : 'bg-[#070707] border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#FAFAFA]'
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        </svg>
+                        {selectedRecord.archived ? '取消归档' : '归档'}
                       </button>
                       <button
                         onClick={() => handleDelete(selectedRecord.id)}

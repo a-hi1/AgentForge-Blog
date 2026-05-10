@@ -24,6 +24,7 @@ export interface PromptAsset {
   rating?: number;
   tags: string[];
   favorite: boolean;
+  archived?: boolean;
   createdAt: string;
   version?: number;
   parentId?: string;
@@ -60,6 +61,7 @@ function migrateRecord(raw: any): PromptAsset {
       rating: raw.rating,
       tags: raw.tags || [],
       favorite: raw.favorite || false,
+      archived: raw.archived || false,
       createdAt: raw.createdAt || new Date().toISOString(),
       version: raw.version,
       parentId: raw.parentId,
@@ -83,6 +85,7 @@ function migrateRecord(raw: any): PromptAsset {
     rating: raw.rating,
     tags: raw.tags || [],
     favorite: raw.favorite || false,
+    archived: raw.archived || false,
     createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
     version: raw.version,
     parentId: raw.parent_id || raw.parentId,
@@ -126,6 +129,7 @@ function toSupabaseRow(asset: PromptAsset) {
     output: asset.fullPrompt,
     created_at: asset.createdAt,
     favorite: asset.favorite,
+    archived: asset.archived || false,
     tags: asset.tags,
     version: asset.version,
     parent_id: asset.parentId,
@@ -675,6 +679,39 @@ export async function toggleFavorite(id: string, favorite?: boolean): Promise<vo
   }
 }
 
+export async function toggleArchive(id: string, archived?: boolean): Promise<void> {
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseServer() || getSupabaseBrowser();
+    if (supabase) {
+      try {
+        const { data: existing } = await supabase
+          .from('prompt_history')
+          .select('archived')
+          .eq('id', id)
+          .maybeSingle();
+
+        const newArchived = archived !== undefined ? archived : !existing?.archived;
+
+        const { error } = await supabase
+          .from('prompt_history')
+          .update({ archived: newArchived })
+          .eq('id', id);
+
+        if (!error) return;
+      } catch (e) {
+        console.warn('[PromptHistory] Supabase archive toggle failed, falling back');
+      }
+    }
+  }
+
+  const history = getLocalStorageFallback();
+  const idx = history.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    history[idx].archived = archived !== undefined ? archived : !history[idx].archived;
+    saveToLocalStorage(history);
+  }
+}
+
 export async function deletePrompt(id: string): Promise<void> {
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseServer() || getSupabaseBrowser();
@@ -831,6 +868,7 @@ export async function updateAssetExecutionResult(
           .update({
             execution_success: executionSuccess,
             feedback: feedbackMap[result.success],
+            rating: result.rating,
             score: newScore.score,
             score_details: newScore,
           })

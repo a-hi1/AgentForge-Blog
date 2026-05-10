@@ -9,14 +9,19 @@ interface PromptOutputProps {
   phase: CompiledPhase | null;
   phaseIndex: number;
   totalPhases: number;
+  savedAssetId?: string | null;
 }
 
-function PromptOutput({ phase, phaseIndex, totalPhases }: PromptOutputProps) {
+function PromptOutput({ phase, phaseIndex, totalPhases, savedAssetId }: PromptOutputProps) {
   const router = useRouter();
 
   const handleSendToPlayground = () => {
     if (!phase) return;
-    router.push(`/playground?prompt=${encodeURIComponent(phase.prompt)}`);
+    const encoded = encodeURIComponent(phase.prompt);
+    const url = savedAssetId
+      ? `/playground?prompt=${encoded}&assetId=${savedAssetId}`
+      : `/playground?prompt=${encoded}`;
+    router.push(url);
   };
 
   if (!phase) {
@@ -70,6 +75,16 @@ function PromptOutput({ phase, phaseIndex, totalPhases }: PromptOutputProps) {
           </button>
         </div>
         <p className="text-sm text-[#71717A] mt-2">{phase.description}</p>
+        {phase.scoreFeedback && phase.scoreFeedback.length > 0 && (
+          <div className="mt-3 p-3 rounded-lg bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.15)]">
+            <p className="text-[10px] text-[#F59E0B] font-medium mb-1.5">改进建议</p>
+            <div className="space-y-1">
+              {phase.scoreFeedback.map((fb, i) => (
+                <p key={i} className="text-[11px] text-[#A1A1AA] leading-relaxed">· {fb}</p>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">

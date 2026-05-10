@@ -250,7 +250,7 @@ export default function PlaygroundPage() {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [input, isLoading, handleStreamEvent]);
+  }, [input, isLoading, handleStreamEvent, assetId]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

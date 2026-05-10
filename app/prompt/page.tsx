@@ -35,6 +35,14 @@ const DEPTH_OPTIONS: { value: PromptDepth; label: string; desc: string; icon: st
 ];
 
 type FlowStep = 'input' | 'reasoning' | 'clarification' | 'generating' | 'done';
+type MobileView = 'input' | 'phases' | 'output';
+
+interface BuildStep {
+  id: string;
+  label: string;
+  detail?: string;
+  status: 'pending' | 'active' | 'done';
+}
 
 const STEP_INDICATORS = [
   { key: 'input', label: '输入想法', icon: '💡' },
@@ -68,6 +76,8 @@ export default function PromptPage() {
   const [saveInput, setSaveInput] = useState('');
   const [saveCategory, setSaveCategory] = useState('');
   const [saving, setSaving] = useState(false);
+  const [buildSteps, setBuildSteps] = useState<BuildStep[]>([]);
+  const [savedAssetId, setSavedAssetId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -90,18 +100,30 @@ export default function PromptPage() {
     setAnswers({});
     setFlowStep('reasoning');
 
+    const steps: BuildStep[] = [
+      { id: 'reason', label: '识别产品类型', status: 'active' },
+      { id: 'clarify', label: '需求澄清分析', status: 'pending' },
+      { id: 'plan', label: '规划开发阶段', status: 'pending' },
+      { id: 'compile', label: '编译 Prompt', status: 'pending' },
+      { id: 'score', label: '质量评分', status: 'pending' },
+    ];
+    setBuildSteps(steps);
+
     try {
       setLoadingStep('深度推理分析中...');
       const projectReasoning = await reasonProject(input);
       setReasoning(projectReasoning);
+      setBuildSteps(prev => prev.map(s => s.id === 'reason' ? { ...s, status: 'done', detail: `${projectReasoning.primaryTypeLabel} · ${projectReasoning.complexity}复杂度 · 确信度${projectReasoning.confidence}%` } : s));
       setFlowStep('reasoning');
 
       const hint = getPersonalizedHint(projectReasoning.primaryType);
       setPersonalHint(hint);
 
       setLoadingStep('生成澄清问题...');
+      setBuildSteps(prev => prev.map(s => s.id === 'clarify' ? { ...s, status: 'active' } : s));
       const clarResult = await generateClarifications(input, projectReasoning);
       setClarification(clarResult);
+      setBuildSteps(prev => prev.map(s => s.id === 'clarify' ? { ...s, status: 'done', detail: clarResult.needed ? `${clarResult.questions.length} 个问题待确认` : '确信度高，跳过澄清' } : s));
       if (clarResult.needed && clarResult.questions.length > 0) {
         setShowClarification(true);
         setFlowStep('clarification');
@@ -129,9 +151,15 @@ export default function PromptPage() {
     selectedDepth: PromptDepth,
     clarificationCtx?: string
   ) => {
+    setBuildSteps(prev => prev.map(s => s.id === 'plan' ? { ...s, status: 'active' } : s));
     setLoadingStep('动态合成 Prompt...');
     const phases = planPhases(projectReasoning, userIdea, selectedDepth, clarificationCtx);
+    setBuildSteps(prev => prev.map(s => s.id === 'plan' ? { ...s, status: 'done', detail: `${phases.length} 个阶段` } : s));
 
+    setBuildSteps(prev => prev.map(s => s.id === 'compile' ? { ...s, status: 'active' } : s));
+    setLoadingStep('编译 Prompt 包...');
+
+    setBuildSteps(prev => prev.map(s => s.id === 'score' ? { ...s, status: 'active' } : s));
     setLoadingStep('质量评分中...');
     const scoredPhases: CompiledPhase[] = [];
     for (const phase of phases) {
@@ -139,8 +167,14 @@ export default function PromptPage() {
       scoredPhases.push({
         ...phase,
         score: scoreResult.total,
+        scoreFeedback: scoreResult.feedback,
       });
     }
+    setBuildSteps(prev => prev.map(s => {
+      if (s.id === 'score') return { ...s, status: 'done', detail: `平均 ${Math.round(scoredPhases.reduce((a, p) => a + (p.score || 0), 0) / scoredPhases.length)} 分` };
+      if (s.id === 'compile') return { ...s, status: 'done' };
+      return s;
+    }));
 
     const compiled = compilePromptPack(userIdea, projectReasoning, scoredPhases, selectedDepth);
     setPack(compiled);
@@ -217,7 +251,7 @@ export default function PromptPage() {
     if (!saveTitle.trim() || !saveCombinedOutput) return;
     setSaving(true);
     try {
-      await savePrompt({
+      const saved = await savePrompt({
         title: saveTitle,
         category: saveCategory,
         phase: savePhase,
@@ -227,6 +261,9 @@ export default function PromptPage() {
         tags: saveTags,
         clarifications: saveClarifications,
       });
+      if (saved?.id) {
+        setSavedAssetId(saved.id);
+      }
       setShowSaveDialog(false);
     } catch (e) {
       console.error('保存失败:', e);
@@ -495,11 +532,56 @@ export default function PromptPage() {
         </div>
 
         <main className={`${mobileView === 'output' ? 'flex' : 'hidden'} md:flex flex-col flex-grow min-w-0`}>
-          <PromptOutput
-            phase={selectedPhase}
-            phaseIndex={selectedIndex}
-            totalPhases={pack?.phases.length ?? 0}
-          />
+          {pack ? (
+            <PromptOutput
+              phase={selectedPhase}
+              phaseIndex={selectedIndex}
+              totalPhases={pack.phases.length}
+              savedAssetId={savedAssetId}
+            />
+          ) : buildSteps.length > 0 ? (
+            <div className="flex flex-col items-center justify-center h-full px-8 py-20">
+              <div className="w-full max-w-sm space-y-3">
+                <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4 text-center">构建进度</h3>
+                {buildSteps.map(step => (
+                  <div key={step.id} className="flex items-start gap-3">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {step.status === 'done' ? (
+                        <svg className="w-4 h-4 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : step.status === 'active' ? (
+                        <svg className="w-4 h-4 text-[#8B5CF6] animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border border-[rgba(255,255,255,0.1)]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium ${step.status === 'done' ? 'text-[#10B981]' : step.status === 'active' ? 'text-[#A78BFA]' : 'text-[#52525B]'}`}>
+                        {step.label}
+                      </p>
+                      {step.detail && (
+                        <p className="text-[10px] text-[#71717A] mt-0.5">{step.detail}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center px-8 py-20">
+              <div className="w-16 h-16 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-[#71717A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                </svg>
+              </div>
+              <h3 className="text-[#FAFAFA] font-medium mb-2">输入想法，开始构建</h3>
+              <p className="text-[#71717A] text-sm">在左侧输入产品想法，系统将自动推理、澄清并生成精准 Prompt</p>
+            </div>
+          )}
         </main>
       </div>
     </div>
