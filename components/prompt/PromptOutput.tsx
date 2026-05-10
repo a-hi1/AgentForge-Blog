@@ -2,10 +2,10 @@
 
 import { memo } from 'react';
 import CopyPromptButton from './CopyPromptButton';
-import type { Phase } from '@/lib/prompt-orchestrator/phasePlanner';
+import type { CompiledPhase } from '@/lib/prompt-orchestrator/templates';
 
 interface PromptOutputProps {
-  phase: Phase | null;
+  phase: CompiledPhase | null;
   phaseIndex: number;
   totalPhases: number;
 }
@@ -37,7 +37,18 @@ function PromptOutput({ phase, phaseIndex, totalPhases }: PromptOutputProps) {
             </span>
             <h2 className="text-lg font-semibold text-[#FAFAFA]">{phase.name}</h2>
           </div>
-          <CopyPromptButton text={phase.prompt} />
+          <div className="flex items-center gap-3">
+            {phase.score !== undefined && (
+              <span className={`text-xs font-medium px-2 py-1 rounded-md ${
+                phase.score >= 85
+                  ? 'bg-[rgba(16,185,129,0.1)] text-[#10B981]'
+                  : 'bg-[rgba(245,158,11,0.1)] text-[#F59E0B]'
+              }`}>
+                质量 {phase.score}分
+              </span>
+            )}
+            <CopyPromptButton text={phase.prompt} />
+          </div>
         </div>
         <p className="text-sm text-[#71717A]">{phase.description}</p>
       </div>

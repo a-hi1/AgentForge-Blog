@@ -8,6 +8,7 @@ const navItems = [
   { href: '/', label: '首页' },
   { href: '/showcase', label: '能力展示' },
   { href: '/prompt', label: '提示词编排' },
+              { href: '/fix', label: '问题修复' },
   { href: '/interview', label: '系统说明' },
   { href: '/lab', label: '实验室' },
   { href: '/playground', label: '智能交互' },

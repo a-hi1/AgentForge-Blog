@@ -1,27 +1,57 @@
-import { AnalysisResult } from './analyzer';
-import { Phase } from './phasePlanner';
+import type { ProjectReasoning } from './reasoner';
+import type { CompiledPhase, PromptDepth } from './templates';
 
 export interface CompiledPack {
   title: string;
   summary: string;
-  analysis: AnalysisResult;
-  phases: Phase[];
+  reasoning: ProjectReasoning;
+  phases: CompiledPhase[];
+  depth: PromptDepth;
   markdown: string;
 }
 
-function analysisSection(analysis: AnalysisResult): string {
-  return `## 项目分析
+function analysisSection(reasoning: ProjectReasoning, depth: PromptDepth): string {
+  const complexityMap: Record<string, string> = { low: '低', medium: '中', high: '高' };
+  const depthMap: Record<string, string> = { quick: '快速', standard: '标准', expert: '专家', architect: '架构师' };
+  const lines = [
+    `## 项目分析`,
+    '',
+    `**项目类型**: ${reasoning.primaryTypeLabel}${reasoning.secondaryTypes.length > 0 ? `（复合型：${reasoning.secondaryTypes.join(' + ')}）` : ''}`,
+    `**技术复杂度**: ${complexityMap[reasoning.complexity] || reasoning.complexity}`,
+    `**分析确信度**: ${reasoning.confidence}%`,
+    `**输出深度**: ${depthMap[depth]}`,
+    `**推荐技术栈**:`,
+    ...reasoning.recommendedStack.map(s => `- ${s}`),
+    `**开发阶段数**: ${reasoning.estimatedPhases}`,
+  ];
 
-**产品类型**: ${analysis.productTypeLabel}
-**复杂度**: ${analysis.complexity === 'high' ? '高' : analysis.complexity === 'low' ? '低' : '中'}
-**建议技术栈**:
-${analysis.recommendedStack.map(s => `- ${s}`).join('\n')}
-**开发阶段数**: ${analysis.estimatedPhases}
-${analysis.keywords.length > 0 ? `**识别关键词**: ${analysis.keywords.join(', ')}` : ''}
-`;
+  if (reasoning.domainFeatures.length > 0) {
+    lines.push('');
+    lines.push('**领域特征**:');
+    reasoning.domainFeatures.slice(0, 6).forEach(f => lines.push(`- ${f}`));
+  }
+
+  if (reasoning.hiddenRequirements.length > 0) {
+    lines.push('');
+    lines.push('**隐含需求**:');
+    reasoning.hiddenRequirements.forEach(r => lines.push(`- ${r}`));
+  }
+
+  if (reasoning.risks.length > 0) {
+    lines.push('');
+    lines.push('**风险提示**:');
+    reasoning.risks.forEach(r => lines.push(`- ⚠️ ${r}`));
+  }
+
+  if (reasoning.rawAnalysis) {
+    lines.push('');
+    lines.push(`> ${reasoning.rawAnalysis}`);
+  }
+
+  return lines.join('\n');
 }
 
-function phaseSummarySection(phases: Phase[]): string {
+function phaseSummarySection(phases: CompiledPhase[]): string {
   return `## 开发阶段总览
 
 | 阶段 | 名称 | 类别 | 说明 |
@@ -30,7 +60,7 @@ ${phases.map((p, i) => `| ${i + 1} | ${p.name} | ${p.category} | ${p.description
 `;
 }
 
-function phasePromptSection(phase: Phase, index: number): string {
+function phasePromptSection(phase: CompiledPhase, index: number): string {
   return `## Phase ${index + 1}: ${phase.name}
 
 > ${phase.description}
@@ -45,15 +75,16 @@ ${phase.prompt}
 
 export function compilePromptPack(
   userIdea: string,
-  analysis: AnalysisResult,
-  phases: Phase[],
+  reasoning: ProjectReasoning,
+  phases: CompiledPhase[],
+  depth: PromptDepth = 'standard',
 ): CompiledPack {
   const sections = [
     `# AgentForge Prompt Pack`,
     '',
     `> ${userIdea}`,
     '',
-    analysisSection(analysis),
+    analysisSection(reasoning, depth),
     '',
     phaseSummarySection(phases),
     '',
@@ -61,29 +92,35 @@ export function compilePromptPack(
     '',
     '---',
     '',
-    '> 由 AgentForge Prompt Strategy Generator 自动生成',
-    '> 复制每个阶段的 Prompt 到 Claude / Trae / Cursor 中即可执行',
+    '> 由 AgentForge Prompt Strategy Generator v2 智能生成',
+    '> 每个阶段的 Prompt 经过动态推理、深度适配和质量评分',
+    '> 复制到 Claude / Trae / Cursor 中即可执行',
   ];
 
   const markdown = sections.join('\n');
 
   return {
-    title: `${analysis.productTypeLabel} — Prompt Pack`,
-    summary: `共 ${phases.length} 个阶段，覆盖从需求分析到项目复盘的完整开发流程`,
-    analysis,
+    title: `${reasoning.primaryTypeLabel} — Prompt Pack`,
+    summary: `共 ${phases.length} 个阶段，${depth} 深度，覆盖从需求分析到项目复盘的完整开发流程`,
+    reasoning,
     phases,
+    depth,
     markdown,
   };
 }
 
-export function compileSinglePhaseMarkdown(phase: Phase, index: number, analysis: AnalysisResult): string {
+export function compileSinglePhaseMarkdown(
+  phase: CompiledPhase,
+  index: number,
+  reasoning: ProjectReasoning
+): string {
   return [
     `# Phase ${index + 1}: ${phase.name}`,
     '',
     `> ${phase.description}`,
     '',
-    `**产品类型**: ${analysis.productTypeLabel}`,
-    `**复杂度**: ${analysis.complexity}`,
+    `**项目类型**: ${reasoning.primaryTypeLabel}`,
+    `**技术复杂度**: ${reasoning.complexity}`,
     '',
     '---',
     '',

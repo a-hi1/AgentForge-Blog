@@ -1,10 +1,10 @@
 'use client';
 
 import { memo } from 'react';
-import type { Phase } from '@/lib/prompt-orchestrator/phasePlanner';
+import type { CompiledPhase } from '@/lib/prompt-orchestrator/templates';
 
 interface PromptPhaseCardProps {
-  phase: Phase;
+  phase: CompiledPhase;
   index: number;
   isSelected: boolean;
   onSelect: () => void;

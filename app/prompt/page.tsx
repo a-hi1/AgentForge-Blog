@@ -2,40 +2,151 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { analyzeProduct } from '@/lib/prompt-orchestrator/analyzer';
+import { reasonProject } from '@/lib/prompt-orchestrator/reasoner';
+import type { ProjectReasoning } from '@/lib/prompt-orchestrator/reasoner';
+import { generateClarifications, mergeAnswersWithContext } from '@/lib/prompt-orchestrator/clarifier';
+import type { ClarificationResult } from '@/lib/prompt-orchestrator/clarifier';
 import { planPhases } from '@/lib/prompt-orchestrator/phasePlanner';
 import { compilePromptPack } from '@/lib/prompt-orchestrator/promptCompiler';
 import type { CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
+import { scorePrompt } from '@/lib/prompt-orchestrator/scoring';
+import { recordGeneration, getPersonalizedHint } from '@/lib/prompt-orchestrator/memory';
+import type { PromptDepth } from '@/lib/prompt-orchestrator/templates';
+import type { CompiledPhase } from '@/lib/prompt-orchestrator/templates';
 import PromptPhaseCard from '@/components/prompt/PromptPhaseCard';
 import PromptOutput from '@/components/prompt/PromptOutput';
 import StrategySummary from '@/components/prompt/StrategySummary';
 
 const EXAMPLES = [
-  '开发一个校园二手交易平台',
+  '开发校园二手交易+兴趣社交平台',
   '做一个 SaaS 团队协作工具，支持任务管理和文档协作',
   '构建一个 AI 驱动的代码审查助手',
-  '开发一个在线教育平台，支持视频课程和作业批改',
-  '做一个企业级 CRM 客户关系管理系统',
-  '构建一个实时数据监控仪表板',
+  '开发在线教育平台，支持视频课程和作业批改',
+  '企业级 CRM 客户关系管理系统',
+  '实时数据监控仪表板，支持多数据源聚合',
+];
+
+const DEPTH_OPTIONS: { value: PromptDepth; label: string; desc: string; icon: string }[] = [
+  { value: 'quick', label: '快速', desc: '400-600 字，关键指令', icon: '⚡' },
+  { value: 'standard', label: '标准', desc: '800-1200 字，完整方案', icon: '📋' },
+  { value: 'expert', label: '专家', desc: '1500-2500 字，深度分析', icon: '🔬' },
+  { value: 'architect', label: '架构师', desc: '2500-4000 字，超细粒度', icon: '🏗️' },
 ];
 
 export default function PromptPage() {
   const [input, setInput] = useState('');
+  const [depth, setDepth] = useState<PromptDepth>('standard');
   const [pack, setPack] = useState<CompiledPack | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'input' | 'output' | 'summary'>('input');
   const [mobileView, setMobileView] = useState<'input' | 'phases' | 'output'>('input');
+  const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
+  const [error, setError] = useState('');
+  const [reasoning, setReasoning] = useState<ProjectReasoning | null>(null);
+  const [clarification, setClarification] = useState<ClarificationResult | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [showClarification, setShowClarification] = useState(false);
+  const [personalHint, setPersonalHint] = useState<string | null>(null);
 
-  const handleGenerate = useCallback(() => {
+  const handleGenerate = useCallback(async () => {
     if (!input.trim()) return;
-    const analysis = analyzeProduct(input);
-    const phases = planPhases(analysis, input);
-    const compiled = compilePromptPack(input, analysis, phases);
+    setLoading(true);
+    setError('');
+    setPack(null);
+    setReasoning(null);
+    setClarification(null);
+    setShowClarification(false);
+    setAnswers({});
+
+    try {
+      setLoadingStep('深度推理分析中...');
+      const projectReasoning = await reasonProject(input);
+      setReasoning(projectReasoning);
+
+      const hint = getPersonalizedHint(projectReasoning.primaryType);
+      setPersonalHint(hint);
+
+      if (projectReasoning.confidence < 80) {
+        setLoadingStep('生成澄清问题...');
+        const clarResult = await generateClarifications(input, projectReasoning);
+        setClarification(clarResult);
+        if (clarResult.needed && clarResult.questions.length > 0) {
+          setShowClarification(true);
+          setLoading(false);
+          setLoadingStep('');
+          return;
+        }
+      }
+
+      await buildPhases(projectReasoning, input, depth);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '生成失败，请重试');
+    } finally {
+      setLoading(false);
+      setLoadingStep('');
+    }
+  }, [input, depth]);
+
+  const buildPhases = useCallback(async (
+    projectReasoning: ProjectReasoning,
+    userIdea: string,
+    selectedDepth: PromptDepth,
+    clarificationCtx?: string
+  ) => {
+    setLoadingStep('动态合成 Prompt...');
+    const phases = planPhases(projectReasoning, userIdea, selectedDepth, clarificationCtx);
+
+    setLoadingStep('质量评分中...');
+    const scoredPhases: CompiledPhase[] = [];
+    for (const phase of phases) {
+      const scoreResult = scorePrompt(phase.prompt, userIdea);
+      scoredPhases.push({
+        ...phase,
+        score: scoreResult.total,
+      });
+    }
+
+    const compiled = compilePromptPack(userIdea, projectReasoning, scoredPhases, selectedDepth);
     setPack(compiled);
     setSelectedIndex(0);
-    setActiveTab('output');
     setMobileView('phases');
-  }, [input]);
+
+    try {
+      recordGeneration({
+        input: userIdea,
+        primaryType: projectReasoning.primaryType,
+        secondaryTypes: projectReasoning.secondaryTypes,
+        complexity: projectReasoning.complexity,
+        stack: projectReasoning.recommendedStack,
+        phaseCount: scoredPhases.length,
+      });
+    } catch {
+      // memory recording is non-critical
+    }
+  }, []);
+
+  const handleConfirmClarification = useCallback(async () => {
+    if (!reasoning) return;
+    setShowClarification(false);
+    setLoading(true);
+    setLoadingStep('融合用户反馈...');
+
+    const mergedContext = clarification
+      ? mergeAnswersWithContext(input, answers, clarification.questions)
+      : undefined;
+
+    await buildPhases(reasoning, input, depth, mergedContext);
+    setLoading(false);
+    setLoadingStep('');
+  }, [reasoning, clarification, answers, input, depth, buildPhases]);
+
+  const handleSkipClarification = useCallback(async () => {
+    if (!reasoning) return;
+    setShowClarification(false);
+    setLoading(true);
+    await buildPhases(reasoning, input, depth);
+    setLoading(false);
+  }, [reasoning, input, depth, buildPhases]);
 
   const handleExampleClick = useCallback((example: string) => {
     setInput(example);
@@ -51,7 +162,7 @@ export default function PromptPage() {
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-[#8B5CF6] animate-pulse" />
-            <span className="text-[#A1A1AA] text-sm font-medium hidden sm:inline">Prompt Strategy Generator</span>
+            <span className="text-[#A1A1AA] text-sm font-medium hidden sm:inline">Prompt Architect v2</span>
             <span className="text-[#71717A] text-xs hidden sm:inline">|</span>
             <div className="hidden sm:flex items-center gap-1 bg-[rgba(255,255,255,0.03)] rounded-lg p-0.5 border border-[rgba(255,255,255,0.06)]">
               <Link href="/playground" className="px-3 py-1 text-xs font-medium rounded-md text-[#71717A] hover:text-[#60A5FA] hover:bg-[rgba(59,130,246,0.08)] transition-all">
@@ -80,24 +191,152 @@ export default function PromptPage() {
         <aside className={`${mobileView === 'input' ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 border-r border-[rgba(255,255,255,0.06)] flex-col bg-[#09090B]/50`}>
           <div className="p-5 border-b border-[rgba(255,255,255,0.06)]">
             <h2 className="text-sm font-semibold text-[#FAFAFA] mb-1">产品想法</h2>
-            <p className="text-xs text-[#71717A] mb-4">输入一句产品描述，自动生成分阶段开发 Prompt</p>
+            <p className="text-xs text-[#71717A] mb-4">输入产品描述，AI 深度推理后生成定制化 Prompt</p>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="例如：开发一个校园二手交易平台..."
+              placeholder="例如：开发校园二手交易+兴趣社交平台..."
               className="w-full bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-xl px-4 py-3 text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6] resize-none text-sm leading-relaxed min-h-[100px] max-h-[200px]"
               rows={4}
             />
+
+            <div className="mt-4 mb-3">
+              <p className="text-xs text-[#71717A] mb-2">输出深度</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {DEPTH_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setDepth(opt.value)}
+                    className={`p-2 rounded-lg text-center transition-all border ${
+                      depth === opt.value
+                        ? 'border-[#8B5CF6] bg-[rgba(139,92,246,0.12)] text-[#A78BFA]'
+                        : 'border-[rgba(255,255,255,0.06)] text-[#71717A] hover:border-[rgba(139,92,246,0.3)]'
+                    }`}
+                  >
+                    <div className="text-base mb-0.5">{opt.icon}</div>
+                    <div className="text-[10px] font-medium">{opt.label}</div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-[#71717A] mt-1.5">
+                {DEPTH_OPTIONS.find(o => o.value === depth)?.desc}
+              </p>
+            </div>
+
             <button
               onClick={handleGenerate}
-              disabled={!input.trim()}
-              className="w-full mt-3 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={!input.trim() || loading}
+              className="w-full mt-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              生成 Prompt 策略
+              {loading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {loadingStep || '生成中...'}
+                </>
+              ) : '智能生成 Prompt'}
             </button>
+
+            {error && (
+              <p className="mt-2 text-xs text-[#EF4444]">{error}</p>
+            )}
           </div>
 
           <div className="flex-grow overflow-y-auto p-5">
+            {personalHint && (
+              <div className="mb-4 p-3 rounded-lg bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.2)]">
+                <p className="text-xs text-[#A78BFA] leading-relaxed">{personalHint}</p>
+              </div>
+            )}
+
+            {reasoning && !showClarification && (
+              <div className="mb-4 p-4 rounded-xl bg-[#0a0a0c] border border-[rgba(255,255,255,0.06)]">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                  <h3 className="text-xs font-semibold text-[#FAFAFA]">推理结果</h3>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-[#71717A]">类型</span>
+                    <span className="text-[10px] text-[#60A5FA] font-medium">{reasoning.primaryTypeLabel}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-[#71717A]">复杂度</span>
+                    <span className="text-[10px] text-[#A1A1AA]">{reasoning.complexity}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-[#71717A]">确信度</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-16 h-1 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${reasoning.confidence}%`,
+                            backgroundColor: reasoning.confidence >= 80 ? '#10B981' : '#F59E0B',
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-[#A1A1AA]">{reasoning.confidence}%</span>
+                    </div>
+                  </div>
+                  {reasoning.secondaryTypes.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-[10px] text-[#71717A]">复合类型</span>
+                      <span className="text-[10px] text-[#A1A1AA]">{reasoning.secondaryTypes.join(' + ')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showClarification && clarification && (
+              <div className="mb-4 p-4 rounded-xl bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.2)]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse" />
+                  <h3 className="text-xs font-semibold text-[#F59E0B]">需求澄清</h3>
+                </div>
+                <p className="text-[10px] text-[#71717A] mb-3">{clarification.summary}</p>
+                <div className="space-y-3">
+                  {clarification.questions.map(q => (
+                    <div key={q.id}>
+                      <p className="text-xs text-[#FAFAFA] mb-1.5">{q.question}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {q.options.map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                            className={`px-2.5 py-1 text-[10px] rounded-md transition-all border ${
+                              answers[q.id] === opt
+                                ? 'border-[#8B5CF6] bg-[rgba(139,92,246,0.15)] text-[#A78BFA]'
+                                : 'border-[rgba(255,255,255,0.06)] text-[#71717A] hover:text-[#A1A1AA]'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={handleConfirmClarification}
+                    className="flex-1 px-3 py-2 text-xs font-medium rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg transition-all"
+                  >
+                    确认并生成
+                  </button>
+                  <button
+                    onClick={handleSkipClarification}
+                    className="px-3 py-2 text-xs font-medium rounded-lg border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA] transition-all"
+                  >
+                    跳过
+                  </button>
+                </div>
+              </div>
+            )}
+
             <h3 className="text-xs text-[#71717A] uppercase tracking-wider mb-3">快速示例</h3>
             <div className="space-y-2">
               {EXAMPLES.map((example, i) => (
@@ -124,6 +363,9 @@ export default function PromptPage() {
             <h2 className="text-sm font-semibold text-[#FAFAFA]">
               {pack ? `${pack.phases.length} 个阶段` : '开发阶段'}
             </h2>
+            {pack && (
+              <p className="text-[10px] text-[#71717A] mt-1">{pack.summary}</p>
+            )}
           </div>
           <div className="flex-grow overflow-y-auto p-3 space-y-2">
             {pack ? (
