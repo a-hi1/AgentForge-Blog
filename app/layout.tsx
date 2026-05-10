@@ -4,8 +4,8 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
 export const metadata: Metadata = {
-  title: "AgentForge OS",
-  description: "AI工程执行过程可视化系统",
+  title: "AgentForge DevOS - Prompt 驱动的个人开发操作系统",
+  description: "让想法被拆解，让开发被驱动，让 Prompt 成为资产",
   icons: {
     icon: '/favicon.svg',
   },

@@ -1,7 +1,7 @@
 'use client';
 
 import { RepoMeta } from '../../lib/github/importer';
-import { CodeAnalysis } from '../../lib/github/codeAnalyzer';
+import { CodeAnalysis, RepoHealth } from '../../lib/github/codeAnalyzer';
 import { MaturityResult } from '../../lib/projects/maturityAnalyzer';
 import { useState } from 'react';
 import CopyPromptButton from '../prompt/CopyPromptButton';
@@ -12,6 +12,25 @@ interface Props {
   maturity: MaturityResult;
   recommendations: { title: string; prompt: string }[];
   onRefresh?: () => void;
+}
+
+function HealthIndicator({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-sm text-gray-400">{label}</span>
+      {ok ? (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">✅ 已配置</span>
+      ) : (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400">⚠️ 缺失</span>
+      )}
+    </div>
+  );
+}
+
+function getDebtColor(score: number): string {
+  if (score >= 80) return 'text-emerald-500';
+  if (score >= 60) return 'text-yellow-500';
+  return 'text-red-500';
 }
 
 export default function RepoInsights({ repoMeta, codeAnalysis, maturity, recommendations, onRefresh }: Props) {
@@ -88,6 +107,44 @@ export default function RepoInsights({ repoMeta, codeAnalysis, maturity, recomme
           <div className="text-sm text-gray-400">架构类型</div>
           <div className="text-xl font-bold mt-1">{architectureLabels[codeAnalysis.architecture]}</div>
         </div>
+      </div>
+
+      {/* 仓库健康面板 */}
+      <div className="p-5 rounded-xl bg-slate-800/50 border border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">仓库健康度</h3>
+          <div className="flex items-center gap-2">
+            <span className={`text-2xl font-bold ${getDebtColor(codeAnalysis.health.techDebtScore)}`}>
+              {codeAnalysis.health.techDebtScore}
+            </span>
+            <span className="text-xs text-gray-500">/100</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          <HealthIndicator label="测试覆盖" ok={codeAnalysis.health.hasTests} />
+          <HealthIndicator label="文档" ok={codeAnalysis.health.hasDocs} />
+          <HealthIndicator label="CI/CD" ok={codeAnalysis.health.hasCI} />
+          <HealthIndicator label="代码规范" ok={codeAnalysis.health.hasLinting} />
+          <HealthIndicator label="TypeScript" ok={codeAnalysis.health.hasTypeScript} />
+          <HealthIndicator label="环境变量示例" ok={codeAnalysis.health.hasEnvExample} />
+        </div>
+
+        {codeAnalysis.health.suggestions.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-700">
+            <h4 className="text-sm font-medium text-gray-300 mb-3">自动生成建议</h4>
+            <div className="space-y-2">
+              {codeAnalysis.health.suggestions.map((s, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <span className="text-orange-400">💡</span>
+                    <span className="text-sm text-gray-300">{s.issue}</span>
+                  </div>
+                  <CopyPromptButton text={s.prompt} label="生成 Prompt" variant="compact" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

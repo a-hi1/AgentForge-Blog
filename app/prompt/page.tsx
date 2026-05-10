@@ -34,6 +34,15 @@ const DEPTH_OPTIONS: { value: PromptDepth; label: string; desc: string; icon: st
   { value: 'architect', label: '架构师', desc: '2500-4000 字，超细粒度', icon: '🏗️' },
 ];
 
+type FlowStep = 'input' | 'reasoning' | 'clarification' | 'generating' | 'done';
+
+const STEP_INDICATORS = [
+  { key: 'input', label: '输入想法', icon: '💡' },
+  { key: 'reasoning', label: '识别类型', icon: '🔍' },
+  { key: 'clarification', label: '深度追问', icon: '❓' },
+  { key: 'generating', label: '生成 Prompt', icon: '⚡' },
+] as const;
+
 export default function PromptPage() {
   const [input, setInput] = useState('');
   const [depth, setDepth] = useState<PromptDepth>('standard');
@@ -48,6 +57,7 @@ export default function PromptPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showClarification, setShowClarification] = useState(false);
   const [personalHint, setPersonalHint] = useState<string | null>(null);
+  const [flowStep, setFlowStep] = useState<FlowStep>('input');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -68,30 +78,34 @@ export default function PromptPage() {
     setClarification(null);
     setShowClarification(false);
     setAnswers({});
+    setFlowStep('reasoning');
 
     try {
       setLoadingStep('深度推理分析中...');
       const projectReasoning = await reasonProject(input);
       setReasoning(projectReasoning);
+      setFlowStep('reasoning');
 
       const hint = getPersonalizedHint(projectReasoning.primaryType);
       setPersonalHint(hint);
 
-      if (projectReasoning.confidence < 80) {
-        setLoadingStep('生成澄清问题...');
-        const clarResult = await generateClarifications(input, projectReasoning);
-        setClarification(clarResult);
-        if (clarResult.needed && clarResult.questions.length > 0) {
-          setShowClarification(true);
-          setLoading(false);
-          setLoadingStep('');
-          return;
-        }
+      setLoadingStep('生成澄清问题...');
+      const clarResult = await generateClarifications(input, projectReasoning);
+      setClarification(clarResult);
+      if (clarResult.needed && clarResult.questions.length > 0) {
+        setShowClarification(true);
+        setFlowStep('clarification');
+        setLoading(false);
+        setLoadingStep('');
+        return;
       }
 
+      setFlowStep('generating');
       await buildPhases(projectReasoning, input, depth);
+      setFlowStep('done');
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成失败，请重试');
+      setFlowStep('input');
     } finally {
       setLoading(false);
       setLoadingStep('');
@@ -158,6 +172,7 @@ export default function PromptPage() {
     if (!reasoning) return;
     setShowClarification(false);
     setLoading(true);
+    setFlowStep('generating');
     setLoadingStep('融合用户反馈...');
 
     const mergedContext = clarification
@@ -165,6 +180,7 @@ export default function PromptPage() {
       : undefined;
 
     await buildPhases(reasoning, input, depth, mergedContext);
+    setFlowStep('done');
     setLoading(false);
     setLoadingStep('');
   }, [reasoning, clarification, answers, input, depth, buildPhases]);
@@ -173,7 +189,9 @@ export default function PromptPage() {
     if (!reasoning) return;
     setShowClarification(false);
     setLoading(true);
+    setFlowStep('generating');
     await buildPhases(reasoning, input, depth);
+    setFlowStep('done');
     setLoading(false);
   }, [reasoning, input, depth, buildPhases]);
 
@@ -191,7 +209,7 @@ export default function PromptPage() {
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-[#8B5CF6] animate-pulse" />
-            <span className="text-[#A1A1AA] text-sm font-medium hidden sm:inline">Prompt Architect v2</span>
+            <span className="text-[#A1A1AA] text-sm font-medium hidden sm:inline">Prompt Studio</span>
             <span className="text-[#71717A] text-xs hidden sm:inline">|</span>
             <div className="hidden sm:flex items-center gap-1 bg-[rgba(255,255,255,0.03)] rounded-lg p-0.5 border border-[rgba(255,255,255,0.06)]">
               <Link href="/playground" className="px-3 py-1 text-xs font-medium rounded-md text-[#71717A] hover:text-[#60A5FA] hover:bg-[rgba(59,130,246,0.08)] transition-all">
@@ -218,12 +236,35 @@ export default function PromptPage() {
 
       <div className="flex-grow flex max-w-[1600px] mx-auto w-full">
         <aside className={`${mobileView === 'input' ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 border-r border-[rgba(255,255,255,0.06)] flex-col bg-[#09090B]/50`}>
+          <div className="px-5 pt-4 pb-2 border-b border-[rgba(255,255,255,0.06)]">
+            <div className="flex items-center justify-between mb-3">
+              {STEP_INDICATORS.map((step, i) => {
+                const isActive = step.key === flowStep;
+                const isDone = STEP_INDICATORS.findIndex(s => s.key === flowStep) > i || flowStep === 'done';
+                return (
+                  <div key={step.key} className="flex items-center gap-1.5">
+                    <span className={`text-sm transition-all ${isActive ? 'scale-110' : isDone ? 'opacity-60' : 'opacity-30'}`}>
+                      {step.icon}
+                    </span>
+                    <span className={`text-[10px] transition-all hidden lg:inline ${
+                      isActive ? 'text-[#A78BFA] font-semibold' : isDone ? 'text-[#71717A] line-through' : 'text-[#52525B]'
+                    }`}>
+                      {step.label}
+                    </span>
+                    {i < STEP_INDICATORS.length - 1 && (
+                      <div className={`w-4 h-px mx-0.5 ${isDone ? 'bg-[#8B5CF6]' : 'bg-[rgba(255,255,255,0.06)]'}`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <div className="p-5 border-b border-[rgba(255,255,255,0.06)]">
             <h2 className="text-sm font-semibold text-[#FAFAFA] mb-1">产品想法</h2>
-            <p className="text-xs text-[#71717A] mb-4">输入产品描述，AI 深度推理后生成定制化 Prompt</p>
+            <p className="text-xs text-[#71717A] mb-4">输入想法 → 识别类型 → 追问澄清 → 精准生成</p>
             <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => { setInput(e.target.value); if (flowStep !== 'input') setFlowStep('input'); }}
               placeholder="例如：开发校园二手交易+兴趣社交平台..."
               className="w-full bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-xl px-4 py-3 text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6] resize-none text-sm leading-relaxed min-h-[100px] max-h-[200px]"
               rows={4}
