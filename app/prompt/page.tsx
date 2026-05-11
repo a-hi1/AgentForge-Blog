@@ -81,6 +81,8 @@ export default function PromptPage() {
   const [saving, setSaving] = useState(false);
   const [buildSteps, setBuildSteps] = useState<BuildStep[]>([]);
   const [savedAssetId, setSavedAssetId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<'MVP' | 'Beta' | 'Growth'>('MVP');
+  const [projectName, setProjectName] = useState('');
 
   useEffect(() => {
     const ctx = loadContext();

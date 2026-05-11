@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { generateFixPrompt } from '@/lib/prompt-orchestrator/fixGenerator';
 import type { FixPrompt } from '@/lib/prompt-orchestrator/fixGenerator';
 import CopyPromptButton from '@/components/prompt/CopyPromptButton';

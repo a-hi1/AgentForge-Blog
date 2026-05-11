@@ -10,7 +10,10 @@ import DecisionGraph from '@/components/planner/DecisionGraph';
 import { generateArtifacts, artifactsToMarkdown, artifactsToScaffold, artifactsToApiSpec } from '@/lib/agent-runtime/artifactGenerator';
 import type { EngineeringArtifacts } from '@/lib/agent-runtime/artifactGenerator';
 import { updateAssetExecutionResult } from '@/lib/prompt/history';
+import type { ExecutionMode } from '@/lib/prompt/history';
 import { saveContext, loadContext } from '@/lib/session/contextStore';
+import { analyzeExecutionResult } from '@/lib/execution/resultAnalyzer';
+import type { ExecutionTruthScore } from '@/lib/execution/resultAnalyzer';
 
 interface Step {
   step: number;
@@ -100,6 +103,14 @@ export default function PlaygroundPage() {
   const [showFullReport, setShowFullReport] = useState(false);
   const [reportSearch, setReportSearch] = useState('');
   const [activeSection, setActiveSection] = useState<string>('summary');
+  const [showMemoryPanel, setShowMemoryPanel] = useState(true);
+  const [showMetaPanel, setShowMetaPanel] = useState(true);
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>('real-api');
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualResultInput, setManualResultInput] = useState('');
+  const [manualExternalAgent, setManualExternalAgent] = useState('');
+  const [manualAnalysis, setManualAnalysis] = useState<ExecutionTruthScore | null>(null);
+  const [analyzingResult, setAnalyzingResult] = useState(false);
 
   useEffect(() => {
     const ctx = loadContext();
@@ -202,6 +213,13 @@ export default function PlaygroundPage() {
           return { ...msg, memoriesUsed: event.memories, memoryInfluenced: event.memory_influenced, adaptations: event.adaptations };
         } else if (event.type === 'memory_status') {
           return { ...msg, content: event.message };
+        } else if (event.type === 'execution_source') {
+          return msg;
+        } else if (event.type === 'step_error') {
+          const newSteps = [...msg.steps];
+          const idx = newSteps.findIndex(s => s.step === event.step);
+          if (idx >= 0) newSteps[idx] = { ...newSteps[idx], status: 'failed', output: `❌ ${event.error}` };
+          return { ...msg, steps: newSteps };
         } else if (event.type === 'step_start') {
           const newStep: Step = { step: event.step, agent: event.agent, task: event.task, output: '', status: 'executing' };
           return { ...msg, steps: [...msg.steps, newStep] };
@@ -284,8 +302,8 @@ export default function PlaygroundPage() {
           const hasOutput = outputs.length > 0;
           setExecutionSummary({
             outcome,
-            successReason: outcome === 'success' ? `全部 ${total} 个步骤执行成功，产出了有效工程输出` : outcome === 'partial' ? `${done}/${total} 步骤完成，部分任务未完成` : `${failed} 个步骤执行失败`,
-            failureReason: outcome !== 'success' ? (failed > 0 ? '部分 Agent 执行出错，可能是 Prompt 指令不够精确' : '执行中断，可能需要更详细的上下文描述') : undefined,
+            successReason: outcome === 'success' ? `全部 ${total} 个步骤真实执行成功，产出了有效工程输出` : outcome === 'partial' ? `${done}/${total} 步骤完成，部分任务未完成` : `${failed} 个步骤执行失败`,
+            failureReason: outcome !== 'success' ? (failed > 0 ? 'Agent API 执行出错，可能是 API 限流或 Prompt 指令不够精确' : '执行中断，可能需要更详细的上下文描述') : undefined,
             promptUpgradeNeeded: outcome !== 'success' || done < total || !hasOutput,
             upgradeReason: outcome !== 'success' ? '当前执行未完全成功，建议优化 Prompt 提高成功率' : !hasOutput ? '执行完成但未产出有效内容，建议补充更多细节' : undefined,
             nextStep: outcome === 'success' ? '在实验室查看完整报告，或导出工程产物' : outcome === 'partial' ? '使用问题修复工具分析失败原因' : '优化 Prompt 后重新执行',
@@ -377,6 +395,12 @@ export default function PlaygroundPage() {
         success: feedbackSuccess,
         rating: feedbackRating,
         notes: feedbackNotes || undefined,
+        provenance: {
+          executionMode: executionMode,
+          realExecution: executionMode === 'real-api',
+          externalAgent: executionMode === 'manual' ? manualExternalAgent : undefined,
+          userRating: feedbackRating,
+        },
       });
       setShowFeedbackDialog(false);
     } catch (e) {
@@ -384,7 +408,67 @@ export default function PlaygroundPage() {
     } finally {
       setSubmittingFeedback(false);
     }
-  }, [assetId, feedbackSuccess, feedbackRating, feedbackNotes]);
+  }, [assetId, feedbackSuccess, feedbackRating, feedbackNotes, executionMode, manualExternalAgent]);
+
+  const handleManualSend = useCallback(() => {
+    if (!input.trim() || isLoading) return;
+    const text = input;
+    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
+    const agentMessage: Message = {
+      id: (Date.now() + 1).toString(), role: 'agent',
+      content: `📋 Prompt 已生成，请复制以下内容发送给外部 Agent 执行：\n\n${text}\n\n执行完成后，请在下方粘贴结果。`,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage, agentMessage]);
+    setInput('');
+    setShowSuggestions(false);
+    setShowManualInput(true);
+    setManualResultInput('');
+    setManualAnalysis(null);
+    setLastPrompt(text);
+  }, [input, isLoading]);
+
+  const handleAnalyzeManualResult = useCallback(async () => {
+    if (!manualResultInput.trim() || !lastPrompt) return;
+    setAnalyzingResult(true);
+    try {
+      const analysis = analyzeExecutionResult(manualResultInput, lastPrompt);
+      setManualAnalysis(analysis);
+
+      const analysisMessage: Message = {
+        id: Date.now().toString(), role: 'agent',
+        content: `🔍 结果分析完成\n\n综合评分: ${analysis.overall}/100\n成功率: ${analysis.successRate}%\n完整性: ${analysis.completeness}%\n工程可落地性: ${analysis.engineeringQuality}%\n${analysis.errorPatterns.length > 0 ? `\n⚠️ 发现问题:\n${analysis.errorPatterns.map(p => `- ${p}`).join('\n')}` : ''}${analysis.needsPromptUpgrade ? `\n\n💡 Prompt 建议升级:\n${analysis.upgradeSuggestions.map(s => `- ${s}`).join('\n')}` : ''}`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, analysisMessage]);
+
+      if (assetId) {
+        await updateAssetExecutionResult(assetId, {
+          success: analysis.overall >= 60 ? 'success' : analysis.overall >= 40 ? 'partial' : 'failed',
+          rating: Math.ceil(analysis.overall / 20),
+          notes: `手动执行 | 外部Agent: ${manualExternalAgent || '未指定'} | 评分: ${analysis.overall}`,
+          provenance: {
+            executionMode: 'manual',
+            realExecution: true,
+            externalAgent: manualExternalAgent || undefined,
+            executionSource: 'manual-bridge',
+            userRating: Math.ceil(analysis.overall / 20),
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Analysis failed:', e);
+    } finally {
+      setAnalyzingResult(false);
+    }
+  }, [manualResultInput, lastPrompt, assetId, manualExternalAgent]);
+
+  const handleModeSwitch = useCallback((mode: ExecutionMode) => {
+    setExecutionMode(mode);
+    setShowManualInput(false);
+    setManualResultInput('');
+    setManualAnalysis(null);
+  }, []);
 
   return (
     <>
@@ -396,13 +480,29 @@ export default function PlaygroundPage() {
             <span className="text-[#A1A1AA] text-sm font-medium">AI 工程控制台</span>
             <span className="text-[#71717A] text-xs hidden sm:inline">|</span>
             <div className="hidden sm:flex items-center gap-1 bg-[rgba(255,255,255,0.03)] rounded-lg p-0.5 border border-[rgba(255,255,255,0.06)]">
-              <span className="px-3 py-1 text-xs font-medium rounded-md bg-[rgba(59,130,246,0.15)] text-[#60A5FA]">
-                执行模式
-              </span>
-              <Link href="/prompt" className="px-3 py-1 text-xs font-medium rounded-md text-[#71717A] hover:text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)] transition-all">
-                提示词模式
-              </Link>
+              {([
+                { mode: 'real-api' as ExecutionMode, label: '真实执行' },
+                { mode: 'manual' as ExecutionMode, label: '手动桥接' },
+                { mode: 'mock' as ExecutionMode, label: '模拟执行' },
+              ]).map(opt => (
+                <button
+                  key={opt.mode}
+                  onClick={() => handleModeSwitch(opt.mode)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    executionMode === opt.mode
+                      ? opt.mode === 'real-api' ? 'bg-[rgba(16,185,129,0.15)] text-[#10B981]'
+                        : opt.mode === 'manual' ? 'bg-[rgba(59,130,246,0.15)] text-[#60A5FA]'
+                        : 'bg-[rgba(161,161,170,0.15)] text-[#A1A1AA]'
+                      : 'text-[#71717A] hover:text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
+            <Link href="/prompt" className="px-3 py-1 text-xs font-medium rounded-md text-[#71717A] hover:text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)] transition-all hidden sm:inline-block">
+              提示词模式
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             {messages.length > 0 && (
@@ -592,6 +692,105 @@ export default function PlaygroundPage() {
             <div ref={messagesEndRef} />
           </div>
 
+          {showManualInput && executionMode === 'manual' && (
+            <div className="border-t border-[rgba(59,130,246,0.2)] bg-[rgba(59,130,246,0.03)] p-4 lg:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#60A5FA] animate-pulse" />
+                  <span className="text-sm font-medium text-[#60A5FA]">手动执行桥接</span>
+                </div>
+                <button onClick={() => { setShowManualInput(false); setManualAnalysis(null); }} className="text-[#71717A] hover:text-[#A1A1AA] transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[#71717A] shrink-0">外部 Agent：</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {['Cursor', 'Claude', 'GPT', 'Gemini', '其他'].map(agent => (
+                    <button
+                      key={agent}
+                      onClick={() => setManualExternalAgent(agent)}
+                      className={`px-2.5 py-1 text-xs rounded-md transition-all ${
+                        manualExternalAgent === agent
+                          ? 'bg-[rgba(59,130,246,0.2)] text-[#60A5FA] border border-[rgba(59,130,246,0.3)]'
+                          : 'text-[#71717A] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(59,130,246,0.2)]'
+                      }`}
+                    >
+                      {agent}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-[#71717A] mb-1.5">粘贴外部 Agent 的执行结果：</label>
+                <textarea
+                  value={manualResultInput}
+                  onChange={e => setManualResultInput(e.target.value)}
+                  placeholder="将外部 Agent 的输出结果粘贴到这里...&#10;&#10;支持 Markdown 格式"
+                  className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-3 text-sm text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#3B82F6] resize-none min-h-[120px] max-h-[300px]"
+                  rows={5}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleAnalyzeManualResult}
+                  disabled={!manualResultInput.trim() || analyzingResult}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white hover:shadow-lg hover:shadow-[rgba(59,130,246,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {analyzingResult ? '分析中...' : '分析结果'}
+                </button>
+                <span className="text-[10px] text-[#71717A]">
+                  {manualResultInput.length > 0 ? `${manualResultInput.length} 字符` : '等待输入'}
+                </span>
+              </div>
+
+              {manualAnalysis && (
+                <div className="p-4 rounded-lg bg-[rgba(24,24,27,0.7)] border border-[rgba(255,255,255,0.08)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-[#FAFAFA]">执行真实性评分</span>
+                    <span className={`text-lg font-bold ${
+                      manualAnalysis.overall >= 70 ? 'text-[#10B981]' :
+                      manualAnalysis.overall >= 50 ? 'text-[#F59E0B]' : 'text-[#EF4444]'
+                    }`}>
+                      {manualAnalysis.overall}/100
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: '成功率', value: manualAnalysis.successRate, color: '#10B981' },
+                      { label: '完整性', value: manualAnalysis.completeness, color: '#3B82F6' },
+                      { label: '工程质量', value: manualAnalysis.engineeringQuality, color: '#8B5CF6' },
+                    ].map(item => (
+                      <div key={item.label} className="text-center">
+                        <div className="text-xs text-[#71717A] mb-1">{item.label}</div>
+                        <div className="text-sm font-semibold" style={{ color: item.color }}>{item.value}%</div>
+                      </div>
+                    ))}
+                  </div>
+                  {manualAnalysis.errorPatterns.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-xs text-[#F59E0B]">⚠️ 发现问题：</span>
+                      {manualAnalysis.errorPatterns.map((p, i) => (
+                        <p key={i} className="text-xs text-[#A1A1AA] pl-3">• {p}</p>
+                      ))}
+                    </div>
+                  )}
+                  {manualAnalysis.needsPromptUpgrade && manualAnalysis.upgradeSuggestions.length > 0 && (
+                    <div className="p-2 rounded-md bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.15)] space-y-1">
+                      <span className="text-xs text-[#A78BFA]">💡 Prompt 升级建议：</span>
+                      {manualAnalysis.upgradeSuggestions.map((s, i) => (
+                        <p key={i} className="text-xs text-[#71717A] pl-3">• {s}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="border-t border-[rgba(255,255,255,0.06)] p-3 lg:p-4">
             <div className="relative">
               <textarea
@@ -599,7 +798,7 @@ export default function PlaygroundPage() {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); setShowSuggestions(false); }}
                 onKeyDown={handleKeyDown}
-                placeholder="描述你的工程需求... (Ctrl+Enter 发送)"
+                placeholder={executionMode === 'manual' ? '输入 Prompt，将发送给外部 Agent 执行...' : '描述你的工程需求... (Ctrl+Enter 发送)'}
                 className="w-full bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-xl px-4 py-3 pr-28 text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:border-[#3B82F6] resize-none text-sm leading-relaxed min-h-[52px] max-h-[200px]"
                 rows={1}
                 disabled={isLoading}
@@ -615,10 +814,10 @@ export default function PlaygroundPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => handleSend()}
+                  onClick={() => executionMode === 'manual' ? handleManualSend() : handleSend()}
                   disabled={isLoading || !input.trim()}
                   className="p-2 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white hover:shadow-lg hover:shadow-[rgba(59,130,246,0.3)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="发送 (Ctrl+Enter)"
+                  title={executionMode === 'manual' ? '生成 Prompt (手动桥接)' : '发送 (Ctrl+Enter)'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </button>
@@ -664,7 +863,7 @@ export default function PlaygroundPage() {
                       </button>
                     ))}
                   </div>
-                  {lastExecution && lastExecution.steps.length > 0 && (
+                  {lastExecution && lastExecution.steps && lastExecution.steps.length > 0 && (
                     <button
                       onClick={() => setShowFullReport(true)}
                       className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs text-[#60A5FA] hover:bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.15)] transition-all"
@@ -755,7 +954,7 @@ export default function PlaygroundPage() {
                   <div className="p-3 rounded-lg bg-[rgba(24,24,27,0.5)] border border-[rgba(255,255,255,0.06)]">
                     <DecisionGraph
                       prompt={lastPrompt}
-                      steps={lastExecution.steps}
+                      steps={lastExecution.steps || []}
                       memoryInfluenced={lastExecution.memoryInfluenced}
                       memoryCount={lastExecution.memoriesUsed?.length}
                     />
@@ -920,7 +1119,7 @@ export default function PlaygroundPage() {
       </div>
     )}
 
-    {showFullReport && lastExecution && lastExecution.steps.length > 0 && (
+    {showFullReport && lastExecution && lastExecution.steps && lastExecution.steps.length > 0 && (
       <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowFullReport(false)}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
         <div
@@ -930,7 +1129,7 @@ export default function PlaygroundPage() {
           <div className="sticky top-0 z-10 bg-[#0A0A0C] border-b border-[rgba(255,255,255,0.06)] p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-semibold text-[#FAFAFA]">完整执行报告</h2>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.06)] text-[#71717A]">{lastExecution.steps.length} 步骤</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.06)] text-[#71717A]">{lastExecution.steps?.length || 0} 步骤</span>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -941,7 +1140,7 @@ export default function PlaygroundPage() {
               />
               <button
                 onClick={() => {
-                  const fullText = lastExecution.steps.map((s: any) =>
+                  const fullText = (lastExecution.steps ?? []).map((s: any) =>
                     `### [${s.agent}] ${s.task}\n\n${s.output || ''}`
                   ).join('\n\n---\n\n');
                   navigator.clipboard.writeText(fullText);
@@ -955,7 +1154,7 @@ export default function PlaygroundPage() {
               </button>
               <button
                 onClick={() => {
-                  const md = `# 执行报告\n\n${lastExecution.content || ''}\n\n${lastExecution.steps.map((s: any) =>
+                  const md = `# 执行报告\n\n${lastExecution.content || ''}\n\n${(lastExecution.steps ?? []).map((s: any) =>
                     `## [${s.agent}] ${s.task}\n\n${s.output || ''}`
                   ).join('\n\n---\n\n')}`;
                   const blob = new Blob([md], { type: 'text/markdown' });
@@ -986,7 +1185,7 @@ export default function PlaygroundPage() {
           )}
 
           <div className="p-4 space-y-4">
-            {lastExecution.steps.map((step: any) => {
+            {(lastExecution.steps ?? []).map((step: any) => {
               const matchesSearch = !reportSearch ||
                 step.task.toLowerCase().includes(reportSearch.toLowerCase()) ||
                 (step.output && step.output.toLowerCase().includes(reportSearch.toLowerCase()));

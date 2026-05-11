@@ -2,6 +2,16 @@ import { getAgentPrompt, getAgentDefaultTask } from './prompts';
 import { validateOutput, buildRetryInstruction } from './outputValidator';
 import { CHINESE_OUTPUT_INSTRUCTION } from './constants';
 
+export type ExecutionSource = 'real-api' | 'manual' | 'mock' | 'failed';
+
+export interface ExecutionResult {
+  output: string;
+  success: boolean;
+  source: ExecutionSource;
+  error?: string;
+  duration: number;
+}
+
 interface AgentConfig {
   name: string;
   task: string;
@@ -23,13 +33,20 @@ export async function executeAgent(
   task: string,
   context: string,
   systemPromptOverride?: string
-): Promise<string> {
+): Promise<ExecutionResult> {
+  const startTime = Date.now();
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
   const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
   if (!apiKey) {
-    return generateFallbackResponse(agentName, task, context);
+    return {
+      output: '',
+      success: false,
+      source: 'failed',
+      error: '未配置 API Key，请在 .env.local 中设置 OPENAI_API_KEY',
+      duration: Date.now() - startTime,
+    };
   }
 
   const config = getConfig(agentName, task);
@@ -55,8 +72,14 @@ export async function executeAgent(
     });
 
     if (!response.ok) {
-      console.error(`[Executor] API call failed: ${response.status} ${response.statusText}`);
-      return generateFallbackResponse(agentName, task, context);
+      const errorText = await response.text().catch(() => '');
+      return {
+        output: '',
+        success: false,
+        source: 'failed',
+        error: `API 调用失败: ${response.status} ${response.statusText}${errorText ? ` - ${errorText.slice(0, 200)}` : ''}`,
+        duration: Date.now() - startTime,
+      };
     }
 
     const result = await response.json();
@@ -65,16 +88,27 @@ export async function executeAgent(
     if (content) {
       const validation = validateOutput(content);
       if (!validation.isValid && validation.chineseRatio < 0.4) {
-        console.warn(`[Executor] Output quality low (score: ${validation.score}), retrying with correction`);
-        return await retryWithCorrection(agentName, fullTask, context, systemPrompt, config, validation.issues);
+        const retryResult = await retryWithCorrection(agentName, fullTask, context, systemPrompt, config, validation.issues);
+        return { ...retryResult, source: 'real-api', duration: Date.now() - startTime };
       }
-      return content;
+      return { output: content, success: true, source: 'real-api', duration: Date.now() - startTime };
     }
 
-    return generateFallbackResponse(agentName, task, context);
+    return {
+      output: '',
+      success: false,
+      source: 'failed',
+      error: 'API 返回空内容',
+      duration: Date.now() - startTime,
+    };
   } catch (error) {
-    console.error('[Executor] API error:', error);
-    return generateFallbackResponse(agentName, task, context);
+    return {
+      output: '',
+      success: false,
+      source: 'failed',
+      error: error instanceof Error ? error.message : 'API 调用异常',
+      duration: Date.now() - startTime,
+    };
   }
 }
 
@@ -85,13 +119,13 @@ async function retryWithCorrection(
   systemPrompt: string,
   config: AgentConfig,
   issues: string[]
-): Promise<string> {
+): Promise<ExecutionResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
   const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
   if (!apiKey) {
-    return generateFallbackResponse(agentName, task, context);
+    return { output: '', success: false, source: 'failed', error: '未配置 API Key', duration: 0 };
   }
 
   const retryInstruction = buildRetryInstruction(issues);
@@ -115,13 +149,17 @@ async function retryWithCorrection(
     });
 
     if (!response.ok) {
-      return generateFallbackResponse(agentName, task, context);
+      return { output: '', success: false, source: 'failed', error: `重试失败: ${response.status}`, duration: 0 };
     }
 
     const result = await response.json();
-    return result.choices[0]?.message?.content || generateFallbackResponse(agentName, task, context);
+    const content = result.choices[0]?.message?.content;
+    if (content) {
+      return { output: content, success: true, source: 'real-api', duration: 0 };
+    }
+    return { output: '', success: false, source: 'failed', error: '重试返回空内容', duration: 0 };
   } catch {
-    return generateFallbackResponse(agentName, task, context);
+    return { output: '', success: false, source: 'failed', error: '重试调用异常', duration: 0 };
   }
 }
 
@@ -130,16 +168,23 @@ export async function executeAgentStreaming(
   task: string,
   context: string,
   onChunk: (chunk: string) => Promise<void>,
-  systemPromptOverride?: string
-): Promise<void> {
+  systemPromptOverride?: string,
+  onSource?: (source: ExecutionSource) => void
+): Promise<ExecutionResult> {
+  const startTime = Date.now();
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
   const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
   if (!apiKey) {
-    const fallback = generateFallbackResponse(agentName, task, context);
-    await onChunk(fallback);
-    return;
+    onSource?.('failed');
+    return {
+      output: '',
+      success: false,
+      source: 'failed',
+      error: '未配置 API Key，请在 .env.local 中设置 OPENAI_API_KEY',
+      duration: Date.now() - startTime,
+    };
   }
 
   const config = getConfig(agentName, task);
@@ -166,21 +211,34 @@ export async function executeAgentStreaming(
     });
 
     if (!response.ok) {
-      console.error(`[Executor] Streaming API failed: ${response.status}`);
-      const fallback = generateFallbackResponse(agentName, task, context);
-      await onChunk(fallback);
-      return;
+      const errorText = await response.text().catch(() => '');
+      onSource?.('failed');
+      return {
+        output: '',
+        success: false,
+        source: 'failed',
+        error: `API 调用失败: ${response.status} ${response.statusText}${errorText ? ` - ${errorText.slice(0, 200)}` : ''}`,
+        duration: Date.now() - startTime,
+      };
     }
+
+    onSource?.('real-api');
 
     const reader = response.body?.getReader();
     if (!reader) {
-      const fallback = generateFallbackResponse(agentName, task, context);
-      await onChunk(fallback);
-      return;
+      onSource?.('failed');
+      return {
+        output: '',
+        success: false,
+        source: 'failed',
+        error: '无法读取 API 响应流',
+        duration: Date.now() - startTime,
+      };
     }
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let fullOutput = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -196,22 +254,30 @@ export async function executeAgentStreaming(
             const json = JSON.parse(line.slice(6));
             const content = json.choices?.[0]?.delta?.content;
             if (content) {
+              fullOutput += content;
               await onChunk(content);
             }
-          } catch (e) {
+          } catch {
             // Ignore malformed JSON chunks
           }
         }
       }
     }
+
+    return { output: fullOutput, success: true, source: 'real-api', duration: Date.now() - startTime };
   } catch (error) {
-    console.error('[Executor] Streaming error:', error);
-    const fallback = generateFallbackResponse(agentName, task, context);
-    await onChunk(fallback);
+    onSource?.('failed');
+    return {
+      output: '',
+      success: false,
+      source: 'failed',
+      error: error instanceof Error ? error.message : 'API 调用异常',
+      duration: Date.now() - startTime,
+    };
   }
 }
 
-function generateFallbackResponse(agentName: string, task: string, context: string): string {
+export function generateMockResponse(agentName: string, task: string, context: string): string {
   const taskPreview = task || context;
 
   if (agentName.includes('架构') || agentName.includes('Architect') || agentName.includes('产品分析')) {
@@ -256,10 +322,8 @@ src/
 # 三、核心代码实现
 
 \`\`\`typescript
-// 核心业务逻辑实现
 export class BusinessService {
   async process(input: string): Promise<Result> {
-    // 业务处理逻辑
     const validated = this.validate(input);
     return await this.execute(validated);
   }

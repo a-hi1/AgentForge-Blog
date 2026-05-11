@@ -318,7 +318,7 @@ function inferCoreUsers(lower: string, types: string[]): string[] {
   if (users.length === 0) {
     users.push('终端用户', '管理员');
   }
-  return [...new Set(users)];
+  return Array.from(new Set(users));
 }
 
 function inferTechnicalBoundaries(lower: string, types: string[]): string[] {

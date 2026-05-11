@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { executeAgentStreaming } from '@/lib/agent-runtime/executor';
+import type { ExecutionSource } from '@/lib/agent-runtime/executor';
 import { generatePlan } from '@/lib/agent-runtime/planner';
 import { MemoryManager } from '@/lib/agent-runtime/memoryManager';
 import { generateId } from '@/lib/agent-runtime/storage';
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
       let executionSteps: any[] = [];
       let executionId: string | null = null;
       let memoryInfluenced = false;
+      let overallSource: ExecutionSource = 'real-api';
 
       const encodeStreamEvent = (event: any) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
             ? `${step.agent}\n\n${contextWithDomain}`
             : undefined;
 
-          await executeAgentStreaming(
+          const result = await executeAgentStreaming(
             step.agent,
             step.task,
             `${prompt}\n\n${memoryContext}`.trim(),
@@ -92,8 +94,28 @@ export async function POST(request: Request) {
                 output: chunk,
               });
             },
-            systemOverride
+            systemOverride,
+            (source: ExecutionSource) => {
+              if (source === 'failed') overallSource = 'failed';
+              encodeStreamEvent({
+                type: 'execution_source',
+                step: step.step,
+                source: source,
+              });
+            }
           );
+
+          if (!result.success && result.source === 'failed') {
+            encodeStreamEvent({
+              type: 'step_error',
+              step: step.step,
+              agent: step.agent,
+              error: result.error || '执行失败',
+              source: 'failed',
+            });
+            overallSource = 'failed';
+            break;
+          }
 
           const qualityValidation = validateOutput(fullOutput);
           
@@ -106,6 +128,8 @@ export async function POST(request: Request) {
             status: 'completed',
             quality_score: qualityValidation.score,
             chinese_ratio: Math.round(qualityValidation.chineseRatio * 100),
+            source: result.source,
+            duration: result.duration,
           });
 
           executionSteps.push({
@@ -113,6 +137,8 @@ export async function POST(request: Request) {
             output: fullOutput,
             status: 'completed',
             quality_score: qualityValidation.score,
+            source: result.source,
+            duration: result.duration,
             timestamp: new Date().toISOString(),
           });
         }
@@ -132,7 +158,7 @@ export async function POST(request: Request) {
               status: s.status as 'completed',
               timestamp: s.timestamp,
             })),
-            status: 'completed',
+            status: overallSource === 'failed' ? 'failed' : 'completed',
             memory_influenced: memoryInfluenced,
             adaptation_reason: plan.adaptationReasons,
             timestamp: new Date().toISOString(),
@@ -140,15 +166,17 @@ export async function POST(request: Request) {
 
           await import('@/lib/agent-runtime/storage').then(m => m.saveExecution(record));
 
-          try {
-            const lessons = await MemoryManager.extractExecutionLessons({
-              prompt,
-              steps: executionSteps,
-              status: 'completed',
-            });
-            await MemoryManager.storeExecutionMemory(executionId, prompt, lessons, `质量评分: ${avgQuality}/100`);
-          } catch (memErr) {
-            console.warn('[Agent API] Memory storage failed:', memErr);
+          if (overallSource !== 'failed') {
+            try {
+              const lessons = await MemoryManager.extractExecutionLessons({
+                prompt,
+                steps: executionSteps,
+                status: 'completed',
+              });
+              await MemoryManager.storeExecutionMemory(executionId, prompt, lessons, `质量评分: ${avgQuality}/100`);
+            } catch (memErr) {
+              console.warn('[Agent API] Memory storage failed:', memErr);
+            }
           }
         }
 
@@ -158,9 +186,11 @@ export async function POST(request: Request) {
           memory_influenced: memoryInfluenced,
           domain: domainAnalysis.domain,
           total_steps: executionSteps.length,
-          avg_quality: Math.round(
-            executionSteps.reduce((s, e) => s + (e.quality_score || 80), 0) / executionSteps.length
-          ),
+          avg_quality: executionSteps.length > 0
+            ? Math.round(executionSteps.reduce((s, e) => s + (e.quality_score || 80), 0) / executionSteps.length)
+            : 0,
+          source: overallSource,
+          execution_source: overallSource,
         });
 
       } catch (error) {
@@ -168,6 +198,7 @@ export async function POST(request: Request) {
         encodeStreamEvent({
           type: 'error',
           message: error instanceof Error ? error.message : '系统处理异常，请稍后重试',
+          source: 'failed',
         });
       } finally {
         controller.close();

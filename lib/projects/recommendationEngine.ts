@@ -17,7 +17,24 @@ export interface DailyTask {
   actionLabel: string;
   actionHref: string;
   priority: 'critical' | 'high' | 'medium';
-  source: 'failed-prompt' | 'low-score' | 'project-stage' | 'default';
+  source: 'failed-prompt' | 'low-score' | 'project-stage' | 'default' | 'real-verified-boost';
+  realityBadge?: string;
+}
+
+export interface PromptHistoryInput {
+  id: string;
+  title: string;
+  input: string;
+  feedback?: string;
+  executionSuccess?: boolean;
+  score?: number;
+  category: string;
+  fullPrompt: string;
+  provenance?: {
+    executionMode: string;
+    realExecution: boolean;
+    externalAgent?: string;
+  };
 }
 
 export function generateRecommendations(): RecommendedTask[] {
@@ -58,9 +75,27 @@ export function generateRecommendations(): RecommendedTask[] {
 }
 
 export function generateDailyTask(
-  history: { id: string; title: string; input: string; feedback?: string; executionSuccess?: boolean; score?: number; category: string; fullPrompt: string }[],
+  history: PromptHistoryInput[],
   projectStage?: string
 ): DailyTask {
+  const realVerified = history.filter(h => h.provenance?.realExecution && h.executionSuccess !== false);
+  if (realVerified.length > 0) {
+    const best = realVerified.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    return {
+      title: `复用已验证资产：${best.title}`,
+      blocker: '已有真实验证通过的 Prompt 可直接复用',
+      reason: `「${best.title}」已在 ${best.provenance?.externalAgent || '外部 Agent'} 中真实执行成功${best.score ? `，评分 ${best.score}` : ''}。优先复用可减少试错成本。`,
+      benefit: '直接使用验证过的 Prompt，跳过试错环节',
+      eta: '5 分钟',
+      category: best.category,
+      actionLabel: '查看资产',
+      actionHref: `/prompt/history?id=${best.id}`,
+      priority: 'high',
+      source: 'real-verified-boost',
+      realityBadge: '🟢 Real Verified',
+    };
+  }
+
   const failed = history.filter(h => h.feedback === 'failed' || h.executionSuccess === false);
   if (failed.length > 0) {
     const worst = failed.sort((a, b) => (a.score ?? 50) - (b.score ?? 50))[0];

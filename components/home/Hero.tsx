@@ -150,6 +150,9 @@ export default function Dashboard() {
                 <h2 className="text-lg font-bold text-white">今日主任务</h2>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
                 <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-gray-400">{dailyTask.category}</span>
+                {dailyTask.realityBadge && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-green-500/15 text-green-400 font-medium">{dailyTask.realityBadge}</span>
+                )}
               </div>
 
               <h3 className="text-xl font-semibold text-white mb-4">{dailyTask.title}</h3>

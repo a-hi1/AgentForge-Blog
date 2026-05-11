@@ -481,6 +481,26 @@ export default function PromptHistoryPage() {
                               {asset.score}分
                             </span>
                           )}
+                          {asset.provenance && (
+                            <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium ${
+                              asset.provenance.realExecution && asset.executionSuccess !== false
+                                ? 'bg-[rgba(16,185,129,0.15)] text-[#10B981]'
+                                : asset.executionSuccess === false
+                                  ? 'bg-[rgba(239,68,68,0.15)] text-[#EF4444]'
+                                  : 'bg-[rgba(245,158,11,0.15)] text-[#F59E0B]'
+                            }`}>
+                              {asset.provenance.realExecution && asset.executionSuccess !== false
+                                ? '🟢 Real Verified'
+                                : asset.executionSuccess === false
+                                  ? '🔴 Failed'
+                                  : '🟡 Simulated'}
+                            </span>
+                          )}
+                          {asset.provenance?.externalAgent && (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-[rgba(255,255,255,0.05)] text-[#71717A]">
+                              {asset.provenance.externalAgent}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-[#71717A] flex-wrap">
                           <span className="px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)]">{asset.category}</span>

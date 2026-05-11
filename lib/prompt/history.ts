@@ -9,6 +9,19 @@ export type PromptPhase =
   | 'debug'
   | 'deployment';
 
+export type ExecutionMode = 'simulated' | 'real-api' | 'manual' | 'mock';
+
+export interface ExecutionProvenance {
+  executionMode: ExecutionMode;
+  externalAgent?: string;
+  realExecution: boolean;
+  executionSource?: string;
+  executionDuration?: number;
+  userRating?: number;
+  failureReason?: string;
+  modificationCount?: number;
+}
+
 export interface PromptAsset {
   id: string;
   title: string;
@@ -33,6 +46,7 @@ export interface PromptAsset {
   score?: number;
   scoreDetails?: PromptScore;
   feedback?: 'excellent' | 'average' | 'failed';
+  provenance?: ExecutionProvenance;
 }
 
 export type PromptHistoryRecord = PromptAsset;
@@ -72,6 +86,7 @@ function migrateRecord(raw: any): PromptAsset {
       score: raw.score,
       scoreDetails: raw.scoreDetails,
       feedback: raw.feedback,
+      provenance: raw.provenance,
     };
   }
   return {
@@ -98,6 +113,7 @@ function migrateRecord(raw: any): PromptAsset {
     score: raw.score,
     scoreDetails: raw.score_details || raw.scoreDetails,
     feedback: raw.feedback,
+    provenance: raw.provenance,
   };
 }
 
@@ -145,6 +161,7 @@ function toSupabaseRow(asset: PromptAsset) {
     score_details: asset.scoreDetails,
     execution_success: asset.executionSuccess,
     feedback: asset.feedback,
+    provenance: asset.provenance,
   };
 }
 
@@ -852,6 +869,7 @@ export async function updateAssetExecutionResult(
     success: 'success' | 'partial' | 'failed';
     rating: number;
     notes?: string;
+    provenance?: ExecutionProvenance;
   }
 ): Promise<void> {
   const prompt = await getPromptById(id);
@@ -871,6 +889,11 @@ export async function updateAssetExecutionResult(
     userFeedback: feedbackMap[result.success],
   });
 
+  const provenanceData: ExecutionProvenance = result.provenance || {
+    executionMode: 'simulated',
+    realExecution: false,
+  };
+
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseServer() || getSupabaseBrowser();
     if (supabase) {
@@ -883,6 +906,7 @@ export async function updateAssetExecutionResult(
             rating: result.rating,
             score: newScore.score,
             score_details: newScore,
+            provenance: provenanceData,
           })
           .eq('id', id);
         if (!error) return;
@@ -903,6 +927,7 @@ export async function updateAssetExecutionResult(
       feedback: feedbackMap[result.success],
       score: newScore.score,
       scoreDetails: newScore,
+      provenance: provenanceData,
     };
     saveToLocalStorage(history);
   }
