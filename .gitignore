@@ -7,6 +7,7 @@ dist/
 build/
 out/
 tsconfig.tsbuildinfo
+build_output*.txt
 
 # Local environment files
 .env
