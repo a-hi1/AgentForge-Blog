@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, Component, ReactNode } from '
 import { useRouter } from 'next/navigation';
 import { savePrompt } from '@/lib/prompt/history';
 import { compilePromptPack, CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
-import { IntentResult, ArchitectureResult, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
+import { IntentResult, ArchitectureResult, ArchitectOpinion, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
 import { evaluatePromptQuality, QualityScore } from '@/lib/prompt/scorer';
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
@@ -18,6 +18,7 @@ class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode
 const CHAIN = [
   { key: 'intent', label: '意图识别' },
   { key: 'architecture', label: '架构决策' },
+  { key: 'opinion', label: '架构判断' },
   { key: 'decompose', label: '任务拆解' },
   { key: 'compile', label: 'Prompt 编译' },
 ] as const;
@@ -35,6 +36,7 @@ export default function PromptPage() {
   const [saved, setSaved] = useState(false);
   const [intent, setIntent] = useState<IntentResult | null>(null);
   const [architecture, setArchitecture] = useState<ArchitectureResult | null>(null);
+  const [opinion, setOpinion] = useState<ArchitectOpinion | null>(null);
   const [decompose, setDecompose] = useState<DecomposeResult | null>(null);
   const [quality, setQuality] = useState<QualityScore | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
@@ -57,6 +59,7 @@ export default function PromptPage() {
     setSaved(false);
     setIntent(null);
     setArchitecture(null);
+    setOpinion(null);
     setDecompose(null);
     setQuality(null);
 
@@ -105,6 +108,7 @@ export default function PromptPage() {
                 if (data.result) {
                   if (data.step === 'intent') setIntent(data.result as IntentResult);
                   if (data.step === 'architecture') setArchitecture(data.result as ArchitectureResult);
+                  if (data.step === 'opinion') setOpinion(data.result as ArchitectOpinion);
                   if (data.step === 'decompose') setDecompose(data.result as DecomposeResult);
                 }
               }
@@ -118,6 +122,10 @@ export default function PromptPage() {
               setArchitecture(data.result as ArchitectureResult);
             }
 
+            if (data.type === 'progress' && data.step === 'opinion' && data.status === 'done' && data.result) {
+              setOpinion(data.result as ArchitectOpinion);
+            }
+
             if (data.type === 'done') {
               const promptText = typeof data.prompt === 'string' ? data.prompt : '';
               setResult(promptText);
@@ -126,9 +134,11 @@ export default function PromptPage() {
               const intentData = data.intent && typeof data.intent === 'object' ? data.intent as IntentResult : intent;
               const archData = data.architecture && typeof data.architecture === 'object' ? data.architecture as ArchitectureResult : architecture;
               const decomposeData = data.decompose && typeof data.decompose === 'object' ? data.decompose as DecomposeResult : null;
+              const opinionData = data.opinion && typeof data.opinion === 'object' ? data.opinion as ArchitectOpinion : null;
 
               if (intentData) setIntent(intentData);
               if (archData) setArchitecture(archData);
+              if (opinionData) setOpinion(opinionData);
               if (decomposeData) setDecompose(decomposeData);
 
               if (intentData && archData && promptText) {
@@ -264,6 +274,7 @@ export default function PromptPage() {
                   setQuality(null);
                   setIntent(null);
                   setArchitecture(null);
+                  setOpinion(null);
                   setDecompose(null);
                   setFallbackSteps(new Set());
                 }}
@@ -391,7 +402,7 @@ export default function PromptPage() {
           </div>
         )}
 
-        {result && (intent || architecture) && (
+        {result && (intent || architecture || opinion) && (
           <div className="mb-6">
             <button
               onClick={() => setShowReasoning(!showReasoning)}
@@ -431,6 +442,31 @@ export default function PromptPage() {
                     )}
                   </div>
                 )}
+                {opinion && (
+                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                    <h3 className="mb-2 text-xs font-semibold text-purple-400">架构师判断</h3>
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="text-emerald-500">推荐：</span>
+                        <span className="text-slate-300">{String(opinion.recommendation || '-')}</span>
+                      </div>
+                      <div>
+                        <span className="text-red-500">不建议：</span>
+                        <span className="text-slate-400">{String(opinion.avoid || '-')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">理由：</span>
+                        <span className="text-slate-300">{String(opinion.rationale || '-')}</span>
+                      </div>
+                      {opinion.riskNotes && (
+                        <div>
+                          <span className="text-amber-500">风险提醒：</span>
+                          <span className="text-slate-300">{String(opinion.riskNotes)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {decompose && Array.isArray(decompose.tasks) && decompose.tasks.length > 0 && (
                   <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
                     <h3 className="mb-2 text-xs font-semibold text-amber-400">任务拆解</h3>
@@ -455,7 +491,7 @@ export default function PromptPage() {
           <div className="mt-16 text-center text-slate-600">
             <div className="text-4xl mb-3">⚡</div>
             <p>输入需求，启动深度推理编译</p>
-            <p className="text-sm mt-1">4 步推理链：意图识别 → 架构决策 → 任务拆解 → Prompt 编译</p>
+            <p className="text-sm mt-1">5 步推理链：意图识别 → 架构决策 → 架构判断 → 任务拆解 → Prompt 编译</p>
           </div>
         )}
       </div>

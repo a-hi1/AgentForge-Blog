@@ -26,6 +26,13 @@ export interface ArchitectureResult {
   rejectedAlternatives: string[];
 }
 
+export interface ArchitectOpinion {
+  recommendation: string;
+  avoid: string;
+  rationale: string;
+  riskNotes: string;
+}
+
 export interface AtomicTask {
   phase: number;
   phaseLabel: string;
@@ -96,61 +103,24 @@ async function callLLMWithJSON<T>(
   throw new Error('Max retries exceeded');
 }
 
-async function callLLMText(
-  messages: { role: string; content: string }[],
-  maxTokens: number = 6000,
-  maxRetries: number = 2
-): Promise<string> {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
-        body: JSON.stringify({
-          model: MODEL,
-          messages,
-          temperature: 0.3,
-          max_tokens: maxTokens,
-        }),
-      });
-
-      if (!response.ok) {
-        if (attempt === maxRetries) throw new Error(`API error: ${response.status}`);
-        continue;
-      }
-
-      const result = await response.json();
-      const content = result.choices?.[0]?.message?.content || '';
-
-      if (content.length < 200) {
-        if (attempt === maxRetries) throw new Error('Generated content too short');
-        continue;
-      }
-
-      return content;
-    } catch (e) {
-      if (attempt === maxRetries) throw e;
-    }
-  }
-  throw new Error('Max retries exceeded');
-}
-
 export async function inferIntent(userInput: string): Promise<IntentResult> {
-  const system = `你是一个高级产品分析引擎。你的唯一任务是深度理解用户输入，推断其真实意图。
+  const system = `你是一位有 10 年经验的产品技术顾问。用户会给你一个模糊的产品想法，你需要像和创始人聊天一样，快速抓住核心。
 
-严格要求：
-- 不要做任何技术栈推荐
-- 不要做任何架构决策
-- 只专注于理解"用户到底想做什么"
-- 必须基于用户输入的具体内容推理，不要使用模板化回答
+你的任务不是翻译用户的话，而是"读懂言外之意"。
+
+关键原则：
+- "做一个 app" ≠ 移动端。如果用户没明确说 iOS/Android，先问：他在验证想法还是已决定做？
+- "做个工具" ≠ 企业级 SaaS。很可能是个人效率工具。
+- 不要用自己的偏好替用户决定。你的判断必须来自输入文本的具体线索。
+- 如果输入模糊，ambiguity 字段必须明确指出"哪些关键信息缺失"。
 
 分析维度：
-1. businessGoal: 用户的业务目标是什么？要解决什么问题？
-2. userType: 目标用户是谁？个人、团队、还是面向公众？
-3. productShape: 产品形态是什么？Web应用、移动应用、API服务、还是其他？
-4. lifecycle: 项目处于什么阶段？想法验证、MVP、还是成熟产品？
-5. ambiguity: 输入中有哪些模糊或未明确的地方？
-6. decisionPoints: 做出以上判断的关键依据（从用户输入中提取的具体线索）
+1. businessGoal — 用户真正想解决的问题（不是表面说的功能）
+2. userType — 谁会用？自己用、小团队、还是面向公众？这决定架构复杂度
+3. productShape — Web / Mobile / API / CLI / 混合？必须根据场景判断，不能默认
+4. lifecycle — 想法验证期、MVP、增长期？这决定技术选型的激进程度
+5. ambiguity — 哪些信息缺失？哪些假设需要验证？
+6. decisionPoints — 支撑你判断的具体线索（从用户原话中提取，不要编造）
 
 输出严格 JSON：
 {
@@ -169,50 +139,75 @@ export async function inferIntent(userInput: string): Promise<IntentResult> {
 }
 
 export async function decideArchitecture(intent: IntentResult): Promise<ArchitectureResult> {
-  const system = `你是一个高级架构决策引擎。基于产品意图，选择最合适的技术方案。
+  const system = `你是一位独立的技术架构师。你不是框架的推销员。你的工作是根据项目实际情况，做出最合适的技术选型。
 
-严格要求：
-- 不允许无理由默认选择任何技术栈
-- 每个决策必须有明确的推理依据
-- 必须考虑并拒绝不适合的替代方案
-- 不同任务必须产生不同的技术方案
+你必须像真正的工程师一样思考：
+- 不是所有项目都需要 React。一个内部工具用 Vue 甚至纯 HTML 可能更好。
+- 不是所有项目都需要后端。如果数据不敏感，BaaS 可能就够了。
+- 不是所有项目都需要数据库。本地存储、文件系统、甚至 localStorage 可能是正确答案。
+- "最合适" ≠ "最先进"。验证期项目用重型框架是浪费时间。
 
-选择框架时考虑：
-- React/Vue/Angular/Svelte 各有适用场景
-- SSR/CSR/SSG 取决于产品需求
-- 轻量项目不需要重型框架
-
-选择后端时考虑：
-- 并非所有项目都需要后端
-- Serverless 函数可能比完整后端更合适
-- BaaS (Supabase/Firebase) 适合快速原型
-
-选择数据库时考虑：
-- 关系型 vs 文档型 vs 图数据库
-- 是否需要实时同步
-- 数据规模和查询模式
+每个决策必须回答三个问题：
+1. 为什么选这个？（正面理由）
+2. 为什么不选那个？（对比分析）
+3. 这个选择的风险是什么？（诚实的 tradeoff）
 
 输出严格 JSON：
 {
-  "frontend": "选择的前端方案",
-  "backend": "选择的后端方案",
-  "db": "选择的数据库方案",
+  "frontend": "选择的前端方案（附简短理由）",
+  "backend": "选择的后端方案（附简短理由）",
+  "db": "选择的数据库方案（附简短理由）",
   "infra": ["基础设施1", "基础设施2"],
-  "reasoning": "详细的决策推理过程，解释为什么选择这些技术",
-  "rejectedAlternatives": ["被拒绝的方案1及原因", "被拒绝的方案2及原因"]
+  "reasoning": "2-3 句话的整体架构逻辑，重点说 tradeoff",
+  "rejectedAlternatives": ["方案A — 为什么不选", "方案B — 为什么不选"]
 }`;
 
-  const userMessage = `产品意图分析：
+  const userMessage = `产品意图：
 - 业务目标：${intent.businessGoal}
 - 目标用户：${intent.userType}
 - 产品形态：${intent.productShape}
 - 项目阶段：${intent.lifecycle}
 - 模糊点：${intent.ambiguity}
-- 关键线索：${intent.decisionPoints.join('、')}
-
-请基于以上分析，做出架构决策。`;
+- 关键线索：${intent.decisionPoints.join('、')}`;
 
   return await callLLMWithJSON<ArchitectureResult>([
+    { role: 'system', content: system },
+    { role: 'user', content: userMessage },
+  ]);
+}
+
+export async function generateArchitectOpinion(
+  intent: IntentResult,
+  architecture: ArchitectureResult
+): Promise<ArchitectOpinion> {
+  const system = `你是一位资深工程顾问，正在给团队写一份简短的技术备忘。
+
+风格要求：
+- 像和高级工程师聊天，不是写文档
+- 直接说判断，不要绕弯子
+- 用中文，自然表达，不要机械编号
+- 每个字段 1-2 句话，不要长篇大论
+
+输出严格 JSON：
+{
+  "recommendation": "一句话判断 — 对于当前阶段，最应该做什么（必须具体，不能泛泛）",
+  "avoid": "一句话 — 当前阶段最不应该做什么",
+  "rationale": "2-3 句话 — 为什么做出这个判断，结合项目阶段和目标用户分析",
+  "riskNotes": "1-2 句话 — 这个方案最大的风险或需要关注的点"
+}`;
+
+  const userMessage = `产品意图：${intent.businessGoal}
+目标用户：${intent.userType}
+产品形态：${intent.productShape}
+项目阶段：${intent.lifecycle}
+
+技术选型：
+前端：${architecture.frontend}
+后端：${architecture.backend}
+数据库：${architecture.db}
+推理：${architecture.reasoning}`;
+
+  return await callLLMWithJSON<ArchitectOpinion>([
     { role: 'system', content: system },
     { role: 'user', content: userMessage },
   ]);
@@ -223,16 +218,21 @@ export async function decomposeToAtomicTasks(
   architecture: ArchitectureResult,
   userInput: string
 ): Promise<DecomposeResult> {
-  const system = `你是一个任务拆解引擎。将产品意图和技术架构拆解为原子级开发任务。
+  const system = `你是一位高级全栈工程师，正在把产品需求拆解为开发任务。
 
-每个任务必须：
-- 精确到单个文件（禁止"src/utils"这种泛目录）
-- 明确输入类型和输出类型
-- 明确依赖的其他文件
-- 明确实现要求（至少 3 条具体函数/方法签名）
-- 明确禁止事项（如禁止 class、禁止特定库等）
+你的拆解必须遵循真实工程实践：
+- 从基础设施层开始，往上到业务层，最后是 UI 层
+- 每个文件只做一件事（单一职责原则）
+- 依赖关系必须有向无环（A 依赖 B，B 不能依赖 A）
+- 实现要求必须是具体的函数签名，不是"实现相关功能"这种废话
+- 禁止事项必须有针对性（比如"禁止 class 组件"、"禁止直接修改 state"）
 
-任务必须分阶段（phase）组织，每个阶段有清晰标签。
+阶段划分原则：
+- Phase 1 通常是：类型定义 + 配置 + 基础设施
+- Phase 2 通常是：核心业务逻辑 + 数据层
+- Phase 3 通常是：UI + 页面 + 集成
+- 每个 Phase 完成后应该可以独立运行验证
+
 至少产出 8 个具体文件任务。
 Phase 数量 3-6 个。
 
@@ -285,117 +285,6 @@ ${JSON.stringify(intent, null, 2)}
   ]);
 }
 
-export async function compilePrompt(
-  intent: IntentResult,
-  architecture: ArchitectureResult,
-  atomicTasks: DecomposeResult,
-  userInput: string
-): Promise<string> {
-  const contract = buildAgentContract();
-  const contractMarkdown = formatContractAsMarkdown(contract);
-
-  const system = `你是一个精确的 Prompt 编译引擎。将产品意图、技术架构和原子任务列表编译为一个可直接复制到 Cursor / Claude Code 执行的开发指令。
-
-输出必须是严格的 Markdown 文档，包含以下 10 个章节，不可省略、不可合并：
-
-## Section 1: ROLE
-定义 Agent 角色。示例格式：
-你是资深全栈工程师。
-目标：严格按要求实现，不做额外架构扩展。
-禁止擅自：替换技术栈 / 增加依赖 / 改变目录结构 / 提前实现后续模块。
-
-## Section 2: PROJECT CONTEXT
-业务目标 / 核心用户 / MVP 范围。必须从意图分析中提取，不能泛泛而谈。
-
-## Section 3: TECHNICAL DECISION
-选型 + why + not（被拒绝方案及原因）。必须引用架构决策结果。
-
-## Section 4: TARGET FILE TREE
-精确到文件的目录树。禁止泛目录（如"src/utils/"）。必须包含所有任务涉及的文件。
-
-## Section 5: FILE TASKS（重点章节）
-每个文件一个任务卡，格式严格：
-文件：xxx.ts
-职责：一句话
-输入：类型描述
-输出：类型描述
-依赖：依赖的文件
-实现要求：至少 3 条具体函数签名
-禁止：具体禁止事项
-
-## Section 6: EXECUTION ORDER
-分 Phase 执行，每个 Phase 列出要完成的文件。
-Phase 完成后输出：DONE_PHASE_N
-等待用户确认后再继续下一个 Phase。
-
-## Section 7: OUTPUT CONTRACT
-强制 Agent 每次输出的格式：
-### Modified Files
-### Code
-### Verification
-### Risks
-禁止输出解释性长文。
-
-## Section 8: VALIDATION CHECKLIST
-可勾选的验证清单。如：
-[ ] npm run dev 无报错
-[ ] TS 0 errors
-[ ] 涉及的文件均已创建
-
-## Section 9: BOUNDARY
-明确禁止范围：修改未指定文件 / 增加 mock / 自动引入测试框架 / 自动改 package manager。
-
-## Section 10: ERROR FEEDBACK TEMPLATE
-固定格式：
-错误：
-当前文件：
-期望：
-实际：
-日志：
-
-${contractMarkdown}
-
-关键要求：
-- 整个 Prompt 可直接复制粘贴到 Cursor
-- Section 5 必须覆盖所有文件，每文件至少 3 条实现要求
-- Section 6 必须分至少 3 个 Phase
-- 所有内容必须具体到可执行，禁止泛泛描述
-- 总长度 3000-6000 字`;
-
-  const taskSummary = atomicTasks.tasks.map(t =>
-    `[Phase ${t.phase}] ${t.file} — ${t.responsibility}`
-  ).join('\n');
-
-  const userMessage = `原始需求：${userInput}
-
-产品意图：
-- 业务目标：${intent.businessGoal}
-- 目标用户：${intent.userType}
-- 产品形态：${intent.productShape}
-- 项目阶段：${intent.lifecycle}
-
-技术架构：
-- 前端：${architecture.frontend}
-- 后端：${architecture.backend}
-- 数据库：${architecture.db}
-- 基础设施：${architecture.infra.join(', ')}
-- 决策推理：${architecture.reasoning}
-- 被拒绝方案：${architecture.rejectedAlternatives.join(' | ')}
-
-原子任务列表：
-${taskSummary}
-
-详细任务数据：
-${JSON.stringify(atomicTasks.tasks, null, 2)}
-
-请编译为完整的 10 段式开发 Prompt。`;
-
-  return await callLLMText([
-    { role: 'system', content: system },
-    { role: 'user', content: userMessage },
-  ], 6000);
-}
-
 export function extractRejectionReasons(architecture: ArchitectureResult): string[] {
   return architecture.rejectedAlternatives.filter(r => r.length > 0);
 }
@@ -421,10 +310,9 @@ export async function generateChain(
   steps.push(decomposeStep);
   onStep(decomposeStep);
 
-  const prompt = await compilePrompt(intent, architecture, decompose, userInput);
-  const compileStep: ReasoningStep = { type: 'compile', label: 'Prompt 编译', result: prompt, status: 'done' };
+  const compileStep: ReasoningStep = { type: 'compile', label: 'Prompt 编译', result: '(programmatic)', status: 'done' };
   steps.push(compileStep);
   onStep(compileStep);
 
-  return { prompt, steps };
+  return { prompt: '(generated by route)', steps };
 }

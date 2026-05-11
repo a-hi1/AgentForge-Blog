@@ -2,12 +2,13 @@ import { NextRequest } from 'next/server';
 import {
   inferIntent,
   decideArchitecture,
+  generateArchitectOpinion,
   decomposeToAtomicTasks,
   IntentResult,
   ArchitectureResult,
+  ArchitectOpinion,
   DecomposeResult,
 } from '@/lib/prompt-orchestrator/reasoner';
-import { buildAgentContract, formatContractAsMarkdown } from '@/lib/prompt-orchestrator/agentContract';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -18,12 +19,10 @@ const HEARTBEAT_MS = 10_000;
 function buildPromptFromData(
   intent: IntentResult,
   architecture: ArchitectureResult,
+  opinion: ArchitectOpinion,
   decompose: DecomposeResult,
   userInput: string
 ): string {
-  const contract = buildAgentContract();
-  const contractMarkdown = formatContractAsMarkdown(contract);
-
   const treeByDir: Record<string, string[]> = {};
   for (const task of decompose.tasks) {
     const parts = task.file.split('/');
@@ -40,120 +39,170 @@ function buildPromptFromData(
   const fileTasks = decompose.tasks.map(t => {
     const lines: string[] = [];
     lines.push(`### ${t.file}`);
-    lines.push(`- 职责：${t.responsibility}`);
-    lines.push(`- 输入：${t.input}`);
-    lines.push(`- 输出：${t.output}`);
-    if (t.dependencies.length > 0) lines.push(`- 依赖：${t.dependencies.join(', ')}`);
-    lines.push(`- 实现要求：`);
-    for (const req of t.implementationRequirements) lines.push(`  - ${req}`);
+    lines.push(`**职责**：${t.responsibility}`);
+    lines.push(`**输入**：${t.input} → **输出**：${t.output}`);
+    if (t.dependencies.length > 0) lines.push(`**前置依赖**：${t.dependencies.join(', ')}`);
+    lines.push('');
+    lines.push('实现要求：');
+    for (const req of t.implementationRequirements) lines.push(`- ${req}`);
     if (t.forbiddenItems.length > 0) {
-      lines.push(`- 禁止：`);
-      for (const f of t.forbiddenItems) lines.push(`  - ${f}`);
+      lines.push('');
+      lines.push('禁止：');
+      for (const f of t.forbiddenItems) lines.push(`- ${f}`);
     }
     return lines.join('\n');
   }).join('\n\n');
 
   const execOrder = decompose.phases.map(p => {
     const fileList = decompose.tasks.filter(t => t.phase === p.phase).map(t => t.file);
-    return `### Phase ${p.phase}: ${p.label}\n文件：${fileList.join(', ')}\n完成后输出：DONE_PHASE_${p.phase}\n等待确认后再继续。`;
+    return `### 第 ${p.phase} 阶段：${p.label}\n涉及文件：${fileList.join(', ')}\n\n完成后请输出 DONE_PHASE_${p.phase}，我会确认后再继续。如果发现问题，我会在当前阶段修复后才推进。`;
   }).join('\n\n');
 
-  const validationItems = [
-    '[ ] npm run dev 无报错',
-    '[ ] TypeScript 0 errors',
-    '[ ] 所有指定文件均已创建',
-    '[ ] 每个文件的导出函数均可正常调用',
-    '[ ] 无未声明的依赖',
-  ];
+  const rejectionBlock = architecture.rejectedAlternatives.length > 0
+    ? architecture.rejectedAlternatives.map(r => `- ${r}`).join('\n')
+    : '- （本轮未产生需要明确拒绝的方案）';
 
-  return `# AgentForge 生成的开发 Prompt
+  return `> ${opinion.recommendation}
 
-## Section 1: ROLE
+---
 
-你是资深全栈工程师。
+## 你的角色
 
-目标：严格按以下要求实现，不做额外架构扩展。
+你是一位资深全栈工程师，正在协助实现一个新项目。
 
-禁止擅自：
-- 替换技术栈
-- 增加未列出的依赖
-- 改变目录结构
-- 提前实现后续 Phase 的内容
+你的工作方式：
+- 先理解需求和约束，再动手
+- 严格按照下面的文件任务实现，不做额外扩展
+- 如果发现任务描述有歧义，先问我，不要猜
+- 每完成一个阶段，停下来等我确认
 
-## Section 2: PROJECT CONTEXT
+你不应该做的事：
+- 替换技术栈或引入未列出的依赖
+- 重构我没有要求修改的代码
+- 提前实现后续阶段的内容
+- 添加 mock 数据或测试桩（除非任务明确要求）
 
-- 业务目标：${intent.businessGoal}
-- 核心用户：${intent.userType}
-- 产品形态：${intent.productShape}
-- 项目阶段：${intent.lifecycle}
-- 模糊点：${intent.ambiguity}
-- MVP 范围：基于以上分析的最小可用版本
+---
 
-## Section 3: TECHNICAL DECISION
+## 当前情况
 
-- 前端：${architecture.frontend}
-- 后端：${architecture.backend}
-- 数据库：${architecture.db}
-- 基础设施：${architecture.infra.join(', ')}
-- 选型理由：${architecture.reasoning}
-- 被拒绝方案：${architecture.rejectedAlternatives.join(' | ')}
+**业务目标**：${intent.businessGoal}
 
-## Section 4: TARGET FILE TREE
+**目标用户**：${intent.userType}
+
+**产品形态**：${intent.productShape}
+
+**项目阶段**：${intent.lifecycle}
+
+${intent.ambiguity ? `**需要关注**：${intent.ambiguity}` : ''}
+
+---
+
+## 为什么这样选
+
+**前端**：${architecture.frontend}
+
+**后端**：${architecture.backend}
+
+**数据库**：${architecture.db}
+
+**基础设施**：${architecture.infra.join('、')}
+
+**选型逻辑**：${architecture.reasoning}
+
+---
+
+## 这次不建议这样做
+
+${rejectionBlock}
+
+---
+
+## 架构师判断
+
+**应该做**：${opinion.recommendation}
+
+**不应该做**：${opinion.avoid}
+
+**为什么**：${opinion.rationale}
+
+**风险提醒**：${opinion.riskNotes}
+
+---
+
+## 项目文件结构
 
 \`\`\`
 ${fileTree}
 \`\`\`
 
-## Section 5: FILE TASKS
+---
+
+## 每个文件要做什么
 
 ${fileTasks}
 
-## Section 6: EXECUTION ORDER
+---
+
+## 执行顺序
+
+分阶段推进，每阶段完成后暂停确认。
 
 ${execOrder}
 
-## Section 7: OUTPUT CONTRACT
+---
 
-每次输出必须严格按以下格式：
+## 你的输出格式
 
-### Modified Files
+每次输出请严格按这个结构：
+
+**修改的文件**
 列出所有被修改或新建的文件路径
 
-### Code
-完整代码，每个文件用 \`\`\`tsx 包裹
+**代码**
+完整代码，每个文件用代码块包裹
 
-### Verification
-如何验证代码正确运行
+**验证方式**
+如何确认代码正确运行
 
-### Risks
-可能的风险和注意事项
+**风险和备注**
+可能的问题、需要注意的边界情况
 
-禁止输出解释性长文。仅输出代码和必要说明。
+不要输出解释性长文。直接给代码和必要的说明。
 
-## Section 8: VALIDATION CHECKLIST
+---
 
-${validationItems.join('\n')}
+## 完成后的验证清单
 
-## Section 9: BOUNDARY
+- [ ] npm run dev 无报错
+- [ ] TypeScript 0 errors
+- [ ] 所有指定文件均已创建
+- [ ] 每个文件的导出函数均可正常调用
+- [ ] 无未声明的额外依赖
 
-禁止：
-- 修改未在 FILE TASKS 中列出的文件
+---
+
+## 边界约束
+
+以下行为视为违规：
+
+- 修改未在"每个文件要做什么"中列出的文件
 - 增加 mock 数据或测试桩
 - 自动引入测试框架（除非任务明确要求）
 - 自动更换 package manager
 - 重构未指定的已有代码
 
-## Section 10: ERROR FEEDBACK TEMPLATE
+---
 
-当遇到错误时，按以下格式反馈：
+## 遇到错误时的反馈方式
 
-错误：[错误信息]
-当前文件：[出错的文件路径]
-期望：[期望的行为]
-实际：[实际的行为]
-日志：[相关日志]
+如果遇到问题，请按以下格式反馈，我会帮你定位：
 
-${contractMarkdown}`;
+**错误**：[错误信息]
+**当前文件**：[出错的文件路径]
+**期望**：[期望的行为]
+**实际**：[实际的行为]
+**日志**：[相关日志片段]`;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -244,6 +293,25 @@ export async function POST(req: NextRequest) {
           send({ type: 'progress', step: 'architecture', status: 'fallback', result: architecture });
         }
 
+        send({ type: 'progress', step: 'opinion', status: 'running' });
+
+        let opinion: ArchitectOpinion;
+        try {
+          console.log('[prompt-generate] stage:start opinion');
+          opinion = await withTimeout(generateArchitectOpinion(intent, architecture), PER_CALL_TIMEOUT, '架构判断');
+          console.log('[prompt-generate] stage:success opinion');
+          send({ type: 'progress', step: 'opinion', status: 'done', result: opinion });
+        } catch (err) {
+          console.error('[prompt-generate] stage:error opinion', err);
+          opinion = {
+            recommendation: `对于「${intent.businessGoal}」，当前阶段建议先聚焦核心功能，快速验证可行性。`,
+            avoid: '不要在验证期投入过多基础设施建设。',
+            rationale: `目标用户是${intent.userType}，产品形态为${intent.productShape}，处于${intent.lifecycle}阶段。此时最重要的是验证核心价值，而非追求技术完美。`,
+            riskNotes: '如果核心假设不成立，过多的前期投入会变成沉没成本。',
+          };
+          send({ type: 'progress', step: 'opinion', status: 'fallback', result: opinion });
+        }
+
         send({ type: 'progress', step: 'decompose', status: 'running' });
 
         let decompose: DecomposeResult;
@@ -292,7 +360,7 @@ export async function POST(req: NextRequest) {
         let prompt: string;
         try {
           console.log('[prompt-generate] stage:start compile (programmatic)');
-          prompt = buildPromptFromData(intent, architecture, decompose, input);
+          prompt = buildPromptFromData(intent, architecture, opinion, decompose, input);
           console.log('[prompt-generate] stage:success compile, length:', prompt.length);
           send({ type: 'progress', step: 'compile', status: 'done' });
         } catch (err) {
@@ -301,7 +369,7 @@ export async function POST(req: NextRequest) {
           send({ type: 'progress', step: 'compile', status: 'fallback' });
         }
 
-        send({ type: 'done', prompt, intent, architecture, decompose });
+        send({ type: 'done', prompt, intent, architecture, opinion, decompose });
         console.log('[prompt-generate] done');
       } catch (err) {
         const msg = err instanceof Error ? err.message : '生成失败，请重试';
