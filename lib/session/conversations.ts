@@ -90,7 +90,24 @@ export function loadConversations(): Conversation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Conversation[];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((c: Record<string, unknown>): Conversation => ({
+      id: String(c.id || ''),
+      title: String(c.title || '未命名'),
+      createdAt: Number(c.createdAt) || Date.now(),
+      updatedAt: Number(c.updatedAt) || Date.now(),
+      pinned: Boolean(c.pinned),
+      status: (['draft', 'repairing', 'verified', 'promoted'].includes(c.status as string) ? c.status : 'draft') as ConversationStatus,
+      messageCount: Number(c.messageCount) || 0,
+      lastMessagePreview: String(c.lastMessagePreview || ''),
+      linkedAssetId: typeof c.linkedAssetId === 'string' ? c.linkedAssetId : undefined,
+      linkedProject: typeof c.linkedProject === 'string' ? c.linkedProject : undefined,
+      originalPrompt: typeof c.originalPrompt === 'string' ? c.originalPrompt : undefined,
+      repairHistory: Array.isArray(c.repairHistory) ? c.repairHistory as RepairEntry[] : [],
+      currentVersion: Number(c.currentVersion) || 1,
+      skillId: typeof c.skillId === 'string' ? c.skillId : undefined,
+    }));
   } catch {
     return [];
   }

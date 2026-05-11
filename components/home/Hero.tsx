@@ -33,12 +33,12 @@ export default function Dashboard() {
     window.location.href = `/playground?conv=${conv.id}`;
   };
 
-  const getStatusInfo = (status: ConversationStatus) => STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  const getStatusInfo = (status?: ConversationStatus) => STATUS_CONFIG[status || 'draft'] || STATUS_CONFIG.draft;
 
   const getLastIssue = (conv: Conversation): string | null => {
-    if (conv.repairHistory.length === 0) return null;
+    if (!conv.repairHistory || conv.repairHistory.length === 0) return null;
     const latest = conv.repairHistory[conv.repairHistory.length - 1];
-    const desc = latest.issueDescription;
+    const desc = latest.issueDescription || '';
     return desc.length > 60 ? desc.slice(0, 60) + '...' : desc;
   };
 
@@ -106,8 +106,8 @@ export default function Dashboard() {
                     )}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-[10px] text-[#52525B]">
-                        <span>v{conv.currentVersion}</span>
-                        {conv.repairHistory.length > 0 && (
+                        <span>v{conv.currentVersion || 1}</span>
+                        {conv.repairHistory && conv.repairHistory.length > 0 && (
                           <span>· {conv.repairHistory.length} 次修复</span>
                         )}
                       </div>
