@@ -78,8 +78,10 @@ export default function PromptPage() {
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (!payload.startsWith('{')) continue;
           try {
-            const data = JSON.parse(line.slice(6));
+            const data = JSON.parse(payload);
 
             if (data.type === 'progress') {
               const idx = CHAIN.findIndex(c => c.key === data.step);
