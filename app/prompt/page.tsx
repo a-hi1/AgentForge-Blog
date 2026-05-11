@@ -22,6 +22,7 @@ export default function PromptPage() {
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(-1);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [fallbackSteps, setFallbackSteps] = useState<Set<string>>(new Set());
   const [pack, setPack] = useState<CompiledPack | null>(null);
   const [saved, setSaved] = useState(false);
   const [intent, setIntent] = useState<IntentResult | null>(null);
@@ -43,6 +44,7 @@ export default function PromptPage() {
     setResult('');
     setCurrentStep(0);
     setCompletedSteps(new Set());
+    setFallbackSteps(new Set());
     setPack(null);
     setSaved(false);
     setIntent(null);
@@ -86,6 +88,15 @@ export default function PromptPage() {
               }
               if (data.status === 'done' && idx >= 0) {
                 setCompletedSteps(prev => new Set([...Array.from(prev), data.step]));
+              }
+              if (data.status === 'fallback' && idx >= 0) {
+                setCompletedSteps(prev => new Set([...Array.from(prev), data.step]));
+                setFallbackSteps(prev => new Set([...Array.from(prev), data.step]));
+                if (data.result) {
+                  if (data.step === 'intent') setIntent(data.result as IntentResult);
+                  if (data.step === 'architecture') setArchitecture(data.result as ArchitectureResult);
+                  if (data.step === 'decompose') setDecompose(data.result as DecomposeResult);
+                }
               }
             }
 
@@ -173,6 +184,7 @@ export default function PromptPage() {
   };
 
   const getStepState = (stepKey: string) => {
+    if (fallbackSteps.has(stepKey)) return 'fallback';
     if (completedSteps.has(stepKey)) return 'done';
     if (CHAIN[currentStep]?.key === stepKey) return 'active';
     return 'pending';
@@ -229,6 +241,7 @@ export default function PromptPage() {
                   setIntent(null);
                   setArchitecture(null);
                   setDecompose(null);
+                  setFallbackSteps(new Set());
                 }}
                 className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 transition"
               >
@@ -257,16 +270,18 @@ export default function PromptPage() {
                 <div key={step.key} className="flex items-center gap-2">
                   <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium ${
                     state === 'done' ? 'bg-emerald-600 text-white' :
+                    state === 'fallback' ? 'bg-amber-600 text-white' :
                     state === 'active' ? 'bg-cyan-600 text-white animate-pulse' :
                     'bg-slate-700 text-slate-400'
                   }`}>
-                    {state === 'done' ? '✓' : i + 1}
+                    {state === 'done' ? '✓' : state === 'fallback' ? '!' : i + 1}
                   </div>
-                  <span className={`text-sm ${state === 'active' ? 'text-cyan-400' : state === 'done' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  <span className={`text-sm ${state === 'active' ? 'text-cyan-400' : state === 'done' ? 'text-emerald-400' : state === 'fallback' ? 'text-amber-400' : 'text-slate-500'}`}>
                     {step.label}
+                    {state === 'fallback' && <span className="text-[10px] ml-1">(降级)</span>}
                   </span>
                   {i < CHAIN.length - 1 && (
-                    <div className={`w-8 h-px ${state === 'done' ? 'bg-emerald-600' : 'bg-slate-700'}`} />
+                    <div className={`w-8 h-px ${state === 'done' || state === 'fallback' ? 'bg-emerald-600' : 'bg-slate-700'}`} />
                   )}
                 </div>
               );
@@ -304,6 +319,15 @@ export default function PromptPage() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {fallbackSteps.size > 0 && result && (
+          <div className="mb-6 rounded-xl border border-amber-800 bg-amber-950/50 p-4">
+            <p className="text-sm text-amber-300">
+              ⚠ 部分推理阶段使用了降级方案（{Array.from(fallbackSteps).map(s => CHAIN.find(c => c.key === s)?.label || s).join('、')}）。
+              生成结果仍可用，但精度可能降低。点击「重新生成」可重试。
+            </p>
           </div>
         )}
 
