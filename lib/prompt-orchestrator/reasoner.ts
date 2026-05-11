@@ -13,6 +13,9 @@ export interface ProjectReasoning {
   recommendedStack: string[];
   estimatedPhases: number;
   rawAnalysis: string;
+  businessModel?: string;
+  coreUsers?: string[];
+  technicalBoundaries?: string[];
 }
 
 const SYSTEM_PROMPT = `你是一位资深的产品技术顾问，擅长从模糊的产品描述中推断出完整的项目定义。
@@ -38,7 +41,10 @@ const SYSTEM_PROMPT = `你是一位资深的产品技术顾问，擅长从模糊
   "risks": ["技术风险1", "技术风险2"],
   "recommendedStack": ["技术1", "技术2"],
   "estimatedPhases": 5,
-  "briefAnalysis": "50字以内的项目概要分析"
+  "briefAnalysis": "50字以内的项目概要分析",
+  "businessModel": "商业模式描述（如 SaaS 订阅、广告、交易抽成等）",
+  "coreUsers": ["核心用户群1", "核心用户群2"],
+  "technicalBoundaries": ["技术边界1", "技术边界2"]
 }
 
 类型标识参考（不限于此，可以自由组合）：
@@ -146,6 +152,9 @@ export async function reasonProject(input: string): Promise<ProjectReasoning> {
       recommendedStack: Array.isArray(parsed.recommendedStack) ? parsed.recommendedStack.map(String) : ['Next.js 14', 'TypeScript', 'PostgreSQL', 'Tailwind CSS'],
       estimatedPhases: typeof parsed.estimatedPhases === 'number' ? parsed.estimatedPhases : 6,
       rawAnalysis: String(parsed.briefAnalysis || ''),
+      businessModel: parsed.businessModel ? String(parsed.businessModel) : undefined,
+      coreUsers: Array.isArray(parsed.coreUsers) ? parsed.coreUsers.map(String) : undefined,
+      technicalBoundaries: Array.isArray(parsed.technicalBoundaries) ? parsed.technicalBoundaries.map(String) : undefined,
     };
   } catch (error) {
     console.warn('[Reasoner] LLM 调用失败，回退到本地推理:', error);
@@ -214,6 +223,9 @@ function reasonProjectLocal(input: string): ProjectReasoning {
     recommendedStack: ['Next.js 14', 'TypeScript', 'PostgreSQL', 'Prisma', 'Tailwind CSS'],
     estimatedPhases: isHybrid ? 8 : 6,
     rawAnalysis: `本地推理：识别为${isHybrid ? '复合型' : '单一型'}项目，${sortedTypes.length} 个匹配类型`,
+    businessModel: inferBusinessModel(lower, sortedTypes.map(([t]) => t)),
+    coreUsers: inferCoreUsers(lower, sortedTypes.map(([t]) => t)),
+    technicalBoundaries: inferTechnicalBoundaries(lower, sortedTypes.map(([t]) => t)),
   };
 }
 
@@ -269,4 +281,65 @@ function inferRisks(lower: string, types: string[]): string[] {
     risks.push('需求变更导致的架构调整');
   }
   return risks;
+}
+
+function inferBusinessModel(lower: string, types: string[]): string {
+  if (types.includes('saas')) return 'SaaS 订阅制（按月/年收费，分层套餐）';
+  if (types.includes('ecommerce')) return '电商平台（商品交易抽成 + 广告位）';
+  if (types.includes('marketplace')) return '双边市场（交易撮合抽成 + 增值服务）';
+  if (types.includes('education')) return '教育平台（课程付费 + 会员订阅）';
+  if (types.includes('ai_tool')) return 'AI 工具（按调用量计费 / 免费增值）';
+  if (lower.includes('二手') || lower.includes('交易')) return 'C2C 交易（交易抽成 + 置顶推广）';
+  if (types.includes('content_community')) return '内容社区（广告 + 会员 + 打赏）';
+  if (types.includes('admin_system')) return '内部工具（降本增效，无直接营收）';
+  return '待定（需进一步分析用户增长与变现路径）';
+}
+
+function inferCoreUsers(lower: string, types: string[]): string[] {
+  const users: string[] = [];
+  if (types.includes('education') || lower.includes('校园') || lower.includes('学生')) {
+    users.push('学生', '教师/导师', '教务管理员');
+  }
+  if (types.includes('ecommerce') || types.includes('marketplace')) {
+    users.push('买家/消费者', '卖家/商家', '平台运营');
+  }
+  if (types.includes('saas') || types.includes('admin_system')) {
+    users.push('企业管理员', '普通员工', '决策层');
+  }
+  if (types.includes('social_platform') || types.includes('content_community')) {
+    users.push('内容创作者', '普通用户', '社区管理员');
+  }
+  if (types.includes('ai_tool')) {
+    users.push('开发者', '产品经理', '终端用户');
+  }
+  if (lower.includes('二手')) {
+    users.push('卖家（发布闲置）', '买家（浏览购买）', '平台管理员');
+  }
+  if (users.length === 0) {
+    users.push('终端用户', '管理员');
+  }
+  return [...new Set(users)];
+}
+
+function inferTechnicalBoundaries(lower: string, types: string[]): string[] {
+  const boundaries: string[] = [];
+  if (lower.includes('支付') || types.includes('ecommerce') || types.includes('marketplace')) {
+    boundaries.push('支付系统需对接第三方（支付宝/微信支付），涉及资质审核');
+  }
+  if (lower.includes('实时') || lower.includes('聊天') || types.includes('social_platform')) {
+    boundaries.push('实时通信需 WebSocket 支持，需考虑连接管理与消息持久化');
+  }
+  if (lower.includes('ai') || types.includes('ai_tool')) {
+    boundaries.push('AI 能力依赖外部 API，需处理限流、超时与降级策略');
+  }
+  if (lower.includes('地图') || lower.includes('定位')) {
+    boundaries.push('地理位置服务需对接第三方地图 API');
+  }
+  if (types.includes('education') || lower.includes('视频')) {
+    boundaries.push('视频/大文件存储需对象存储服务（如 S3/OSS）');
+  }
+  if (boundaries.length === 0) {
+    boundaries.push('标准 Web 应用架构，无特殊技术边界');
+  }
+  return boundaries;
 }

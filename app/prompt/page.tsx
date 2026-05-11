@@ -18,6 +18,7 @@ import { savePrompt, type PromptPhase } from '@/lib/prompt/history';
 import PromptPhaseCard from '@/components/prompt/PromptPhaseCard';
 import PromptOutput from '@/components/prompt/PromptOutput';
 import StrategySummary from '@/components/prompt/StrategySummary';
+import { saveContext, loadContext } from '@/lib/session/contextStore';
 
 const EXAMPLES = [
   '开发校园二手交易+兴趣社交平台',
@@ -82,14 +83,31 @@ export default function PromptPage() {
   const [savedAssetId, setSavedAssetId] = useState<string | null>(null);
 
   useEffect(() => {
+    const ctx = loadContext();
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const idea = urlParams.get('idea');
       if (idea) {
         setInput(idea);
+        return;
       }
     }
+    if (ctx.draftInput && ctx.lastPage === '/prompt' && !input) {
+      setInput(ctx.draftInput);
+    }
+    if (ctx.currentPhase) setPhase(ctx.currentPhase as 'MVP' | 'Beta' | 'Growth');
+    if (ctx.currentProject) setProjectName(ctx.currentProject);
+    saveContext({ lastPage: '/prompt' });
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (input.trim()) {
+        saveContext({ draftInput: input, currentPhase: phase, currentProject: projectName || undefined });
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [input, phase, projectName]);
 
   const handleGenerate = useCallback(async () => {
     if (!input.trim()) return;

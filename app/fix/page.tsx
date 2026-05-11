@@ -62,6 +62,22 @@ const CATEGORIES: Category[] = [
   },
 ];
 
+function detectCategoryFromInput(text: string): string | null {
+  const lower = text.toLowerCase();
+  if (/\b(TypeError|ReferenceError|SyntaxError|undefined is not|cannot read|null is not|is not a function|is not defined|hydration|useEffect|useState|render|hook|jsx)\b/i.test(lower)) return 'frontend';
+  if (/\b(401|403|404|500|502|503|fetch failed|CORS|timeout|rate limit|ECONNREFUSED|RLS|supabase|pg_|column.*does not exist)\b/i.test(lower)) return 'backend';
+  if (/\b(build error|next\.config|Cannot find module|Module not found|webpack|turbopack|prerender|vercel|deploy|edge runtime)\b/i.test(lower)) return 'build';
+  if (/\b(performance|bundle|re-?render|LCP|CLS|FID|lazy|chunk|memory leak|slow)\b/i.test(lower)) return 'performance';
+  return null;
+}
+
+const WHY_FAILED_TEMPLATES: Record<string, string> = {
+  frontend: '前端问题通常源于：1) 状态更新时机不当导致渲染循环；2) 服务端与客户端状态不同步；3) Hook 依赖数组配置错误。建议检查状态更新是否在正确的生命周期中执行。',
+  backend: '后端问题通常源于：1) RLS 策略配置不当；2) 查询语法不兼容；3) 认证令牌过期或权限不足。建议先在 SQL Editor / Postman 中验证请求。',
+  build: '构建问题通常源于：1) 服务端/客户端组件边界不清；2) 第三方库不兼容 SSR；3) 环境变量缺失。建议检查组件是否正确标记了 use client。',
+  performance: '性能问题通常源于：1) 不必要的重渲染；2) 大包未做代码分割；3) 数据库查询未加索引。建议使用 React DevTools Profiler 定位瓶颈。',
+};
+
 interface HistoryEntry {
   id: string;
   input: string;
@@ -101,6 +117,11 @@ export default function FixPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  const detectedCategory = useMemo(() => {
+    if (!input.trim() || input.trim().length < 10) return null;
+    return detectCategoryFromInput(input);
+  }, [input]);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -258,6 +279,22 @@ export default function FixPage() {
                 placeholder="详细描述你遇到的问题，或粘贴错误日志..."
                 className="w-full h-40 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
               />
+              {detectedCategory && (
+                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                  <svg className="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span className="text-xs text-indigo-300">
+                    自动识别为 <strong>{CATEGORIES.find(c => c.id === detectedCategory)?.name || detectedCategory}</strong> 问题
+                  </span>
+                  <button
+                    onClick={() => setSelectedCategory(detectedCategory)}
+                    className="ml-auto text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >
+                    应用分类
+                  </button>
+                </div>
+              )}
               <div className="flex items-center justify-between mt-4">
                 <p className="text-xs text-gray-500">越详细的描述越有助于精准修复</p>
                 <button
@@ -319,6 +356,19 @@ export default function FixPage() {
                     })}
                   </div>
                 </div>
+                {WHY_FAILED_TEMPLATES[fixResult.category] && (
+                  <div className="px-6 pb-5">
+                    <div className="p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <span className="text-xs font-medium text-amber-300">为什么会失败？</span>
+                      </div>
+                      <p className="text-xs text-amber-200/70 leading-relaxed">{WHY_FAILED_TEMPLATES[fixResult.category]}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

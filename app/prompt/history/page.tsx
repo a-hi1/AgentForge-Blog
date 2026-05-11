@@ -21,12 +21,20 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 type TabKey = 'my' | 'system' | 'favorite' | 'recent';
+type SortKey = 'recent' | 'score' | 'favorite' | 'execution';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'my', label: '我的 Prompt', icon: '📝' },
   { key: 'system', label: '系统模板', icon: '📦' },
   { key: 'favorite', label: '收藏夹', icon: '⭐' },
   { key: 'recent', label: '最近使用', icon: '🕐' },
+];
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'recent', label: '最近创建' },
+  { key: 'score', label: '评分最高' },
+  { key: 'favorite', label: '收藏优先' },
+  { key: 'execution', label: '执行最多' },
 ];
 
 const PHASE_LABELS: Record<string, string> = {
@@ -60,6 +68,8 @@ export default function PromptHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('my');
+  const [sortBy, setSortBy] = useState<SortKey>('recent');
+  const [phaseFilter, setPhaseFilter] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refinementResult, setRefinementResult] = useState<RefinementResult | null>(null);
   const [showRefinement, setShowRefinement] = useState(false);
@@ -114,6 +124,9 @@ export default function PromptHistoryPage() {
         );
         break;
     }
+    if (phaseFilter) {
+      list = list.filter(a => a.phase === phaseFilter);
+    }
     if (search) {
       const s = search.toLowerCase();
       list = list.filter(
@@ -121,8 +134,23 @@ export default function PromptHistoryPage() {
           a.title.toLowerCase().includes(s) ||
           a.input.toLowerCase().includes(s) ||
           a.fullPrompt.toLowerCase().includes(s) ||
-          a.tags.some(t => t.toLowerCase().includes(s))
+          a.tags.some(t => t.toLowerCase().includes(s)) ||
+          (a.phase && a.phase.toLowerCase().includes(s)) ||
+          (a.projectId && a.projectId.toLowerCase().includes(s))
       );
+    }
+    switch (sortBy) {
+      case 'score':
+        list = [...list].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        break;
+      case 'favorite':
+        list = [...list].sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
+        break;
+      case 'execution':
+        list = [...list].sort((a, b) => (b.executionUsed ? 1 : 0) - (a.executionUsed ? 1 : 0));
+        break;
+      default:
+        break;
     }
     return list;
   })();
@@ -373,12 +401,31 @@ export default function PromptHistoryPage() {
                 </svg>
                 <input
                   type="text"
-                  placeholder="搜索 Prompt..."
+                  placeholder="搜索 Prompt（标题、内容、标签、阶段、项目）..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#FAFAFA] text-sm focus:border-[rgba(139,92,246,0.5)] focus:outline-none"
                 />
               </div>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as SortKey)}
+                className="px-3 py-2 bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#A1A1AA] text-xs focus:border-[rgba(139,92,246,0.5)] focus:outline-none"
+              >
+                {SORT_OPTIONS.map(opt => (
+                  <option key={opt.key} value={opt.key}>{opt.label}</option>
+                ))}
+              </select>
+              <select
+                value={phaseFilter}
+                onChange={e => setPhaseFilter(e.target.value)}
+                className="px-3 py-2 bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#A1A1AA] text-xs focus:border-[rgba(139,92,246,0.5)] focus:outline-none"
+              >
+                <option value="">全部阶段</option>
+                {Object.entries(PHASE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
             </div>
 
             {loading ? (

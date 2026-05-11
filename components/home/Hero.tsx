@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { generateDailyTask, DailyTask } from '@/lib/projects/recommendationEngine';
 import { getPromptHistory } from '@/lib/prompt/history';
+import { getLastInterruptedTask } from '@/lib/session/contextStore';
 
 interface ResumeTask {
   description: string;
@@ -28,6 +29,11 @@ function getTimeAgo(date: Date): string {
 function detectResumeTask(): ResumeTask | null {
   if (typeof window === 'undefined') return null;
   try {
+    const ctxTask = getLastInterruptedTask();
+    if (ctxTask) {
+      return { ...ctxTask, timeAgo: '刚刚' };
+    }
+
     const raw = localStorage.getItem('agentforge-playground-messages');
     if (raw) {
       const messages = JSON.parse(raw);

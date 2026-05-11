@@ -10,6 +10,7 @@ import DecisionGraph from '@/components/planner/DecisionGraph';
 import { generateArtifacts, artifactsToMarkdown, artifactsToScaffold, artifactsToApiSpec } from '@/lib/agent-runtime/artifactGenerator';
 import type { EngineeringArtifacts } from '@/lib/agent-runtime/artifactGenerator';
 import { updateAssetExecutionResult } from '@/lib/prompt/history';
+import { saveContext, loadContext } from '@/lib/session/contextStore';
 
 interface Step {
   step: number;
@@ -95,6 +96,37 @@ export default function PlaygroundPage() {
   const [feedbackNotes, setFeedbackNotes] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [executionSummary, setExecutionSummary] = useState<ExecutionSummary | null>(null);
+  const [stepExpanded, setStepExpanded] = useState<Record<string, boolean>>({});
+  const [showFullReport, setShowFullReport] = useState(false);
+  const [reportSearch, setReportSearch] = useState('');
+  const [activeSection, setActiveSection] = useState<string>('summary');
+
+  useEffect(() => {
+    const ctx = loadContext();
+    if (ctx.draftInput && !input) {
+      setInput(ctx.draftInput);
+    }
+    if (ctx.expandedPanels) {
+      setShowMemoryPanel(ctx.expandedPanels.memory ?? true);
+      setShowMetaPanel(ctx.expandedPanels.meta ?? true);
+    }
+    saveContext({ lastPage: '/playground' });
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveContext({
+        draftInput: input,
+        assetId: assetId ?? undefined,
+        executionState: isLoading ? 'running' : messages.some(m => m.isExecution) ? 'completed' : 'idle',
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [input, assetId, isLoading]);
+
+  useEffect(() => {
+    saveContext({ expandedPanels: { memory: showMemoryPanel, meta: showMetaPanel } });
+  }, [showMemoryPanel, showMetaPanel]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -477,28 +509,48 @@ export default function PlaygroundPage() {
                           {message.content}
                         </div>
                       )}
-                      {message.steps.map((step) => (
-                        <div
-                          key={step.step}
-                          className={`p-4 rounded-xl border transition-all ${
-                            step.status === 'completed' ? 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.05)]'
-                            : step.status === 'executing' ? 'border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.05)]'
-                            : 'border-[rgba(255,255,255,0.06)] bg-[rgba(24,24,27,0.3)]'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 mb-3">
-                            <span className="text-[#71717A] text-xs font-mono">#{step.step}</span>
-                            <AgentBadge agent={step.agent} size="sm" />
-                            <AgentStatus status={step.status === 'executing' ? 'executing' : 'completed'} size="sm" />
+                      {message.steps.map((step) => {
+                        const stepKey = `${message.id}-${step.step}`;
+                        const isExecDone = step.status === 'completed' || step.status === 'failed';
+                        const isExpanded = stepExpanded[stepKey] ?? !isExecDone;
+                        return (
+                          <div
+                            key={step.step}
+                            data-section={step.step === 1 ? 'architecture' : step.step === 2 ? 'implementation' : step.step === 3 ? 'risks' : 'recommendations'}
+                            className={`rounded-xl border transition-all overflow-hidden ${
+                              step.status === 'completed' ? 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.05)]'
+                              : step.status === 'executing' ? 'border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.05)]'
+                              : 'border-[rgba(255,255,255,0.06)] bg-[rgba(24,24,27,0.3)]'
+                            }`}
+                          >
+                            <button
+                              onClick={() => setStepExpanded(prev => ({ ...prev, [stepKey]: !isExpanded }))}
+                              className="w-full flex items-center gap-3 p-4 hover:bg-[rgba(255,255,255,0.02)] transition-colors text-left"
+                            >
+                              <svg className={`w-3 h-3 text-[#52525B] shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                              <span className="text-[#71717A] text-xs font-mono">#{step.step}</span>
+                              <AgentBadge agent={step.agent} size="sm" />
+                              <AgentStatus status={step.status === 'executing' ? 'executing' : 'completed'} size="sm" />
+                              <span className="text-xs text-[#52525B] ml-auto shrink-0">{step.task}</span>
+                              {!isExpanded && step.output && (
+                                <span className="text-[10px] text-[#52525B] shrink-0">{step.output.split('\n').length} 行</span>
+                              )}
+                            </button>
+                            {isExpanded && (
+                              <div className="px-4 pb-4 pl-10">
+                                <p className="text-[#A1A1AA] text-sm mb-2">{step.task}</p>
+                                {step.output && (
+                                  <div className="mt-2 p-3 bg-[#111113] rounded-lg border border-[rgba(255,255,255,0.05)]">
+                                    <pre className="text-[#A1A1AA] whitespace-pre-wrap text-xs font-mono leading-relaxed max-h-[500px] overflow-y-auto">{step.output}</pre>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <p className="text-[#A1A1AA] text-sm mb-2">{step.task}</p>
-                          {step.output && (
-                            <div className="mt-3 p-3 bg-[#111113] rounded-lg border border-[rgba(255,255,255,0.05)]">
-                              <pre className="text-[#A1A1AA] whitespace-pre-wrap text-xs font-mono leading-relaxed">{step.output}</pre>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                       {message.executionId && message.steps.length > 0 && message.steps.every(s => s.status === 'completed') && (
                         <div className="flex justify-center mt-4">
                           <Link href="/lab" className="inline-flex items-center gap-2 px-4 py-2 bg-[rgba(24,24,27,0.72)] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[rgba(255,255,255,0.2)] transition-all text-sm">
@@ -586,6 +638,46 @@ export default function PlaygroundPage() {
             {lastExecution ? (
               <>
                 <div className="space-y-2">
+                  <h3 className="text-xs text-[#71717A] uppercase tracking-wider">报告导航</h3>
+                  <div className="space-y-0.5">
+                    {[
+                      { id: 'summary', label: '执行摘要' },
+                      { id: 'architecture', label: '架构设计' },
+                      { id: 'implementation', label: '实现细节' },
+                      { id: 'risks', label: '风险提示' },
+                      { id: 'recommendations', label: '下一步' },
+                    ].map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveSection(item.id);
+                          const el = document.querySelector(`[data-section="${item.id}"]`);
+                          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }}
+                        className={`w-full text-left px-3 py-1.5 rounded-md text-xs transition-colors ${
+                          activeSection === item.id
+                            ? 'text-[#FAFAFA] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]'
+                            : 'text-[#71717A] hover:text-[#A1A1AA] hover:bg-[rgba(255,255,255,0.03)]'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  {lastExecution && lastExecution.steps.length > 0 && (
+                    <button
+                      onClick={() => setShowFullReport(true)}
+                      className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs text-[#60A5FA] hover:bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.15)] transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                      </svg>
+                      查看完整报告
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <h3 className="text-xs text-[#71717A] uppercase tracking-wider">当前状态</h3>
                   <div className="p-3 rounded-lg bg-[rgba(24,24,27,0.5)] border border-[rgba(255,255,255,0.06)]">
                     {currentRunningStep ? (
@@ -671,7 +763,7 @@ export default function PlaygroundPage() {
                 </div>
 
                 {executionSummary && (
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-section="summary">
                     <h3 className="text-xs text-[#71717A] uppercase tracking-wider">执行结果智能分析</h3>
                     <div className={`p-3 rounded-lg border ${
                       executionSummary.outcome === 'success' ? 'bg-[rgba(16,185,129,0.05)] border-[rgba(16,185,129,0.2)]' :
@@ -823,6 +915,97 @@ export default function PlaygroundPage() {
             >
               {submittingFeedback ? '提交中...' : '提交反馈'}
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showFullReport && lastExecution && lastExecution.steps.length > 0 && (
+      <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowFullReport(false)}>
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        <div
+          className="relative w-full max-w-2xl bg-[#0A0A0C] border-l border-[rgba(255,255,255,0.08)] overflow-y-auto"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="sticky top-0 z-10 bg-[#0A0A0C] border-b border-[rgba(255,255,255,0.06)] p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-[#FAFAFA]">完整执行报告</h2>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.06)] text-[#71717A]">{lastExecution.steps.length} 步骤</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={reportSearch}
+                onChange={e => setReportSearch(e.target.value)}
+                placeholder="搜索报告..."
+                className="px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] text-xs text-[#A1A1AA] placeholder-[#52525B] focus:outline-none focus:border-[#3B82F6] w-40"
+              />
+              <button
+                onClick={() => {
+                  const fullText = lastExecution.steps.map((s: any) =>
+                    `### [${s.agent}] ${s.task}\n\n${s.output || ''}`
+                  ).join('\n\n---\n\n');
+                  navigator.clipboard.writeText(fullText);
+                }}
+                className="p-2 rounded-lg text-[#71717A] hover:text-[#A1A1AA] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+                title="复制全部"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  const md = `# 执行报告\n\n${lastExecution.content || ''}\n\n${lastExecution.steps.map((s: any) =>
+                    `## [${s.agent}] ${s.task}\n\n${s.output || ''}`
+                  ).join('\n\n---\n\n')}`;
+                  const blob = new Blob([md], { type: 'text/markdown' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'execution-report.md'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="p-2 rounded-lg text-[#71717A] hover:text-[#A1A1AA] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+                title="导出 Markdown"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </button>
+              <button onClick={() => setShowFullReport(false)} className="p-2 rounded-lg text-[#71717A] hover:text-[#FAFAFA] hover:bg-[rgba(255,255,255,0.05)] transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {lastExecution.content && (
+            <div className="p-4 border-b border-[rgba(255,255,255,0.06)]">
+              <p className="text-sm text-[#A1A1AA] leading-relaxed whitespace-pre-wrap">{lastExecution.content}</p>
+            </div>
+          )}
+
+          <div className="p-4 space-y-4">
+            {lastExecution.steps.map((step: any) => {
+              const matchesSearch = !reportSearch ||
+                step.task.toLowerCase().includes(reportSearch.toLowerCase()) ||
+                (step.output && step.output.toLowerCase().includes(reportSearch.toLowerCase()));
+              if (!matchesSearch) return null;
+              return (
+                <div key={step.step} className="rounded-lg border border-[rgba(255,255,255,0.06)] overflow-hidden">
+                  <div className="flex items-center gap-3 p-3 bg-[rgba(255,255,255,0.02)]">
+                    <span className="text-[#71717A] text-xs font-mono">#{step.step}</span>
+                    <AgentBadge agent={step.agent} size="sm" />
+                    <span className="text-xs text-[#A1A1AA] flex-1">{step.task}</span>
+                  </div>
+                  {step.output && (
+                    <div className="p-3 border-t border-[rgba(255,255,255,0.04)]">
+                      <pre className="text-xs text-[#D4D4D8] whitespace-pre-wrap leading-relaxed font-mono">{step.output}</pre>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

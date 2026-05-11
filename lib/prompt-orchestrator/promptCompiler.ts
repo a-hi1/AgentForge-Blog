@@ -48,6 +48,24 @@ function analysisSection(reasoning: ProjectReasoning, depth: PromptDepth): strin
     lines.push(`> ${reasoning.rawAnalysis}`);
   }
 
+  if (reasoning.businessModel) {
+    lines.push('');
+    lines.push('**商业模式**:');
+    lines.push(reasoning.businessModel);
+  }
+
+  if (reasoning.coreUsers && reasoning.coreUsers.length > 0) {
+    lines.push('');
+    lines.push('**核心用户**:');
+    reasoning.coreUsers.forEach(u => lines.push(`- ${u}`));
+  }
+
+  if (reasoning.technicalBoundaries && reasoning.technicalBoundaries.length > 0) {
+    lines.push('');
+    lines.push('**技术边界**:');
+    reasoning.technicalBoundaries.forEach(b => lines.push(`- 🔒 ${b}`));
+  }
+
   return lines.join('\n');
 }
 
@@ -138,4 +156,86 @@ export function downloadMarkdown(content: string, filename: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+const EMPTY_PATTERNS = [
+  /根据实际需求/g,
+  /适当选择/g,
+  /合理设计/g,
+  /必要时/g,
+  /可以考虑/g,
+  /酌情/g,
+  /视情况而定/g,
+  /灵活处理/g,
+];
+
+const GENERIC_PATTERNS = [
+  /使用合适的技术栈/g,
+  /实现基本功能/g,
+  /确保用户体验/g,
+  /做好错误处理/g,
+  /添加必要的/g,
+];
+
+export interface SpecificityReport {
+  score: number;
+  emptyPhrases: string[];
+  genericPhrases: string[];
+  missingDetails: string[];
+  suggestions: string[];
+}
+
+export function validateSpecificity(prompt: string, reasoning?: { constraints?: string[]; risks?: string[] }): SpecificityReport {
+  const emptyPhrases: string[] = [];
+  const genericPhrases: string[] = [];
+  const missingDetails: string[] = [];
+  const suggestions: string[] = [];
+
+  for (const pattern of EMPTY_PATTERNS) {
+    const matches = prompt.match(pattern);
+    if (matches) emptyPhrases.push(...matches);
+  }
+
+  for (const pattern of GENERIC_PATTERNS) {
+    const matches = prompt.match(pattern);
+    if (matches) genericPhrases.push(...matches);
+  }
+
+  if (!prompt.includes('技术栈') && !prompt.includes('TypeScript') && !prompt.includes('React')) {
+    missingDetails.push('未指定具体技术栈');
+  }
+  if (!prompt.includes('验收') && !prompt.includes('标准') && !prompt.includes('完成条件')) {
+    missingDetails.push('缺少明确验收标准');
+  }
+  if (!prompt.includes('禁止') && !prompt.includes('不要') && !prompt.includes('约束')) {
+    missingDetails.push('缺少明确约束条件');
+  }
+
+  if (emptyPhrases.length > 0) suggestions.push('替换模糊表述为具体技术指令');
+  if (genericPhrases.length > 0) suggestions.push('增加项目特定的技术细节');
+  if (missingDetails.length > 0) suggestions.push('补充缺失的关键信息');
+
+  const score = Math.max(0, 100 - emptyPhrases.length * 12 - genericPhrases.length * 10 - missingDetails.length * 8);
+
+  return { score, emptyPhrases, genericPhrases, missingDetails, suggestions };
+}
+
+export function injectConstraints(prompt: string, reasoning?: { constraints?: string[]; risks?: string[]; technicalBoundaries?: string[] }): string {
+  if (!reasoning) return prompt;
+
+  const sections: string[] = [prompt];
+
+  if (reasoning.constraints && reasoning.constraints.length > 0) {
+    sections.push('\n## 技术约束\n' + reasoning.constraints.map(c => `- ${c}`).join('\n'));
+  }
+
+  if (reasoning.risks && reasoning.risks.length > 0) {
+    sections.push('\n## 风险提示\n' + reasoning.risks.map(r => `- ⚠️ ${r}`).join('\n'));
+  }
+
+  if (reasoning.technicalBoundaries && reasoning.technicalBoundaries.length > 0) {
+    sections.push('\n## 技术边界\n' + reasoning.technicalBoundaries.map(b => `- 🔒 ${b}`).join('\n'));
+  }
+
+  return sections.join('\n');
 }
