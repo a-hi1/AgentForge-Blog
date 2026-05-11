@@ -19,6 +19,7 @@ import PromptPhaseCard from '@/components/prompt/PromptPhaseCard';
 import PromptOutput from '@/components/prompt/PromptOutput';
 import StrategySummary from '@/components/prompt/StrategySummary';
 import { saveContext, loadContext } from '@/lib/session/contextStore';
+import { trackFunnelEvent } from '@/lib/analytics/funnelTracker';
 
 const EXAMPLES = [
   '开发校园二手交易+兴趣社交平台',
@@ -100,6 +101,7 @@ export default function PromptPage() {
     if (ctx.currentPhase) setPhase(ctx.currentPhase as 'MVP' | 'Beta' | 'Growth');
     if (ctx.currentProject) setProjectName(ctx.currentProject);
     saveContext({ lastPage: '/prompt' });
+    trackFunnelEvent('studio_open');
   }, []);
 
   useEffect(() => {
@@ -225,6 +227,7 @@ export default function PromptPage() {
     setSaveTags(projectReasoning.secondaryTypes || []);
     setSaveInput(userIdea);
     setShowSaveDialog(true);
+    trackFunnelEvent('generate', undefined, { primaryType: projectReasoning.primaryType, phaseCount: scoredPhases.length });
   }, []);
 
   const handleConfirmClarification = useCallback(async () => {
@@ -285,6 +288,7 @@ export default function PromptPage() {
       });
       if (saved?.id) {
         setSavedAssetId(saved.id);
+        trackFunnelEvent('asset_saved', saved.id, { title: saveTitle, category: saveCategory });
       }
       setShowSaveDialog(false);
     } catch (e) {
@@ -310,6 +314,7 @@ export default function PromptPage() {
       });
       if (saved?.id) {
         setSavedAssetId(saved.id);
+        trackFunnelEvent('asset_saved', saved.id, { title: saveTitle, category: saveCategory, action: 'save_and_execute' });
         setShowSaveDialog(false);
         router.push(`/playground?prompt=${encodeURIComponent(saveCombinedOutput)}&assetId=${saved.id}`);
       }

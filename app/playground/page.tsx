@@ -14,6 +14,7 @@ import type { ExecutionMode } from '@/lib/prompt/history';
 import { saveContext, loadContext } from '@/lib/session/contextStore';
 import { analyzeExecutionResult } from '@/lib/execution/resultAnalyzer';
 import type { ExecutionTruthScore } from '@/lib/execution/resultAnalyzer';
+import { trackFunnelEvent } from '@/lib/analytics/funnelTracker';
 
 interface Step {
   step: number;
@@ -149,6 +150,7 @@ export default function PlaygroundPage() {
       const aid = urlParams.get('assetId');
       if (aid) {
         setAssetId(aid);
+        trackFunnelEvent('reuse', aid);
       }
     }
   }, []);
@@ -256,6 +258,7 @@ export default function PlaygroundPage() {
     setIsLoading(true);
     setShowSuggestions(false);
     setActiveTab('execution');
+    trackFunnelEvent('execute', assetId || undefined, { promptLength: text.length, mode: executionMode });
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -403,6 +406,7 @@ export default function PlaygroundPage() {
         },
       });
       setShowFeedbackDialog(false);
+      trackFunnelEvent('feedback', assetId, { success: feedbackSuccess, rating: feedbackRating });
     } catch (e) {
       console.error('Feedback submit failed:', e);
     } finally {
@@ -422,6 +426,7 @@ export default function PlaygroundPage() {
     setMessages(prev => [...prev, userMessage, agentMessage]);
     setInput('');
     setShowSuggestions(false);
+    trackFunnelEvent('execute', assetId || undefined, { promptLength: text.length, mode: 'manual' });
     setShowManualInput(true);
     setManualResultInput('');
     setManualAnalysis(null);
@@ -455,6 +460,7 @@ export default function PlaygroundPage() {
             userRating: Math.ceil(analysis.overall / 20),
           },
         });
+        trackFunnelEvent('feedback', assetId, { mode: 'manual', score: analysis.overall, agent: manualExternalAgent });
       }
     } catch (e) {
       console.error('Analysis failed:', e);
