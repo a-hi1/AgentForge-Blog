@@ -5,6 +5,7 @@ export interface PromptScore {
   constraintClarity: number;
   executability: number;
   safety: number;
+  copyToAgent: number;
   feedback: string[];
   needsRewrite: boolean;
 }
@@ -15,14 +16,16 @@ interface ScoreWeights {
   constraintClarity: number;
   executability: number;
   safety: number;
+  copyToAgent: number;
 }
 
 const WEIGHTS: ScoreWeights = {
-  precision: 0.25,
-  contextRichness: 0.20,
-  constraintClarity: 0.20,
-  executability: 0.25,
+  precision: 0.15,
+  contextRichness: 0.15,
+  constraintClarity: 0.15,
+  executability: 0.20,
   safety: 0.10,
+  copyToAgent: 0.25,
 };
 
 const REWRITE_THRESHOLD = 85;
@@ -145,19 +148,59 @@ function scoreSafety(prompt: string): { score: number; feedback: string[] } {
   return { score: Math.min(100, Math.max(0, score)), feedback };
 }
 
+function scoreCopyToAgent(prompt: string): { score: number; feedback: string[] } {
+  let score = 40;
+  const feedback: string[] = [];
+  const lower = prompt.toLowerCase();
+
+  const hasFilePath = /[a-zA-Z]:\\|\.\//.test(prompt) || prompt.includes('app/') || prompt.includes('src/') || prompt.includes('lib/') || prompt.includes('components/');
+  if (hasFilePath) score += 15;
+  else feedback.push('缺少具体文件路径，AI 无法定位修改位置');
+
+  const hasTechStack = ['next.js', 'react', 'typescript', 'tailwind', 'supabase', 'prisma', 'zustand']
+    .filter(t => lower.includes(t)).length;
+  if (hasTechStack >= 2) score += 10;
+  else feedback.push('未明确技术栈，AI 可能选择不一致的技术方案');
+
+  const hasCodeBlock = prompt.includes('```');
+  if (hasCodeBlock) score += 10;
+
+  const hasAcceptance = ['验收', '标准', '完成条件', '测试通过', '编译通过', '0 errors']
+    .some(s => lower.includes(s));
+  if (hasAcceptance) score += 15;
+  else feedback.push('缺少验收标准，无法判断执行是否完成');
+
+  const hasPauseCondition = ['暂停', '遇到以下情况', '如果不确定', '暂停条件']
+    .some(s => lower.includes(s));
+  if (hasPauseCondition) score += 5;
+
+  const vaguePatterns = ['请设计一个', '请实现一个', '请创建一个', '请开发一个'];
+  const hasVagueRequest = vaguePatterns.some(p => lower.includes(p));
+  const hasSpecificRequest = ['修改', '在.*文件', '将.*改为', '添加.*到', '更新.*接口']
+    .some(p => new RegExp(p).test(lower));
+  if (hasSpecificRequest && !hasVagueRequest) score += 5;
+  else if (hasVagueRequest && !hasSpecificRequest) {
+    feedback.push('请求过于宽泛，应具体说明修改哪个文件的哪个部分');
+  }
+
+  return { score: Math.min(100, score), feedback };
+}
+
 export function scorePrompt(prompt: string, context?: string): PromptScore {
   const precision = scorePrecision(prompt, context || '');
   const contextRichness = scoreContextRichness(prompt);
   const constraintClarity = scoreConstraintClarity(prompt);
   const executability = scoreExecutability(prompt);
   const safety = scoreSafety(prompt);
+  const copyToAgent = scoreCopyToAgent(prompt);
 
   const total = Math.round(
     precision.score * WEIGHTS.precision +
     contextRichness.score * WEIGHTS.contextRichness +
     constraintClarity.score * WEIGHTS.constraintClarity +
     executability.score * WEIGHTS.executability +
-    safety.score * WEIGHTS.safety
+    safety.score * WEIGHTS.safety +
+    copyToAgent.score * WEIGHTS.copyToAgent
   );
 
   const feedback = [
@@ -166,6 +209,7 @@ export function scorePrompt(prompt: string, context?: string): PromptScore {
     ...constraintClarity.feedback,
     ...executability.feedback,
     ...safety.feedback,
+    ...copyToAgent.feedback,
   ];
 
   return {
@@ -175,6 +219,7 @@ export function scorePrompt(prompt: string, context?: string): PromptScore {
     constraintClarity: constraintClarity.score,
     executability: executability.score,
     safety: safety.score,
+    copyToAgent: copyToAgent.score,
     feedback,
     needsRewrite: total < REWRITE_THRESHOLD,
   };

@@ -11,12 +11,15 @@ export interface CompiledPack {
 }
 
 function analysisSection(reasoning: ProjectReasoning, depth: PromptDepth): string {
-  const complexityMap: Record<string, string> = { low: '低', medium: '中', high: '高' };
+  const complexityMap: Record<string, string> = { low: '低', medium: '中', high: '高', 'very-high': '极高' };
   const depthMap: Record<string, string> = { quick: '快速', standard: '标准', expert: '专家', architect: '架构师' };
   const lines = [
-    `## 项目分析`,
+    `## 项目意图推理`,
     '',
-    `**项目类型**: ${reasoning.primaryTypeLabel}${reasoning.secondaryTypes.length > 0 ? `（复合型：${reasoning.secondaryTypes.join(' + ')}）` : ''}`,
+    `**商业目标**: ${reasoning.businessGoal || '待定义'}`,
+    `**核心用户**: ${(reasoning.coreUsers || []).join('、') || '待定义'}`,
+    `**最短价值闭环**: ${reasoning.shortestValueLoop || '待定义'}`,
+    `**项目差异化**: ${reasoning.projectDifferentiation || '待定义'}`,
     `**技术复杂度**: ${complexityMap[reasoning.complexity] || reasoning.complexity}`,
     `**分析确信度**: ${reasoning.confidence}%`,
     `**输出深度**: ${depthMap[depth]}`,
@@ -43,27 +46,21 @@ function analysisSection(reasoning: ProjectReasoning, depth: PromptDepth): strin
     reasoning.risks.forEach(r => lines.push(`- ⚠️ ${r}`));
   }
 
-  if (reasoning.rawAnalysis) {
+  if (reasoning.implicitRisks.length > 0) {
     lines.push('');
-    lines.push(`> ${reasoning.rawAnalysis}`);
+    lines.push('**非显性风险**:');
+    reasoning.implicitRisks.forEach(r => lines.push(`- 🔴 ${r}`));
   }
 
-  if (reasoning.businessModel) {
-    lines.push('');
-    lines.push('**商业模式**:');
-    lines.push(reasoning.businessModel);
-  }
-
-  if (reasoning.coreUsers && reasoning.coreUsers.length > 0) {
-    lines.push('');
-    lines.push('**核心用户**:');
-    reasoning.coreUsers.forEach(u => lines.push(`- ${u}`));
-  }
-
-  if (reasoning.technicalBoundaries && reasoning.technicalBoundaries.length > 0) {
+  if (reasoning.technicalBoundaries.length > 0) {
     lines.push('');
     lines.push('**技术边界**:');
     reasoning.technicalBoundaries.forEach(b => lines.push(`- 🔒 ${b}`));
+  }
+
+  if (reasoning.rawAnalysis) {
+    lines.push('');
+    lines.push(`> ${reasoning.rawAnalysis}`);
   }
 
   return lines.join('\n');
@@ -102,7 +99,7 @@ export function compilePromptPack(
     '',
     `> ${userIdea}`,
     '',
-    analysisSection(reasoning, depth),
+    `> 📋 复制以下 Prompt 到 Claude / Cursor / Trae 中即可执行`,
     '',
     phaseSummarySection(phases),
     '',
@@ -110,21 +107,72 @@ export function compilePromptPack(
     '',
     '---',
     '',
-    '> 由 AgentForge Prompt Strategy Generator v2 智能生成',
-    '> 每个阶段的 Prompt 经过动态推理、深度适配和质量评分',
-    '> 复制到 Claude / Trae / Cursor 中即可执行',
+    '<details>',
+    '<summary>🔍 查看生成推理</summary>',
+    '',
+    analysisSection(reasoning, depth),
+    '',
+    '</details>',
+    '',
+    '---',
+    '',
+    '> 由 AgentForge Prompt Production Engine 智能生成',
+    '> 每个阶段的 Prompt 经过意图推理、动态生成和质量评分',
   ];
 
   const markdown = sections.join('\n');
 
   return {
     title: `${reasoning.primaryTypeLabel} — Prompt Pack`,
-    summary: `共 ${phases.length} 个阶段，${depth} 深度，覆盖从需求分析到项目复盘的完整开发流程`,
+    summary: `共 ${phases.length} 个阶段，${depth} 深度，覆盖完整开发流程`,
     reasoning,
     phases,
     depth,
     markdown,
   };
+}
+
+export function compileForExecution(
+  phase: CompiledPhase,
+  index: number,
+  reasoning: ProjectReasoning,
+): string {
+  const lines = [
+    `# ${phase.name}`,
+    '',
+    `## 执行指令`,
+    '',
+    '```',
+    phase.prompt,
+    '```',
+    '',
+    '---',
+    '',
+    `## 项目上下文`,
+    `- 商业目标：${reasoning.businessGoal}`,
+    `- 核心用户：${(reasoning.coreUsers || []).join('、')}`,
+    `- 最短价值闭环：${reasoning.shortestValueLoop}`,
+    `- 技术栈：${reasoning.recommendedStack.join(' → ')}`,
+  ];
+
+  if (reasoning.constraints.length > 0) {
+    lines.push('');
+    lines.push('## 约束条件');
+    reasoning.constraints.forEach(c => lines.push(`- ${c}`));
+  }
+
+  if (reasoning.implicitRisks.length > 0) {
+    lines.push('');
+    lines.push('## 非显性风险');
+    reasoning.implicitRisks.forEach(r => lines.push(`- ${r}`));
+  }
+
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  lines.push('将以上内容复制到 AI 编程助手中执行。');
+
+  return lines.join('\n');
 }
 
 export function compileSinglePhaseMarkdown(

@@ -68,17 +68,24 @@ function buildContextBlock(ctx: DynamicPromptContext): string {
   const r = ctx.reasoning;
   const lines: string[] = [];
 
-  lines.push(`【项目上下文】`);
-  lines.push(`- 项目类型：${r.primaryTypeLabel}${r.secondaryTypes.length > 0 ? `（复合型：${r.secondaryTypes.join(' + ')}）` : ''}`);
+  lines.push(`【项目意图推理】`);
+  lines.push(`- 商业目标：${r.businessGoal || '待定义'}`);
+  lines.push(`- 核心用户：${(r.coreUsers || []).join('、') || '待定义'}`);
+  lines.push(`- 最短价值闭环：${r.shortestValueLoop || '待定义'}`);
+  lines.push(`- 项目差异化：${r.projectDifferentiation || '待定义'}`);
   lines.push(`- 技术复杂度：${r.complexity}`);
   lines.push(`- 推荐技术栈：${r.recommendedStack.join(' → ')}`);
 
-  if (r.domainFeatures.length > 0) {
-    lines.push(`- 领域特征：${r.domainFeatures.slice(0, 5).join('、')}`);
+  if (r.technicalBoundaries.length > 0) {
+    lines.push(`- 技术边界：${r.technicalBoundaries.join('；')}`);
   }
 
-  if (r.rawAnalysis) {
-    lines.push(`- 分析概要：${r.rawAnalysis}`);
+  if (r.implicitRisks.length > 0) {
+    lines.push(`- 非显性风险：${r.implicitRisks.join('；')}`);
+  }
+
+  if (r.domainFeatures.length > 0) {
+    lines.push(`- 领域特征：${r.domainFeatures.slice(0, 5).join('、')}`);
   }
 
   if (ctx.clarificationContext) {
@@ -545,127 +552,78 @@ ${buildAcceptanceBlock([
 ], ctx)}`,
 };
 
-const PHASE_MAP: Record<string, PhaseDefinition[]> = {
-  hybrid_marketplace: [
-    { templateId: 'product_init', name: '需求澄清与项目规划', category: '启动', description: '明确复合型平台的核心功能和模块边界' },
-    { templateId: 'architecture', name: '系统架构设计', category: '设计', description: '设计支持多业务线的可扩展架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计支持多业务域的统一数据模型' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现核心业务流程和基础交互' },
-    { templateId: 'feature_dev', name: '功能迭代', category: '开发', description: '扩展功能、优化体验、完善细节' },
-    { templateId: 'audit', name: '代码审计', category: '质量', description: '代码质量、安全性、性能全面审查' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '生产环境部署与监控配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结技术方案和项目经验' },
-  ],
-  saas: [
-    { templateId: 'product_init', name: '需求澄清与项目规划', category: '启动', description: '明确 SaaS 平台的核心功能、用户角色和商业模式' },
-    { templateId: 'architecture', name: '系统架构设计', category: '设计', description: '设计多租户架构、API 层和认证体系' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计用户、订阅、计费等核心数据模型' },
-    { templateId: 'mvp_dev', name: '用户系统与认证', category: '开发', description: '实现注册、登录、多租户切换' },
-    { templateId: 'feature_dev', name: '核心业务与 Dashboard', category: '开发', description: '实现 SaaS 核心功能和管理仪表板' },
-    { templateId: 'audit', name: '代码审计与质量验证', category: '质量', description: '安全审计、性能测试、代码质量检查' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '生产环境配置、域名绑定、监控告警' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结技术亮点，输出项目文档' },
-  ],
-  blog_cms: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确内容管理需求和编辑体验目标' },
-    { templateId: 'architecture', name: '架构设计', category: '设计', description: '设计内容模型、路由和渲染方案' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计文章、分类、标签等数据结构' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现文章编辑器、分类管理和内容展示' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: 'SEO 检查、性能优化、代码审查' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '部署到 Vercel，配置域名和 CDN' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结技术方案和优化经验' },
-  ],
-  ecommerce: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确商品类型、交易流程和支付方式' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计商品、订单、支付的系统架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计商品、订单、库存等数据模型' },
-    { templateId: 'mvp_dev', name: '商品与购物车', category: '开发', description: '实现商品展示、搜索和购物车功能' },
-    { templateId: 'feature_dev', name: '订单与支付', category: '开发', description: '实现订单流程和支付集成' },
-    { templateId: 'audit', name: '安全审计', category: '质量', description: '支付安全、数据安全和性能测试' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '生产环境部署和监控配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结电商架构经验' },
-  ],
-  social_platform: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确社交关系和内容互动模型' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计实时通信和 Feed 流架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计用户关系、消息、动态等数据模型' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现用户主页、发布和关注功能' },
-    { templateId: 'feature_dev', name: '实时与互动', category: '开发', description: '实现消息、通知和内容推荐' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: '并发安全和内容审核检查' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '部署和 WebSocket 配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结社交平台架构经验' },
-  ],
-  admin_system: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确业务流程、权限模型和报表需求' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计 RBAC 权限和模块化架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计用户、角色、权限等数据模型' },
-    { templateId: 'mvp_dev', name: 'MVP 核心模块', category: '开发', description: '实现权限管理、基础 CRUD 和报表' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: '权限安全检查和功能验证' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '内部部署和访问控制配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结管理系统架构经验' },
-  ],
-  ai_tool: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确 AI 能力边界和用户体验目标' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计 LLM 集成和向量检索架构' },
-    { templateId: 'database', name: '数据与知识库', category: '设计', description: '设计对话、知识库和嵌入向量存储' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现对话界面和 LLM 调用' },
-    { templateId: 'feature_dev', name: '高级功能', category: '开发', description: '实现 RAG、记忆和多轮对话' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: 'AI 输出质量和安全性审查' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '部署和 API 限流配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结 AI 工程化经验' },
-  ],
-  content_community: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确社区定位、内容类型和互动机制' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计内容模型、搜索和推荐架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计帖子、评论、互动等数据模型' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现帖子发布、浏览和评论功能' },
-    { templateId: 'feature_dev', name: '社交与推荐', category: '开发', description: '实现点赞、收藏、标签和内容推荐' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: '内容审核和性能测试' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '部署和搜索服务配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结社区平台架构经验' },
-  ],
-  data_analytics: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确数据源、指标和可视化需求' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计数据采集、处理和展示架构' },
-    { templateId: 'database', name: '数据存储设计', category: '设计', description: '设计时序数据存储和聚合策略' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现仪表板和核心图表组件' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: '数据准确性和性能测试' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '部署和数据源配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结数据分析平台经验' },
-  ],
-  education: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确教学场景、用户角色和学习流程' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计课程体系和学习路径架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计课程、作业、成绩等数据模型' },
-    { templateId: 'mvp_dev', name: 'MVP 核心功能', category: '开发', description: '实现课程展示和基础学习功能' },
-    { templateId: 'feature_dev', name: '互动与评估', category: '开发', description: '实现作业、考试和学习分析' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: '功能完整性和性能测试' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '部署和视频 CDN 配置' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结教育平台架构经验' },
-  ],
-  general: [
-    { templateId: 'product_init', name: '需求分析', category: '启动', description: '明确项目目标和功能范围' },
-    { templateId: 'architecture', name: '系统架构', category: '设计', description: '设计整体技术架构' },
-    { templateId: 'database', name: '数据库设计', category: '设计', description: '设计核心数据模型' },
-    { templateId: 'mvp_dev', name: 'MVP 开发', category: '开发', description: '实现核心功能模块' },
-    { templateId: 'audit', name: '质量审计', category: '质量', description: '代码质量和功能验证' },
-    { templateId: 'deploy', name: '部署上线', category: '部署', description: '生产环境部署' },
-    { templateId: 'review', name: '项目复盘', category: '收尾', description: '总结和知识沉淀' },
-  ],
-};
+function generateDynamicPhaseDefinitions(r: ProjectReasoning): PhaseDefinition[] {
+  const phases: PhaseDefinition[] = [];
 
-function findPhaseDefinitions(primaryType: string): PhaseDefinition[] {
-  if (PHASE_MAP[primaryType]) return PHASE_MAP[primaryType];
+  phases.push({
+    templateId: 'product_init',
+    name: '需求推理与项目定义',
+    category: '启动',
+    description: `基于意图推理定义核心价值：${r.businessGoal || r.primaryTypeLabel}`,
+  });
 
-  if (primaryType.startsWith('hybrid_')) {
-    return PHASE_MAP.hybrid_marketplace;
+  phases.push({
+    templateId: 'architecture',
+    name: '系统架构设计',
+    category: '设计',
+    description: `设计满足「${r.shortestValueLoop || '核心价值'}」的技术架构`,
+  });
+
+  const needsDatabase = r.domainFeatures.some(f =>
+    ['数据', '存储', '用户', '订单', '交易', '商品', '内容'].some(k => f.includes(k))
+  ) || r.complexity !== 'low';
+
+  if (needsDatabase) {
+    phases.push({
+      templateId: 'database',
+      name: '数据模型设计',
+      category: '设计',
+      description: `设计支撑${r.primaryTypeLabel}的数据模型`,
+    });
   }
 
-  for (const key of Object.keys(PHASE_MAP)) {
-    if (primaryType.includes(key)) return PHASE_MAP[key];
+  phases.push({
+    templateId: 'mvp_dev',
+    name: 'MVP 核心实现',
+    category: '开发',
+    description: `实现最短价值闭环：${r.shortestValueLoop?.split('→')[1]?.trim() || '核心功能'}`,
+  });
+
+  if (r.complexity === 'high' || r.complexity === 'very-high') {
+    phases.push({
+      templateId: 'feature_dev',
+      name: '功能迭代与优化',
+      category: '开发',
+      description: `基于${r.implicitRisks.length > 0 ? '风险应对' : '用户反馈'}扩展功能`,
+    });
   }
 
-  return PHASE_MAP.general;
+  phases.push({
+    templateId: 'audit',
+    name: '质量审计',
+    category: '质量',
+    description: `代码质量、安全性${r.implicitRisks.length > 0 ? '、非显性风险' : ''}审查`,
+  });
+
+  phases.push({
+    templateId: 'deploy',
+    name: '部署上线',
+    category: '部署',
+    description: '生产环境部署与监控配置',
+  });
+
+  phases.push({
+    templateId: 'review',
+    name: '项目复盘',
+    category: '收尾',
+    description: `总结${r.projectDifferentiation ? '差异化' : ''}技术方案和经验`,
+  });
+
+  return phases;
+}
+
+function findPhaseDefinitions(r: ProjectReasoning): PhaseDefinition[] {
+  return generateDynamicPhaseDefinitions(r);
 }
 
 export function buildDynamicPhases(
@@ -674,7 +632,7 @@ export function buildDynamicPhases(
   depth: PromptDepth = 'standard',
   clarificationContext?: string
 ): CompiledPhase[] {
-  const definitions = findPhaseDefinitions(reasoning.primaryType);
+  const definitions = findPhaseDefinitions(reasoning);
   const previousPhases: string[] = [];
 
   return definitions.map((def, index) => {
@@ -721,6 +679,6 @@ for (const [key, builder] of Object.entries(PHASE_BUILDERS)) {
   PHASE_BUILDERS_WRAPPED[key] = (ctx) => builder(addHiddenRequirementsAccessor(ctx));
 }
 
-export function getPhaseCountForType(primaryType: string): number {
-  return findPhaseDefinitions(primaryType).length;
+export function getPhaseCountForType(r: ProjectReasoning): number {
+  return findPhaseDefinitions(r).length;
 }

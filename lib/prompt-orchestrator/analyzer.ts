@@ -9,7 +9,7 @@ export type ProductType =
   | 'content_community'
   | 'general';
 
-export type Complexity = 'low' | 'medium' | 'high';
+export type Complexity = 'low' | 'medium' | 'high' | 'very-high';
 
 export interface AnalysisResult {
   productType: ProductType;

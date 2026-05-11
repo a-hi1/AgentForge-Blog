@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createConversation } from '@/lib/session/conversations';
 
 const navItems = [
   { href: '/', label: '工作台' },
@@ -140,6 +141,18 @@ export default function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <span>Ctrl+K</span>
+            </button>
+            <button
+              onClick={() => {
+                const conv = createConversation();
+                router.push(`/playground?conv=${conv.id}`);
+              }}
+              className="ml-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[rgba(139,92,246,0.15)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.25)] transition-all text-xs font-medium"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              新会话
             </button>
           </nav>
 

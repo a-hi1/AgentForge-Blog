@@ -15,6 +15,17 @@ import { saveContext, loadContext } from '@/lib/session/contextStore';
 import { analyzeExecutionResult } from '@/lib/execution/resultAnalyzer';
 import type { ExecutionTruthScore } from '@/lib/execution/resultAnalyzer';
 import { trackFunnelEvent } from '@/lib/analytics/funnelTracker';
+import {
+  createConversation,
+  getRecentConversations,
+  addMessage,
+  loadMessages,
+  searchConversations,
+  updateConversation,
+  togglePin,
+  removeConversation,
+} from '@/lib/session/conversations';
+import type { Conversation, ConversationMessage } from '@/lib/session/conversations';
 
 interface Step {
   step: number;
@@ -112,6 +123,11 @@ export default function PlaygroundPage() {
   const [manualExternalAgent, setManualExternalAgent] = useState('');
   const [manualAnalysis, setManualAnalysis] = useState<ExecutionTruthScore | null>(null);
   const [analyzingResult, setAnalyzingResult] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [convSearch, setConvSearch] = useState('');
+  const [showConvSearch, setShowConvSearch] = useState(false);
+  const [contextTab, setContextTab] = useState<'prompt' | 'result' | 'repo' | 'assets'>('prompt');
 
   useEffect(() => {
     const ctx = loadContext();
@@ -141,6 +157,10 @@ export default function PlaygroundPage() {
   }, [showMemoryPanel, showMetaPanel]);
 
   useEffect(() => {
+    setConversations(getRecentConversations(20));
+  }, []);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const prompt = urlParams.get('prompt');
@@ -151,6 +171,21 @@ export default function PlaygroundPage() {
       if (aid) {
         setAssetId(aid);
         trackFunnelEvent('reuse', aid);
+      }
+      const convId = urlParams.get('conv');
+      if (convId) {
+        setActiveConvId(convId);
+        const msgs = loadMessages(convId);
+        if (msgs.length > 0) {
+          const convMessages: Message[] = msgs.map(m => ({
+            id: m.id,
+            role: m.role === 'user' ? 'user' : 'agent',
+            content: m.content,
+            timestamp: new Date(m.timestamp),
+            isExecution: m.role === 'execution',
+          }));
+          setMessages(convMessages);
+        }
       }
     }
   }, []);
@@ -259,6 +294,15 @@ export default function PlaygroundPage() {
     setShowSuggestions(false);
     setActiveTab('execution');
     trackFunnelEvent('execute', assetId || undefined, { promptLength: text.length, mode: executionMode });
+
+    let convId = activeConvId;
+    if (!convId) {
+      const conv = createConversation(text);
+      convId = conv.id;
+      setActiveConvId(convId);
+      setConversations(getRecentConversations(20));
+    }
+    addMessage(convId, 'user', text);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -476,6 +520,34 @@ export default function PlaygroundPage() {
     setManualAnalysis(null);
   }, []);
 
+  const handleNewConversation = useCallback(() => {
+    const conv = createConversation();
+    setActiveConvId(conv.id);
+    setMessages([]);
+    setInput('');
+    setShowSuggestions(true);
+    setConversations(getRecentConversations(20));
+  }, []);
+
+  const handleSelectConversation = useCallback((conv: Conversation) => {
+    setActiveConvId(conv.id);
+    const msgs = loadMessages(conv.id);
+    const convMessages: Message[] = msgs.map(m => ({
+      id: m.id,
+      role: m.role === 'user' ? 'user' : 'agent',
+      content: m.content,
+      timestamp: new Date(m.timestamp),
+      isExecution: m.role === 'execution',
+    }));
+    setMessages(convMessages);
+    setShowSuggestions(convMessages.length === 0);
+  }, []);
+
+  const filteredConversations = useMemo(() => {
+    if (!convSearch.trim()) return conversations;
+    return searchConversations(convSearch);
+  }, [conversations, convSearch]);
+
   return (
     <>
     <div className="min-h-[calc(100vh-80px)] flex flex-col">
@@ -532,44 +604,104 @@ export default function PlaygroundPage() {
       </div>
 
       <div className="flex-grow flex max-w-[1600px] mx-auto w-full">
-        <aside className={`${activeTab === 'templates' ? 'flex' : 'hidden'} md:flex w-full md:w-72 lg:w-80 border-r border-[rgba(255,255,255,0.06)] flex-col bg-[#09090B]/50`}>
-          <div className="p-4 border-b border-[rgba(255,255,255,0.06)]">
-            <h2 className="text-sm font-semibold text-[#FAFAFA] mb-3">任务模板</h2>
-            <div className="flex flex-wrap gap-1.5">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-2.5 py-1 text-xs rounded-md transition-all ${activeCategory === cat ? 'bg-[rgba(59,130,246,0.2)] text-[#60A5FA] border border-[rgba(59,130,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border border-transparent hover:border-[rgba(255,255,255,0.1)]'}`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex-grow overflow-y-auto p-3 space-y-2">
-            {filteredTemplates.map(template => (
+        <aside className={`${activeTab === 'templates' ? 'flex' : 'hidden'} md:flex w-full md:w-60 lg:w-72 border-r border-[rgba(255,255,255,0.06)] flex-col bg-[#09090B]/50`}>
+          <div className="p-3 border-b border-[rgba(255,255,255,0.06)]">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-[#FAFAFA]">Sessions</h2>
               <button
-                key={template.id}
-                onClick={() => selectTemplate(template)}
-                className="w-full text-left p-3 rounded-lg border border-[rgba(255,255,255,0.06)] hover:border-[rgba(59,130,246,0.3)] hover:bg-[rgba(59,130,246,0.05)] transition-all group"
+                onClick={handleNewConversation}
+                className="p-1.5 rounded-md bg-[rgba(139,92,246,0.15)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.25)] transition-all"
+                title="新建会话"
               >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-base">{template.icon}</span>
-                  <span className="text-sm font-medium text-[#FAFAFA] group-hover:text-[#60A5FA] transition-colors">
-                    {template.name}
-                  </span>
-                </div>
-                <p className="text-xs text-[#71717A] line-clamp-2 leading-relaxed">
-                  {template.prompt}
-                </p>
-                <div className="mt-2 flex items-center gap-1">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)] text-[#71717A]">
-                    {template.category}
-                  </span>
-                </div>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
               </button>
-            ))}
+            </div>
+            {showConvSearch ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={convSearch}
+                  onChange={e => setConvSearch(e.target.value)}
+                  placeholder="搜索会话..."
+                  className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] rounded-md px-2 py-1 text-xs text-[#A1A1AA] placeholder-[#52525B] focus:outline-none focus:border-[#3B82F6]"
+                  autoFocus
+                />
+                <button onClick={() => { setShowConvSearch(false); setConvSearch(''); }} className="text-[#52525B] hover:text-[#71717A]">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setShowConvSearch(true)} className="flex items-center gap-1.5 text-[10px] text-[#52525B] hover:text-[#71717A] transition-colors">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                搜索
+              </button>
+            )}
+          </div>
+          <div className="flex-grow overflow-y-auto p-2 space-y-0.5">
+            {filteredConversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <p className="text-xs text-[#52525B]">暂无会话</p>
+                <button onClick={handleNewConversation} className="mt-2 text-xs text-[#A78BFA] hover:text-[#8B5CF6] transition-colors">
+                  创建新会话
+                </button>
+              </div>
+            ) : (
+              filteredConversations.map(conv => (
+                <button
+                  key={conv.id}
+                  onClick={() => handleSelectConversation(conv)}
+                  className={`w-full text-left p-2.5 rounded-lg transition-all group ${
+                    activeConvId === conv.id
+                      ? 'bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]'
+                      : 'hover:bg-[rgba(255,255,255,0.03)] border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    {conv.pinned && (
+                      <svg className="w-3 h-3 text-[#F59E0B] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+                      </svg>
+                    )}
+                    <span className="text-xs font-medium text-[#FAFAFA] truncate flex-1">{conv.title}</span>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={e => { e.stopPropagation(); togglePin(conv.id); setConversations(getRecentConversations(20)); }}
+                        className="p-0.5 rounded text-[#52525B] hover:text-[#F59E0B]"
+                        title={conv.pinned ? '取消置顶' : '置顶'}
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); removeConversation(conv.id); setConversations(getRecentConversations(20)); if (activeConvId === conv.id) { setActiveConvId(null); setMessages([]); } }}
+                        className="p-0.5 rounded text-[#52525B] hover:text-[#EF4444]"
+                        title="删除"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[#52525B]">
+                      {new Date(conv.updatedAt).toLocaleDateString() === new Date().toLocaleDateString()
+                        ? new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : new Date(conv.updatedAt).toLocaleDateString()
+                      }
+                    </span>
+                    <span className="text-[10px] text-[#3f3f46]">·</span>
+                    <span className="text-[10px] text-[#52525B]">{conv.messageCount} 条</span>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </aside>
 
@@ -615,48 +747,60 @@ export default function PlaygroundPage() {
                           {message.content}
                         </div>
                       )}
-                      {message.steps.map((step) => {
+                      <div className="flex items-start gap-1.5 overflow-x-auto pb-2 scrollbar-thin">
+                      {message.steps.map((step, stepIdx) => {
                         const stepKey = `${message.id}-${step.step}`;
                         const isExecDone = step.status === 'completed' || step.status === 'failed';
-                        const isExpanded = stepExpanded[stepKey] ?? !isExecDone;
+                        const isExpanded = stepExpanded[stepKey] ?? false;
                         return (
                           <div
                             key={step.step}
                             data-section={step.step === 1 ? 'architecture' : step.step === 2 ? 'implementation' : step.step === 3 ? 'risks' : 'recommendations'}
-                            className={`rounded-xl border transition-all overflow-hidden ${
-                              step.status === 'completed' ? 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.05)]'
-                              : step.status === 'executing' ? 'border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.05)]'
-                              : 'border-[rgba(255,255,255,0.06)] bg-[rgba(24,24,27,0.3)]'
-                            }`}
+                            className="flex items-center gap-1.5 shrink-0"
                           >
                             <button
                               onClick={() => setStepExpanded(prev => ({ ...prev, [stepKey]: !isExpanded }))}
-                              className="w-full flex items-center gap-3 p-4 hover:bg-[rgba(255,255,255,0.02)] transition-colors text-left"
+                              className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all min-w-[110px] ${
+                                step.status === 'completed' ? 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.05)]'
+                                : step.status === 'executing' ? 'border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.05)]'
+                                : 'border-[rgba(255,255,255,0.06)] bg-[rgba(24,24,27,0.3)]'
+                              } hover:border-[rgba(255,255,255,0.15)]`}
                             >
-                              <svg className={`w-3 h-3 text-[#52525B] shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="flex items-center gap-1.5">
+                                <AgentBadge agent={step.agent} size="sm" />
+                                <AgentStatus status={step.status === 'executing' ? 'executing' : 'completed'} size="sm" />
+                              </div>
+                              <span className="text-[11px] font-medium text-[#FAFAFA] truncate max-w-[90px]">{step.task}</span>
+                              <span className="text-[9px] text-[#52525B]">#{step.step}</span>
+                            </button>
+                            {stepIdx < (message.steps?.length ?? 0) - 1 && (
+                              <svg className="w-3.5 h-3.5 text-[#3f3f46] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
-                              <span className="text-[#71717A] text-xs font-mono">#{step.step}</span>
-                              <AgentBadge agent={step.agent} size="sm" />
-                              <AgentStatus status={step.status === 'executing' ? 'executing' : 'completed'} size="sm" />
-                              <span className="text-xs text-[#52525B] ml-auto shrink-0">{step.task}</span>
-                              {!isExpanded && step.output && (
-                                <span className="text-[10px] text-[#52525B] shrink-0">{step.output.split('\n').length} 行</span>
-                              )}
-                            </button>
+                            )}
                             {isExpanded && (
-                              <div className="px-4 pb-4 pl-10">
-                                <p className="text-[#A1A1AA] text-sm mb-2">{step.task}</p>
-                                {step.output && (
-                                  <div className="mt-2 p-3 bg-[#111113] rounded-lg border border-[rgba(255,255,255,0.05)]">
-                                    <pre className="text-[#A1A1AA] whitespace-pre-wrap text-xs font-mono leading-relaxed max-h-[500px] overflow-y-auto">{step.output}</pre>
+                              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setStepExpanded(prev => ({ ...prev, [stepKey]: false }))}>
+                                <div className="w-[600px] max-h-[70vh] bg-[#18181B] rounded-2xl border border-[rgba(255,255,255,0.1)] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                                  <div className="flex items-center justify-between p-4 border-b border-[rgba(255,255,255,0.06)]">
+                                    <div className="flex items-center gap-2">
+                                      <AgentBadge agent={step.agent} size="sm" />
+                                      <span className="text-sm font-medium text-[#FAFAFA]">{step.task}</span>
+                                      <span className="text-[10px] text-[#52525B]">#{step.step}</span>
+                                    </div>
+                                    <button onClick={() => setStepExpanded(prev => ({ ...prev, [stepKey]: false }))} className="text-[#52525B] hover:text-[#A1A1AA]">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
                                   </div>
-                                )}
+                                  <div className="p-4 overflow-y-auto max-h-[55vh]">
+                                    <pre className="text-[#A1A1AA] whitespace-pre-wrap text-xs font-mono leading-relaxed">{step.output || '无输出'}</pre>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
                         );
                       })}
+                      </div>
                       {message.executionId && message.steps.length > 0 && message.steps.every(s => s.status === 'completed') && (
                         <div className="flex justify-center mt-4">
                           <Link href="/lab" className="inline-flex items-center gap-2 px-4 py-2 bg-[rgba(24,24,27,0.72)] border border-[rgba(255,255,255,0.1)] rounded-lg text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[rgba(255,255,255,0.2)] transition-all text-sm">
@@ -835,9 +979,29 @@ export default function PlaygroundPage() {
           </div>
         </main>
 
-        <aside className={`${activeTab === 'intel' ? 'flex' : 'hidden'} md:flex w-full md:w-72 lg:w-80 border-l border-[rgba(255,255,255,0.06)] flex-col bg-[#09090B]/50`}>
-          <div className="p-4 border-b border-[rgba(255,255,255,0.06)]">
-            <h2 className="text-sm font-semibold text-[#FAFAFA]">执行情报</h2>
+        <aside className={`${activeTab === 'intel' ? 'flex' : 'hidden'} md:flex w-full md:w-64 lg:w-72 border-l border-[rgba(255,255,255,0.06)] flex-col bg-[#09090B]/50`}>
+          <div className="p-3 border-b border-[rgba(255,255,255,0.06)]">
+            <h2 className="text-sm font-semibold text-[#FAFAFA] mb-2">Context Panel</h2>
+            <div className="flex gap-1">
+              {[
+                { id: 'prompt' as const, label: '当前 Prompt' },
+                { id: 'result' as const, label: '执行结果' },
+                { id: 'repo' as const, label: 'Repo' },
+                { id: 'assets' as const, label: '历史资产' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setContextTab(tab.id)}
+                  className={`px-2 py-1 text-[10px] rounded-md transition-all ${
+                    contextTab === tab.id
+                      ? 'bg-[rgba(59,130,246,0.15)] text-[#60A5FA]'
+                      : 'text-[#52525B] hover:text-[#71717A]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex-grow overflow-y-auto p-4 space-y-4">
             {lastExecution ? (
