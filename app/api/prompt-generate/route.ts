@@ -1,12 +1,6 @@
 import { NextRequest } from 'next/server';
-import {
-  inferIntent,
-  decideArchitecture,
-  compilePrompt,
-} from '@/lib/prompt-orchestrator/reasoner';
-import type { ReasoningStep } from '@/lib/prompt-orchestrator/reasoner';
+import { inferIntent, decideArchitecture, decomposeToAtomicTasks, compilePrompt } from '@/lib/prompt-orchestrator/reasoner';
 
-export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 const MAX_RETRIES = 2;
@@ -29,42 +23,45 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   throw new Error(`${label} 失败`);
 }
 
-export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  if (!body?.input?.trim()) {
-    return Response.json({ error: '请提供产品想法' }, { status: 400 });
+function sse(data: Record<string, unknown>) {
+  return `data: ${JSON.stringify(data)}\n\n`;
+}
+
+export async function POST(req: NextRequest) {
+  const { userInput } = await req.json();
+
+  if (!userInput || typeof userInput !== 'string' || userInput.trim().length < 2) {
+    return new Response(sse({ type: 'error', error: '请输入至少 10 个字的需求描述' }), {
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+    });
   }
 
-  const userInput: string = body.input.trim();
-
-  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: Record<string, unknown>) => {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch { /* controller may be closed */ }
+        controller.enqueue(new TextEncoder().encode(sse(data)));
       };
 
       try {
-        send({ type: 'progress', step: 'intent', status: 'active' });
+        send({ type: 'progress', step: 'intent', status: 'running' });
+        const intent = await withRetry(() => inferIntent(userInput.trim()), '意图识别');
+        send({ type: 'progress', step: 'intent', status: 'done' });
 
-        const intent = await withRetry(() => inferIntent(userInput), '意图识别');
-        send({ type: 'step', step: { type: 'intent', label: '意图识别', result: intent, status: 'done' } as ReasoningStep });
-
-        send({ type: 'progress', step: 'architecture', status: 'active' });
-
+        send({ type: 'progress', step: 'architecture', status: 'running' });
         const architecture = await withRetry(() => decideArchitecture(intent), '架构决策');
-        send({ type: 'step', step: { type: 'architecture', label: '架构决策', result: architecture, status: 'done' } as ReasoningStep });
+        send({ type: 'progress', step: 'architecture', status: 'done' });
 
-        send({ type: 'progress', step: 'compile', status: 'active' });
+        send({ type: 'progress', step: 'decompose', status: 'running' });
+        const decompose = await withRetry(() => decomposeToAtomicTasks(intent, architecture, userInput.trim()), '任务拆解');
+        send({ type: 'progress', step: 'decompose', status: 'done' });
 
-        const prompt = await withRetry(() => compilePrompt(intent, architecture, userInput), 'Prompt 编译');
-        send({ type: 'step', step: { type: 'compile', label: 'Prompt 编译', result: prompt, status: 'done' } as ReasoningStep });
+        send({ type: 'progress', step: 'compile', status: 'running' });
+        const prompt = await withRetry(() => compilePrompt(intent, architecture, decompose, userInput.trim()), 'Prompt 编译');
+        send({ type: 'progress', step: 'compile', status: 'done' });
 
-        send({ type: 'done', prompt, intent, architecture });
+        send({ type: 'done', prompt, intent, architecture, decompose });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : '推理失败，请重试';
+        const msg = e instanceof Error ? e.message : '生成失败，请重试';
         send({ type: 'error', error: msg });
       } finally {
         controller.close();
@@ -73,10 +70,6 @@ export async function POST(request: NextRequest) {
   });
 
   return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
+    headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
   });
 }

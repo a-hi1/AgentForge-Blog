@@ -521,6 +521,7 @@ export async function savePrompt(params: {
   clarifications?: string[];
   executionSuccess?: boolean;
   feedback?: 'excellent' | 'average' | 'failed';
+  qualityScore?: number;
 }): Promise<PromptAsset> {
   const scoreDetails = calculatePromptScore({
     prompt: params.fullPrompt,
@@ -544,7 +545,7 @@ export async function savePrompt(params: {
     parentId: params.parentId,
     mutationReason: params.mutationReason,
     diffSummary: params.diffSummary,
-    score: scoreDetails.score,
+    score: scoreDetails.overall,
     scoreDetails: scoreDetails,
     executionSuccess: params.executionSuccess,
     executionUsed: params.executionSuccess !== undefined,
@@ -806,7 +807,7 @@ export async function updatePromptFeedback(
       try {
         const { error } = await supabase
           .from('prompt_history')
-          .update({ feedback, score: newScore.score, score_details: newScore })
+          .update({ feedback, score: newScore.overall, score_details: newScore })
           .eq('id', id);
         if (!error) return;
       } catch (e) {
@@ -818,7 +819,7 @@ export async function updatePromptFeedback(
   const history = getLocalStorageFallback();
   const idx = history.findIndex(r => r.id === id);
   if (idx !== -1) {
-    history[idx] = { ...history[idx], feedback, score: newScore.score, scoreDetails: newScore };
+    history[idx] = { ...history[idx], feedback, score: newScore.overall, scoreDetails: newScore };
     saveToLocalStorage(history);
   }
 }
@@ -840,7 +841,7 @@ export async function updateExecutionSuccess(id: string, success: boolean): Prom
       try {
         const { error } = await supabase
           .from('prompt_history')
-          .update({ execution_success: success, score: newScore.score, score_details: newScore })
+          .update({ execution_success: success, score: newScore.overall, score_details: newScore })
           .eq('id', id);
         if (!error) return;
       } catch (e) {
@@ -856,7 +857,7 @@ export async function updateExecutionSuccess(id: string, success: boolean): Prom
       ...history[idx],
       executionUsed: true,
       executionSuccess: success,
-      score: newScore.score,
+      score: newScore.overall,
       scoreDetails: newScore,
     };
     saveToLocalStorage(history);
@@ -904,7 +905,7 @@ export async function updateAssetExecutionResult(
             execution_success: executionSuccess,
             feedback: feedbackMap[result.success],
             rating: result.rating,
-            score: newScore.score,
+            score: newScore.overall,
             score_details: newScore,
             provenance: provenanceData,
           })
@@ -925,7 +926,7 @@ export async function updateAssetExecutionResult(
       executionSuccess,
       rating: result.rating,
       feedback: feedbackMap[result.success],
-      score: newScore.score,
+      score: newScore.overall,
       scoreDetails: newScore,
       provenance: provenanceData,
     };

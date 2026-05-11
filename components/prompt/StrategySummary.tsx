@@ -1,7 +1,6 @@
 'use client';
 
 import { memo } from 'react';
-import { downloadMarkdown } from '@/lib/prompt-orchestrator/promptCompiler';
 import CopyPromptButton from './CopyPromptButton';
 import type { CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
 
@@ -9,8 +8,20 @@ interface StrategySummaryProps {
   pack: CompiledPack;
 }
 
+function downloadMarkdown(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function StrategySummary({ pack }: StrategySummaryProps) {
-  const { intent, architecture, phases, depth } = pack;
+  const { intent, architecture, decompose } = pack;
 
   return (
     <div className="space-y-5">
