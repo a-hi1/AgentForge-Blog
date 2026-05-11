@@ -10,18 +10,7 @@ interface PromptPhaseCardProps {
   onSelect: () => void;
 }
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  '启动': { bg: 'rgba(16,185,129,0.1)', text: '#10B981', border: 'rgba(16,185,129,0.2)' },
-  '设计': { bg: 'rgba(139,92,246,0.1)', text: '#8B5CF6', border: 'rgba(139,92,246,0.2)' },
-  '开发': { bg: 'rgba(59,130,246,0.1)', text: '#3B82F6', border: 'rgba(59,130,246,0.2)' },
-  '质量': { bg: 'rgba(245,158,11,0.1)', text: '#F59E0B', border: 'rgba(245,158,11,0.2)' },
-  '部署': { bg: 'rgba(239,68,68,0.1)', text: '#EF4444', border: 'rgba(239,68,68,0.2)' },
-  '收尾': { bg: 'rgba(99,102,241,0.1)', text: '#6366F1', border: 'rgba(99,102,241,0.2)' },
-};
-
 function PromptPhaseCard({ phase, index, isSelected, onSelect }: PromptPhaseCardProps) {
-  const colors = CATEGORY_COLORS[phase.category] || CATEGORY_COLORS['开发'];
-
   return (
     <button
       onClick={onSelect}
@@ -38,17 +27,9 @@ function PromptPhaseCard({ phase, index, isSelected, onSelect }: PromptPhaseCard
           {index + 1}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span
-              className="px-2 py-0.5 text-[10px] font-medium rounded-full"
-              style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
-            >
-              {phase.category}
-            </span>
-            <h3 className={`text-sm font-semibold truncate ${isSelected ? 'text-[#60A5FA]' : 'text-[#FAFAFA]'}`}>
-              {phase.name}
-            </h3>
-          </div>
+          <h3 className={`text-sm font-semibold truncate mb-1.5 ${isSelected ? 'text-[#60A5FA]' : 'text-[#FAFAFA]'}`}>
+            {phase.name}
+          </h3>
           <p className="text-xs text-[#71717A] line-clamp-2 leading-relaxed">
             {phase.description}
           </p>
