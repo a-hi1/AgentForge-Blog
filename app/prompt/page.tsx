@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, Component, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { savePrompt } from '@/lib/prompt/history';
 import { compilePromptPack, CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
 import { IntentResult, ArchitectureResult, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
 import { evaluatePromptQuality, QualityScore } from '@/lib/prompt/scorer';
+
+class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 const CHAIN = [
   { key: 'intent', label: '意图识别' },
@@ -111,42 +119,47 @@ export default function PromptPage() {
             }
 
             if (data.type === 'done') {
-              setResult(data.prompt);
+              const promptText = typeof data.prompt === 'string' ? data.prompt : '';
+              setResult(promptText);
               setCurrentStep(-1);
 
-              const intentData = data.intent || (CHAIN[0] && completedSteps.has('intent') ? intent : null);
-              const archData = data.architecture || architecture;
-              const decomposeData = data.decompose || null;
+              const intentData = data.intent && typeof data.intent === 'object' ? data.intent as IntentResult : intent;
+              const archData = data.architecture && typeof data.architecture === 'object' ? data.architecture as ArchitectureResult : architecture;
+              const decomposeData = data.decompose && typeof data.decompose === 'object' ? data.decompose as DecomposeResult : null;
 
               if (intentData) setIntent(intentData);
               if (archData) setArchitecture(archData);
               if (decomposeData) setDecompose(decomposeData);
 
-              if (intentData && archData) {
-                const compiled = compilePromptPack(
-                  intentData,
-                  archData,
-                  decomposeData || { tasks: [], phases: [] },
-                  data.prompt
-                );
-                setPack(compiled);
-
-                const q = evaluatePromptQuality(data.prompt, compiled);
-                setQuality(q);
-
+              if (intentData && archData && promptText) {
                 try {
-                  const savedRecord = await savePrompt({
-                    title: intentData.businessGoal.slice(0, 50) || input.trim().slice(0, 30),
-                    category: 'deep-reasoning',
-                    phase: 'idea',
-                    input: input.trim(),
-                    fullPrompt: data.prompt,
-                    qualityScore: q.overall,
-                    tags: [archData.frontend, archData.backend, archData.db].filter(Boolean),
-                  });
-                  if (savedRecord?.id) setSaved(true);
-                } catch {
-                  /* auto-save is best-effort */
+                  const compiled = compilePromptPack(
+                    intentData,
+                    archData,
+                    decomposeData || { tasks: [], phases: [] },
+                    promptText
+                  );
+                  setPack(compiled);
+
+                  const q = evaluatePromptQuality(promptText, compiled);
+                  setQuality(q);
+
+                  try {
+                    const savedRecord = await savePrompt({
+                      title: String(intentData.businessGoal || '').slice(0, 50) || input.trim().slice(0, 30),
+                      category: 'deep-reasoning',
+                      phase: 'idea',
+                      input: input.trim(),
+                      fullPrompt: promptText,
+                      qualityScore: q.overall,
+                      tags: [archData.frontend, archData.backend, archData.db].filter(Boolean) as string[],
+                    });
+                    if (savedRecord?.id) setSaved(true);
+                  } catch {
+                    /* auto-save is best-effort */
+                  }
+                } catch (qualityErr) {
+                  console.error('[prompt] quality evaluation failed:', qualityErr);
                 }
               }
             }
@@ -193,6 +206,15 @@ export default function PromptPage() {
   };
 
   return (
+    <ErrorBoundary fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-white mb-2">渲染出错</p>
+          <p className="text-sm text-slate-400 mb-4">请刷新页面重试</p>
+          <button onClick={() => window.location.reload()} className="rounded-lg bg-cyan-600 px-6 py-2 text-sm text-white">刷新页面</button>
+        </div>
+      </div>
+    }>
     <div className="min-h-screen bg-slate-950">
       <div className="mx-auto max-w-4xl px-6 py-12">
         <div className="mb-8 flex items-center justify-between">
@@ -291,7 +313,7 @@ export default function PromptPage() {
           </div>
         )}
 
-        {quality && (
+        {quality && quality.dimensions && typeof quality.overall === 'number' && (
           <div className="mb-6 rounded-xl border border-slate-700 bg-slate-900/80 p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">Prompt Quality</h3>
@@ -384,10 +406,10 @@ export default function PromptPage() {
                   <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
                     <h3 className="mb-2 text-xs font-semibold text-cyan-400">意图识别</h3>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-slate-500">业务目标：</span><span className="text-slate-300">{intent.businessGoal}</span></div>
-                      <div><span className="text-slate-500">用户类型：</span><span className="text-slate-300">{intent.userType}</span></div>
-                      <div><span className="text-slate-500">产品形态：</span><span className="text-slate-300">{intent.productShape}</span></div>
-                      <div><span className="text-slate-500">生命周期：</span><span className="text-slate-300">{intent.lifecycle}</span></div>
+                      <div><span className="text-slate-500">业务目标：</span><span className="text-slate-300">{String(intent.businessGoal || '-')}</span></div>
+                      <div><span className="text-slate-500">用户类型：</span><span className="text-slate-300">{String(intent.userType || '-')}</span></div>
+                      <div><span className="text-slate-500">产品形态：</span><span className="text-slate-300">{String(intent.productShape || '-')}</span></div>
+                      <div><span className="text-slate-500">生命周期：</span><span className="text-slate-300">{String(intent.lifecycle || '-')}</span></div>
                     </div>
                   </div>
                 )}
@@ -395,11 +417,11 @@ export default function PromptPage() {
                   <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
                     <h3 className="mb-2 text-xs font-semibold text-emerald-400">架构决策</h3>
                     <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{architecture.frontend}</span></div>
-                      <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{architecture.backend}</span></div>
-                      <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{architecture.db}</span></div>
+                      <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{String(architecture.frontend || '-')}</span></div>
+                      <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{String(architecture.backend || '-')}</span></div>
+                      <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{String(architecture.db || '-')}</span></div>
                     </div>
-                    {architecture.rejectedAlternatives.length > 0 && (
+                    {Array.isArray(architecture.rejectedAlternatives) && architecture.rejectedAlternatives.length > 0 && (
                       <div className="mt-2 text-xs">
                         <span className="text-slate-500">被拒绝方案：</span>
                         {architecture.rejectedAlternatives.map((alt, i) => (
@@ -409,7 +431,7 @@ export default function PromptPage() {
                     )}
                   </div>
                 )}
-                {decompose && decompose.tasks.length > 0 && (
+                {decompose && Array.isArray(decompose.tasks) && decompose.tasks.length > 0 && (
                   <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
                     <h3 className="mb-2 text-xs font-semibold text-amber-400">任务拆解</h3>
                     <div className="space-y-1 text-xs">
@@ -438,5 +460,6 @@ export default function PromptPage() {
         )}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
