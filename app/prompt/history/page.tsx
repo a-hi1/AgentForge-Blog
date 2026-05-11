@@ -17,24 +17,24 @@ import {
   PromptPhase,
 } from '@/lib/prompt/history';
 import { refinePrompt, RefinementResult } from '@/lib/prompt/refiner';
+import { loadSkills, removeSkill, type Skill } from '@/lib/session/skillStore';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
-type TabKey = 'my' | 'system' | 'favorite' | 'recent';
-type SortKey = 'recent' | 'score' | 'favorite' | 'execution';
+type TabKey = 'drafts' | 'verified' | 'skills';
+type SortKey = 'recent' | 'score' | 'usage' | 'success';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'my', label: '我的 Prompt', icon: '📝' },
-  { key: 'system', label: '系统模板', icon: '📦' },
-  { key: 'favorite', label: '收藏夹', icon: '⭐' },
-  { key: 'recent', label: '最近使用', icon: '🕐' },
+  { key: 'skills', label: 'Skills', icon: '⭐' },
+  { key: 'verified', label: 'Verified', icon: '🟢' },
+  { key: 'drafts', label: 'Drafts', icon: '📝' },
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'recent', label: '最近创建' },
   { key: 'score', label: '评分最高' },
-  { key: 'favorite', label: '收藏优先' },
-  { key: 'execution', label: '执行最多' },
+  { key: 'usage', label: '使用最多' },
+  { key: 'success', label: '成功率最高' },
 ];
 
 const PHASE_LABELS: Record<string, string> = {
@@ -57,17 +57,16 @@ const PHASE_USAGE_TIPS: Record<string, { suitable: string; notSuitable: string; 
 
 const FLOW_STEPS = [
   { step: 1, text: '在 Prompt Studio 生成', href: '/prompt' },
-  { step: 2, text: '自动保存到我的资产' },
-  { step: 3, text: '发送到 Playground', href: '/playground' },
-  { step: 4, text: '执行后反馈结果' },
-  { step: 5, text: '成为可复用经验' },
+  { step: 2, text: '复制到 Agent 工具执行' },
+  { step: 3, text: '反馈问题 → 生成修复 Prompt', href: '/playground' },
+  { step: 4, text: '验证通过 → 沉淀为 Skill' },
 ];
 
 export default function PromptHistoryPage() {
   const [allAssets, setAllAssets] = useState<PromptAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<TabKey>('my');
+  const [activeTab, setActiveTab] = useState<TabKey>('skills');
   const [sortBy, setSortBy] = useState<SortKey>('recent');
   const [phaseFilter, setPhaseFilter] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -86,15 +85,28 @@ export default function PromptHistoryPage() {
     reason: string;
     suggestions: string[];
   } | null>(null);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [deleteSkillConfirm, setDeleteSkillConfirm] = useState<string | null>(null);
   const promptRef = useRef<HTMLPreElement>(null);
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
     try {
       const records = await getPromptHistory({ limit: 200 });
-      setAllAssets(records);
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const draftsToDelete = records.filter(
+        a => a.source === 'user-generated' && !a.feedback && !a.executionSuccess && new Date(a.createdAt).getTime() < sevenDaysAgo
+      );
+      for (const draft of draftsToDelete) {
+        await deletePrompt(draft.id);
+      }
+      const cleaned = draftsToDelete.length > 0
+        ? records.filter(a => !draftsToDelete.find(d => d.id === a.id))
+        : records;
+      setAllAssets(cleaned);
+      setSkills(loadSkills());
     } catch (e) {
-      console.error('[PromptHistory] Load failed:', e);
+      console.error('[SkillVault] Load failed:', e);
     } finally {
       setLoading(false);
     }
@@ -109,19 +121,14 @@ export default function PromptHistoryPage() {
   const filteredAssets = (() => {
     let list: PromptAsset[] = [];
     switch (activeTab) {
-      case 'my':
-        list = allAssets.filter(a => a.source === 'user-generated');
+      case 'drafts':
+        list = allAssets.filter(a => a.source === 'user-generated' && !a.feedback && !a.executionSuccess);
         break;
-      case 'system':
-        list = systemTemplates;
+      case 'verified':
+        list = allAssets.filter(a => a.feedback === 'excellent' || a.executionSuccess === true);
         break;
-      case 'favorite':
-        list = allAssets.filter(a => a.favorite);
-        break;
-      case 'recent':
-        list = [...allAssets].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+      case 'skills':
+        list = [];
         break;
     }
     if (phaseFilter) {
@@ -143,11 +150,11 @@ export default function PromptHistoryPage() {
       case 'score':
         list = [...list].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
         break;
-      case 'favorite':
-        list = [...list].sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
-        break;
-      case 'execution':
+      case 'usage':
         list = [...list].sort((a, b) => (b.executionUsed ? 1 : 0) - (a.executionUsed ? 1 : 0));
+        break;
+      case 'success':
+        list = [...list].sort((a, b) => (b.executionSuccess ? 1 : 0) - (a.executionSuccess ? 1 : 0));
         break;
       default:
         break;
@@ -346,8 +353,8 @@ export default function PromptHistoryPage() {
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#FAFAFA] mb-1">Prompt 资产库</h1>
-            <p className="text-sm text-[#71717A]">管理、复用你的 Prompt 资产</p>
+            <h1 className="text-2xl font-bold text-[#FAFAFA] mb-1">Skill Vault</h1>
+            <p className="text-sm text-[#71717A]">管理已验证的 Prompt 和沉淀的 Skill</p>
           </div>
           <Link
             href="/prompt"
@@ -373,19 +380,19 @@ export default function PromptHistoryPage() {
             >
               <span className="mr-1.5">{tab.icon}</span>
               {tab.label}
-              {tab.key === 'my' && (
+              {tab.key === 'skills' && (
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#A78BFA]">
-                  {allAssets.filter(a => a.source === 'user-generated').length}
+                  {skills.length}
                 </span>
               )}
-              {tab.key === 'favorite' && (
-                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(245,158,11,0.15)] text-[#F59E0B]">
-                  {allAssets.filter(a => a.favorite).length}
+              {tab.key === 'verified' && (
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[#10B981]">
+                  {allAssets.filter(a => a.feedback === 'excellent' || a.executionSuccess === true).length}
                 </span>
               )}
-              {tab.key === 'system' && (
+              {tab.key === 'drafts' && (
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(255,255,255,0.05)] text-[#71717A]">
-                  {systemTemplates.length}
+                  {allAssets.filter(a => a.source === 'user-generated' && !a.feedback && !a.executionSuccess).length}
                 </span>
               )}
             </button>
@@ -433,14 +440,91 @@ export default function PromptHistoryPage() {
                 <div className="animate-spin w-8 h-8 border-2 border-[#8B5CF6] border-t-transparent rounded-full mx-auto mb-4" />
                 <p className="text-[#71717A]">加载中...</p>
               </div>
+            ) : activeTab === 'skills' ? (
+              skills.length === 0 ? (
+                <div className="py-16 text-center bg-[#111113] rounded-xl border border-[rgba(255,255,255,0.06)]">
+                  <p className="text-[#71717A] mb-2">还没有沉淀的 Skill</p>
+                  <p className="text-[10px] text-[#52525B] mb-4">在 Workbench 中验证 Prompt 后，可沉淀为可复用 Skill</p>
+                  <Link href="/playground" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] text-white text-sm">
+                    前往 Workbench
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {skills.map(skill => (
+                    <div
+                      key={skill.id}
+                      className="group p-4 rounded-lg border border-[rgba(139,92,246,0.2)] bg-[rgba(139,92,246,0.03)] hover:border-[rgba(139,92,246,0.4)] transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0 pr-4">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[10px]">⭐</span>
+                            <h3 className="text-[#FAFAFA] font-medium text-sm truncate">{skill.title}</h3>
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-[rgba(139,92,246,0.15)] text-[#A78BFA]">{skill.category}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-[#71717A]">
+                            <span>使用 {skill.usageCount} 次</span>
+                            <span>成功率 {Math.round(skill.successRate * 100)}%</span>
+                            <span>稳定性 {Math.round(skill.stabilityScore * 100)}%</span>
+                            <span>{formatDistanceToNow(new Date(skill.promotedAt), { addSuffix: true, locale: zhCN })}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(skill.prompt);
+                            }}
+                            className="p-1.5 rounded text-[#71717A] hover:text-[#A78BFA] hover:bg-[rgba(139,92,246,0.1)] transition-all"
+                            title="复制 Prompt"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setDeleteSkillConfirm(skill.id)}
+                            className="p-1.5 rounded text-[#71717A] hover:text-[#EF4444] hover:bg-[rgba(239,68,68,0.1)] transition-all opacity-0 group-hover:opacity-100"
+                            title="删除 Skill"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      {deleteSkillConfirm === skill.id && (
+                        <div className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.06)] flex items-center justify-end gap-2">
+                          <span className="text-[11px] text-[#71717A] mr-auto">确定删除此 Skill？</span>
+                          <button
+                            onClick={() => setDeleteSkillConfirm(null)}
+                            className="px-3 py-1 text-[11px] rounded border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA]"
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={() => {
+                              removeSkill(skill.id);
+                              setSkills(loadSkills());
+                              setDeleteSkillConfirm(null);
+                            }}
+                            className="px-3 py-1 text-[11px] rounded bg-[rgba(239,68,68,0.15)] text-[#EF4444] hover:bg-[rgba(239,68,68,0.25)]"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
             ) : filteredAssets.length === 0 ? (
               <div className="py-16 text-center bg-[#111113] rounded-xl border border-[rgba(255,255,255,0.06)]">
                 <p className="text-[#71717A] mb-4">
-                  {activeTab === 'my' ? '还没有 Prompt 资产' :
-                   activeTab === 'favorite' ? '还没有收藏的 Prompt' :
-                   activeTab === 'system' ? '暂无系统模板' : '暂无记录'}
+                  {activeTab === 'drafts' ? '没有未验证的草稿' :
+                   activeTab === 'verified' ? '还没有已验证的 Prompt' : '暂无记录'}
                 </p>
-                {activeTab === 'my' && (
+                {activeTab === 'drafts' && (
                   <Link href="/prompt" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] text-white text-sm">
                     开始生成
                   </Link>

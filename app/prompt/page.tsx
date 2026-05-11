@@ -14,7 +14,7 @@ import { scorePrompt } from '@/lib/prompt-orchestrator/scoring';
 import { recordGeneration, getPersonalizedHint } from '@/lib/prompt-orchestrator/memory';
 import type { PromptDepth } from '@/lib/prompt-orchestrator/templates';
 import type { CompiledPhase } from '@/lib/prompt-orchestrator/templates';
-import { savePrompt, type PromptPhase } from '@/lib/prompt/history';
+import { savePrompt } from '@/lib/prompt/history';
 import PromptPhaseCard from '@/components/prompt/PromptPhaseCard';
 import PromptOutput from '@/components/prompt/PromptOutput';
 import StrategySummary from '@/components/prompt/StrategySummary';
@@ -70,18 +70,14 @@ export default function PromptPage() {
   const [showClarification, setShowClarification] = useState(false);
   const [personalHint, setPersonalHint] = useState<string | null>(null);
   const [flowStep, setFlowStep] = useState<FlowStep>('input');
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveTitle, setSaveTitle] = useState('');
-  const [saveProjectId, setSaveProjectId] = useState('');
-  const [saveTags, setSaveTags] = useState<string[]>([]);
-  const [savePhase, setSavePhase] = useState<PromptPhase>('idea');
   const [saveCombinedOutput, setSaveCombinedOutput] = useState('');
   const [saveClarifications, setSaveClarifications] = useState<string[]>([]);
   const [saveInput, setSaveInput] = useState('');
+  const [saveTitle, setSaveTitle] = useState('');
   const [saveCategory, setSaveCategory] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [saveTags, setSaveTags] = useState<string[]>([]);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [buildSteps, setBuildSteps] = useState<BuildStep[]>([]);
-  const [savedAssetId, setSavedAssetId] = useState<string | null>(null);
   const [phase, setPhase] = useState<'MVP' | 'Beta' | 'Growth'>('MVP');
   const [projectName, setProjectName] = useState('');
 
@@ -226,7 +222,6 @@ export default function PromptPage() {
     setSaveCategory(projectReasoning.primaryType);
     setSaveTags(projectReasoning.secondaryTypes || []);
     setSaveInput(userIdea);
-    setShowSaveDialog(true);
     trackFunnelEvent('generate', undefined, { primaryType: projectReasoning.primaryType, phaseCount: scoredPhases.length });
   }, []);
 
@@ -272,61 +267,50 @@ export default function PromptPage() {
     return pack ? pack.phases[selectedIndex] ?? null : null;
   }, [pack, selectedIndex]);
 
-  const handleSaveToLibrary = useCallback(async () => {
-    if (!saveTitle.trim() || !saveCombinedOutput) return;
-    setSaving(true);
+  const handleCopyPrompt = useCallback(async () => {
+    if (!saveCombinedOutput) return;
     try {
-      const saved = await savePrompt({
-        title: saveTitle,
-        category: saveCategory,
-        phase: savePhase,
-        projectId: saveProjectId || undefined,
-        input: saveInput,
-        fullPrompt: saveCombinedOutput,
-        tags: saveTags,
-        clarifications: saveClarifications,
-      });
-      if (saved?.id) {
-        setSavedAssetId(saved.id);
-        trackFunnelEvent('asset_saved', saved.id, { title: saveTitle, category: saveCategory });
-      }
-      setShowSaveDialog(false);
-    } catch (e) {
-      console.error('保存失败:', e);
-    } finally {
-      setSaving(false);
+      await navigator.clipboard.writeText(saveCombinedOutput);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = saveCombinedOutput;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
     }
-  }, [saveTitle, saveCategory, savePhase, saveProjectId, saveInput, saveCombinedOutput, saveTags, saveClarifications]);
+  }, [saveCombinedOutput]);
 
-  const handleSaveAndExecute = useCallback(async () => {
+  const handleStartTask = useCallback(() => {
+    if (!saveCombinedOutput) return;
+    router.push(`/playground?prompt=${encodeURIComponent(saveCombinedOutput)}`);
+  }, [saveCombinedOutput, router]);
+
+  const handleSaveAsCandidate = useCallback(async () => {
     if (!saveTitle.trim() || !saveCombinedOutput) return;
-    setSaving(true);
     try {
       const saved = await savePrompt({
         title: saveTitle,
         category: saveCategory,
-        phase: savePhase,
-        projectId: saveProjectId || undefined,
+        phase: 'idea',
         input: saveInput,
         fullPrompt: saveCombinedOutput,
         tags: saveTags,
         clarifications: saveClarifications,
       });
       if (saved?.id) {
-        setSavedAssetId(saved.id);
-        trackFunnelEvent('asset_saved', saved.id, { title: saveTitle, category: saveCategory, action: 'save_and_execute' });
-        setShowSaveDialog(false);
-        router.push(`/playground?prompt=${encodeURIComponent(saveCombinedOutput)}&assetId=${saved.id}`);
+        trackFunnelEvent('asset_saved', saved.id, { title: saveTitle, category: saveCategory, action: 'save_candidate' });
       }
     } catch (e) {
       console.error('保存失败:', e);
-    } finally {
-      setSaving(false);
     }
-  }, [saveTitle, saveCategory, savePhase, saveProjectId, saveInput, saveCombinedOutput, saveTags, saveClarifications, router]);
+  }, [saveTitle, saveCategory, saveInput, saveCombinedOutput, saveTags, saveClarifications]);
 
   return (
-    <>
     <div className="min-h-[calc(100vh-80px)] flex flex-col">
       <div className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
@@ -336,13 +320,42 @@ export default function PromptPage() {
             <span className="text-[#71717A] text-xs hidden sm:inline">|</span>
             <div className="hidden sm:flex items-center gap-1 bg-[rgba(255,255,255,0.03)] rounded-lg p-0.5 border border-[rgba(255,255,255,0.06)]">
               <Link href="/playground" className="px-3 py-1 text-xs font-medium rounded-md text-[#71717A] hover:text-[#60A5FA] hover:bg-[rgba(59,130,246,0.08)] transition-all">
-                执行模式
+                Workbench
               </Link>
               <span className="px-3 py-1 text-xs font-medium rounded-md bg-[rgba(139,92,246,0.15)] text-[#A78BFA]">
                 提示词模式
               </span>
             </div>
           </div>
+          {pack && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyPrompt}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[rgba(255,255,255,0.1)] text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[rgba(255,255,255,0.2)] transition-all flex items-center gap-1.5"
+              >
+                {copiedPrompt ? (
+                  <><svg className="w-3.5 h-3.5 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>已复制</>
+                ) : (
+                  <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>复制 Prompt</>
+                )}
+              </button>
+              <button
+                onClick={handleStartTask}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+                开始任务
+              </button>
+              <button
+                onClick={handleSaveAsCandidate}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[rgba(139,92,246,0.3)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)] transition-all"
+              >
+                保存为候选
+              </button>
+            </div>
+          )}
           <div className="flex md:hidden gap-1">
             {(['input', 'phases', 'output'] as const).map(view => (
               <button
@@ -590,7 +603,6 @@ export default function PromptPage() {
               phase={selectedPhase}
               phaseIndex={selectedIndex}
               totalPhases={pack.phases.length}
-              savedAssetId={savedAssetId}
             />
           ) : buildSteps.length > 0 ? (
             <div className="flex flex-col items-center justify-center h-full px-8 py-20">
@@ -638,99 +650,5 @@ export default function PromptPage() {
         </main>
       </div>
     </div>
-
-    {showSaveDialog && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="w-full max-w-lg mx-4 bg-[#111113] border border-[rgba(255,255,255,0.1)] rounded-2xl p-6 shadow-2xl">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold text-[#FAFAFA]">保存到资产库</h3>
-            <button onClick={() => setShowSaveDialog(false)} className="text-[#71717A] hover:text-[#FAFAFA] transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs text-[#71717A] mb-1.5">标题</label>
-              <input
-                value={saveTitle}
-                onChange={e => setSaveTitle(e.target.value)}
-                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] focus:outline-none focus:border-[#8B5CF6]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-[#71717A] mb-1.5">所属项目</label>
-              <input
-                value={saveProjectId}
-                onChange={e => setSaveProjectId(e.target.value)}
-                placeholder="项目 ID（可选）"
-                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#8B5CF6]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-[#71717A] mb-1.5">阶段</label>
-              <select
-                value={savePhase}
-                onChange={e => setSavePhase(e.target.value as PromptPhase)}
-                className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[#FAFAFA] focus:outline-none focus:border-[#8B5CF6]"
-              >
-                <option value="idea">💡 想法</option>
-                <option value="architecture">🏗️ 架构</option>
-                <option value="implementation">⚙️ 实现</option>
-                <option value="optimization">🚀 优化</option>
-                <option value="debug">🔍 调试</option>
-                <option value="deployment">📦 部署</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-[#71717A] mb-1.5">标签</label>
-              {saveTags.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {saveTags.map((tag, i) => (
-                    <span key={i} className="px-2 py-0.5 text-[10px] rounded bg-[rgba(139,92,246,0.15)] text-[#A78BFA] border border-[rgba(139,92,246,0.2)]">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-[#52525B]">无标签</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={() => setShowSaveDialog(false)}
-              className="px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(255,255,255,0.1)] text-[#71717A] hover:text-[#A1A1AA] transition-all"
-            >
-              跳过
-            </button>
-            <button
-              onClick={handleSaveToLibrary}
-              disabled={saving || !saveTitle.trim()}
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium border border-[rgba(139,92,246,0.3)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.08)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? '保存中...' : '保存到资产库'}
-            </button>
-            <button
-              onClick={handleSaveAndExecute}
-              disabled={saving || !saveTitle.trim()}
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {saving ? '保存中...' : '保存并执行'}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-    </>
   );
 }

@@ -2,7 +2,7 @@ import { getAgentPrompt, getAgentDefaultTask } from './prompts';
 import { validateOutput, buildRetryInstruction } from './outputValidator';
 import { CHINESE_OUTPUT_INSTRUCTION } from './constants';
 
-export type ExecutionSource = 'real-api' | 'manual' | 'mock' | 'failed';
+export type ExecutionSource = 'real-api' | 'failed';
 
 export interface ExecutionResult {
   output: string;
@@ -277,87 +277,4 @@ export async function executeAgentStreaming(
   }
 }
 
-export function generateMockResponse(agentName: string, task: string, context: string): string {
-  const taskPreview = task || context;
 
-  if (agentName.includes('架构') || agentName.includes('Architect') || agentName.includes('产品分析')) {
-    return `# 一、业务目标分析
-
-基于用户需求「${taskPreview.slice(0, 80)}」，核心目标是构建一个满足业务场景的系统。
-
-# 二、核心功能拆解
-
-1. 用户模块：处理用户注册、登录和权限管理
-2. 核心业务模块：实现主要业务逻辑
-3. 数据模块：管理数据存储和查询
-
-# 三、数据模型设计
-
-核心数据表包括用户表、业务主表和关联表，需要考虑索引策略和查询优化。
-
-# 四、系统架构设计
-
-采用前后端分离架构，前端使用 React/Next.js，后端提供 RESTful API，数据层使用 PostgreSQL。
-
-# 五、关键实现难点
-
-需要关注并发处理、数据一致性保证和异常场景的容错设计。`;
-  }
-
-  if (agentName.includes('代码') || agentName.includes('Coding') || agentName.includes('实现') || agentName.includes('重构')) {
-    return `# 一、实现思路
-
-基于需求「${taskPreview.slice(0, 80)}」，采用模块化方式实现。
-
-# 二、模块目录结构
-
-\`\`\`
-src/
-  ├── models/        # 数据模型定义
-  ├── services/      # 业务逻辑层
-  ├── controllers/   # 接口处理层
-  └── utils/         # 工具函数
-\`\`\`
-
-# 三、核心代码实现
-
-\`\`\`typescript
-export class BusinessService {
-  async process(input: string): Promise<Result> {
-    const validated = this.validate(input);
-    return await this.execute(validated);
-  }
-}
-\`\`\`
-
-# 四、API 接口设计
-
-提供 RESTful API，包含输入验证、错误处理和响应格式化。
-
-# 五、注意事项
-
-需要处理并发场景、输入验证和错误恢复。`;
-  }
-
-  if (agentName.includes('调试') || agentName.includes('Debug') || agentName.includes('诊断')) {
-    return `# 一、风险点识别
-
-针对「${taskPreview.slice(0, 80)}」的实现，识别以下风险：
-- 边界条件未充分处理
-- 异常路径缺乏容错机制
-
-# 二、Bug 场景分析
-
-在高并发或异常输入场景下，可能出现数据不一致或服务不可用。
-
-# 三、修复方案
-
-增加输入验证、异常捕获和重试机制。
-
-# 四、验证策略
-
-设计覆盖正常路径和异常路径的测试用例。`;
-  }
-
-  return `针对「${taskPreview.slice(0, 80)}」，已完成分析。需要结合具体业务场景进行深入设计和实现。`;
-}

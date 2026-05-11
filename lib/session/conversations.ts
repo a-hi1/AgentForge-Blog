@@ -3,30 +3,46 @@ const MESSAGES_KEY = 'agentforge_conversation_messages';
 const MAX_CONVERSATIONS = 100;
 const MAX_MESSAGES_PER_CONVERSATION = 200;
 
+export type ConversationStatus = 'draft' | 'repairing' | 'verified' | 'promoted';
+
+export interface RepairEntry {
+  version: number;
+  issueDescription: string;
+  repairPrompt: string;
+  rootCause: string;
+  fixStrategy: string;
+  createdAt: number;
+}
+
 export interface Conversation {
   id: string;
   title: string;
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
-  status: 'active' | 'archived';
+  status: ConversationStatus;
   messageCount: number;
   lastMessagePreview: string;
   linkedAssetId?: string;
   linkedProject?: string;
+  originalPrompt?: string;
+  repairHistory: RepairEntry[];
+  currentVersion: number;
+  skillId?: string;
 }
 
 export interface ConversationMessage {
   id: string;
   conversationId: string;
-  role: 'user' | 'assistant' | 'system' | 'execution';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
   metadata?: {
     stepName?: string;
-    executionSource?: string;
     score?: number;
     phaseIndex?: number;
+    version?: number;
+    isRepair?: boolean;
   };
 }
 
@@ -48,10 +64,12 @@ export function createConversation(firstMessage?: string, linkedAssetId?: string
     createdAt: now,
     updatedAt: now,
     pinned: false,
-    status: 'active',
+    status: 'draft',
     messageCount: 0,
     lastMessagePreview: '',
     linkedAssetId,
+    repairHistory: [],
+    currentVersion: 1,
   };
 
   const conversations = loadConversations();
@@ -170,10 +188,29 @@ export function searchConversations(query: string): Conversation[] {
 
 export function getRecentConversations(limit: number = 10): Conversation[] {
   return loadConversations()
-    .filter(c => c.status === 'active')
     .sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.updatedAt - a.updatedAt;
     })
     .slice(0, limit);
+}
+
+export function addRepairEntry(
+  conversationId: string,
+  entry: Omit<RepairEntry, 'version' | 'createdAt'>
+): void {
+  const conversations = loadConversations();
+  const conv = conversations.find(c => c.id === conversationId);
+  if (!conv) return;
+
+  const newVersion = conv.currentVersion + 1;
+  conv.repairHistory.push({
+    ...entry,
+    version: newVersion,
+    createdAt: Date.now(),
+  });
+  conv.currentVersion = newVersion;
+  conv.status = 'repairing';
+  conv.updatedAt = Date.now();
+  saveConversations(conversations);
 }
