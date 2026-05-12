@@ -118,7 +118,7 @@ export class MemoryManager {
     try {
       const apiKey = process.env.OPENAI_API_KEY;
       const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-      const model = process.env.OPENAI_MODEL || 'glm-4.5-air';
+      const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
       if (!apiKey) {
         return null;

@@ -3,9 +3,17 @@
 import { useState, useCallback, useEffect, useRef, Component, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { savePrompt } from '@/lib/prompt/history';
-import { compilePromptPack, CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
-import { IntentResult, ArchitectureResult, ArchitectOpinion, DecomposeResult, ProjectReality, EngineeringReminder } from '@/lib/prompt-orchestrator/reasoner';
-import { evaluatePromptQuality, QualityScore } from '@/lib/prompt/scorer';
+import { IntentResult, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
+
+interface UnifiedIntent extends IntentResult {
+  architecture: {
+    frontend: string;
+    backend: string;
+    db: string;
+    infra: string[];
+    reasoning: string;
+  };
+}
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -16,14 +24,9 @@ class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode
 }
 
 const CHAIN = [
-  { key: 'intent', label: '意图识别' },
-  { key: 'architecture', label: '架构决策' },
-  { key: 'opinion', label: '架构判断' },
+  { key: 'intent', label: '理解需求' },
   { key: 'decompose', label: '任务拆解' },
-  { key: 'reality', label: '项目现实' },
-  { key: 'reminders', label: '开发提醒' },
-  { key: 'complexity', label: '复杂度控制' },
-  { key: 'compile', label: 'Prompt 编译' },
+  { key: 'compile', label: '编译输出' },
 ] as const;
 
 export default function PromptPage() {
@@ -35,16 +38,9 @@ export default function PromptPage() {
   const [currentStep, setCurrentStep] = useState(-1);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [fallbackSteps, setFallbackSteps] = useState<Set<string>>(new Set());
-  const [pack, setPack] = useState<CompiledPack | null>(null);
   const [saved, setSaved] = useState(false);
-  const [intent, setIntent] = useState<IntentResult | null>(null);
-  const [architecture, setArchitecture] = useState<ArchitectureResult | null>(null);
-  const [opinion, setOpinion] = useState<ArchitectOpinion | null>(null);
+  const [intent, setIntent] = useState<UnifiedIntent | null>(null);
   const [decompose, setDecompose] = useState<DecomposeResult | null>(null);
-  const [reality, setReality] = useState<ProjectReality | null>(null);
-  const [reminders, setReminders] = useState<EngineeringReminder[]>([]);
-  const [complexityWarnings, setComplexityWarnings] = useState<string[]>([]);
-  const [quality, setQuality] = useState<QualityScore | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -61,16 +57,9 @@ export default function PromptPage() {
     setCurrentStep(0);
     setCompletedSteps(new Set());
     setFallbackSteps(new Set());
-    setPack(null);
     setSaved(false);
     setIntent(null);
-    setArchitecture(null);
-    setOpinion(null);
     setDecompose(null);
-    setReality(null);
-    setReminders([]);
-    setComplexityWarnings([]);
-    setQuality(null);
 
     try {
       const resp = await fetch('/api/prompt-generate', {
@@ -115,27 +104,18 @@ export default function PromptPage() {
                 setCompletedSteps(prev => new Set([...Array.from(prev), data.step]));
                 setFallbackSteps(prev => new Set([...Array.from(prev), data.step]));
                 if (data.result) {
-                  if (data.step === 'intent') setIntent(data.result as IntentResult);
-                  if (data.step === 'architecture') setArchitecture(data.result as ArchitectureResult);
-                  if (data.step === 'opinion') setOpinion(data.result as ArchitectOpinion);
+                  if (data.step === 'intent') setIntent(data.result as UnifiedIntent);
                   if (data.step === 'decompose') setDecompose(data.result as DecomposeResult);
-                  if (data.step === 'reality') setReality(data.result as ProjectReality);
-                  if (data.step === 'reminders') setReminders(data.result as EngineeringReminder[]);
-                  if (data.step === 'complexity') setComplexityWarnings(data.result as string[]);
                 }
               }
             }
 
             if (data.type === 'progress' && data.step === 'intent' && data.status === 'done' && data.result) {
-              setIntent(data.result as IntentResult);
+              setIntent(data.result as UnifiedIntent);
             }
 
-            if (data.type === 'progress' && data.step === 'architecture' && data.status === 'done' && data.result) {
-              setArchitecture(data.result as ArchitectureResult);
-            }
-
-            if (data.type === 'progress' && data.step === 'opinion' && data.status === 'done' && data.result) {
-              setOpinion(data.result as ArchitectOpinion);
+            if (data.type === 'progress' && data.step === 'decompose' && data.status === 'done' && data.result) {
+              setDecompose(data.result as DecomposeResult);
             }
 
             if (data.type === 'done') {
@@ -143,53 +123,32 @@ export default function PromptPage() {
               setResult(promptText);
               setCurrentStep(-1);
 
-              const intentData = data.intent && typeof data.intent === 'object' ? data.intent as IntentResult : intent;
-              const archData = data.architecture && typeof data.architecture === 'object' ? data.architecture as ArchitectureResult : architecture;
+              const intentData = data.intent && typeof data.intent === 'object' ? data.intent as UnifiedIntent : intent;
               const decomposeData = data.decompose && typeof data.decompose === 'object' ? data.decompose as DecomposeResult : null;
-              const opinionData = data.opinion && typeof data.opinion === 'object' ? data.opinion as ArchitectOpinion : null;
-              const realityData = data.reality && typeof data.reality === 'object' ? data.reality as ProjectReality : null;
-              const remindersData = Array.isArray(data.reminders) ? data.reminders as EngineeringReminder[] : [];
-              const complexityData = Array.isArray(data.complexityWarnings) ? data.complexityWarnings as string[] : [];
 
               if (intentData) setIntent(intentData);
-              if (archData) setArchitecture(archData);
-              if (opinionData) setOpinion(opinionData);
               if (decomposeData) setDecompose(decomposeData);
-              if (realityData) setReality(realityData);
-              if (remindersData.length > 0) setReminders(remindersData);
-              if (complexityData.length > 0) setComplexityWarnings(complexityData);
 
-              if (intentData && archData && promptText) {
+              if (intentData && promptText) {
                 try {
-                  const compiled = compilePromptPack(
-                    intentData,
-                    archData,
-                    decomposeData || { tasks: [], phases: [] },
-                    promptText
-                  );
-                  setPack(compiled);
-
-                  const q = evaluatePromptQuality(promptText, compiled);
-                  setQuality(q);
-
-                  try {
-                    const savedRecord = await savePrompt({
-                      title: String(intentData.businessGoal || '').slice(0, 50) || input.trim().slice(0, 30),
-                      category: 'deep-reasoning',
-                      phase: 'idea',
-                      input: input.trim(),
-                      fullPrompt: promptText,
-                      qualityScore: q.overall,
-                      tags: [archData.frontend, archData.backend, archData.db].filter(Boolean) as string[],
-                    });
-                    if (savedRecord?.id) setSaved(true);
-                  } catch {
-                    /* auto-save is best-effort */
-                  }
-                } catch (qualityErr) {
-                  console.error('[prompt] quality evaluation failed:', qualityErr);
+                  const savedRecord = await savePrompt({
+                    title: String(intentData.businessGoal || '').slice(0, 50) || input.trim().slice(0, 30),
+                    category: 'context-pack',
+                    phase: 'idea',
+                    input: input.trim(),
+                    fullPrompt: promptText,
+                    qualityScore: 0,
+                    tags: [intentData.architecture.frontend, intentData.architecture.backend, intentData.architecture.db].filter(Boolean) as string[],
+                  });
+                  if (savedRecord?.id) setSaved(true);
+                } catch {
+                  /* auto-save is best-effort */
                 }
               }
+            }
+
+            if (data.type === 'step_error') {
+              throw new Error(data.error || '分析超时，请重试');
             }
 
             if (data.type === 'error') {
@@ -213,6 +172,20 @@ export default function PromptPage() {
 
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
+  }, []);
+
+  // Pre-fill from Discovery result
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('agentforge_discovery_result');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.enrichedInput) {
+          setInput(data.enrichedInput);
+        }
+        sessionStorage.removeItem('agentforge_discovery_result');
+      }
+    } catch { /* ignore */ }
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -247,8 +220,8 @@ export default function PromptPage() {
       <div className="mx-auto max-w-4xl px-6 py-12">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Prompt Studio</h1>
-            <p className="mt-1 text-sm text-slate-400">深度推理编译引擎 — 生成可直接复制到 Cursor 执行的 Agent 指令</p>
+            <h1 className="text-2xl font-bold text-white">AI 导出</h1>
+            <p className="mt-1 text-sm text-slate-400">输入需求，生成 AI 可消费的项目上下文</p>
           </div>
           <button
             onClick={() => router.push('/prompt/history')}
@@ -273,7 +246,14 @@ export default function PromptPage() {
               disabled={loading || !input.trim()}
               className="rounded-lg bg-cyan-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-40 transition"
             >
-              {loading ? '编译中...' : '深度编译'}
+              {loading ? '编译中...' : '生成上下文'}
+            </button>
+            <button
+              onClick={() => router.push('/prompt/discovery')}
+              disabled={loading}
+              className="rounded-lg border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.08)] px-4 py-2.5 text-sm font-medium text-[#A78BFA] hover:bg-[rgba(139,92,246,0.15)] disabled:opacity-40 transition"
+            >
+              方向探索
             </button>
             {loading && (
               <button
@@ -287,16 +267,9 @@ export default function PromptPage() {
               <button
                 onClick={() => {
                   setResult('');
-                  setPack(null);
                   setSaved(false);
-                  setQuality(null);
                   setIntent(null);
-                  setArchitecture(null);
-                  setOpinion(null);
                   setDecompose(null);
-                  setReality(null);
-                  setReminders([]);
-                  setComplexityWarnings([]);
                   setFallbackSteps(new Set());
                 }}
                 className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 transition"
@@ -305,10 +278,10 @@ export default function PromptPage() {
               </button>
             )}
             <div className="ml-auto flex items-center gap-2">
-              {['做Habit App', 'Todo应用', 'AI图库'].map((ex) => (
+              {['做一个 habit tracker', 'AI 写作助手', 'Chrome 书签插件'].map((ex) => (
                 <button
                   key={ex}
-                  onClick={() => setInput(`帮我${ex}`)}
+                  onClick={() => setInput(ex)}
                   className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 transition"
                 >
                   {ex}
@@ -345,44 +318,11 @@ export default function PromptPage() {
           </div>
         )}
 
-        {quality && quality.dimensions && typeof quality.overall === 'number' && (
-          <div className="mb-6 rounded-xl border border-slate-700 bg-slate-900/80 p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">Prompt Quality</h3>
-              <span className={`text-2xl font-bold ${
-                quality.overall >= 80 ? 'text-emerald-400' :
-                quality.overall >= 60 ? 'text-amber-400' : 'text-red-400'
-              }`}>
-                {quality.overall}
-              </span>
-            </div>
-            <div className="grid grid-cols-5 gap-3">
-              {([
-                { key: 'executionPrecision', label: '执行精度' },
-                { key: 'boundaryStrictness', label: '约束强度' },
-                { key: 'stepControl', label: '步骤控制' },
-                { key: 'copyToAgent', label: 'Cursor适配' },
-                { key: 'repairability', label: '修复能力' },
-              ] as const).map(dim => {
-                const val = quality.dimensions[dim.key];
-                return (
-                  <div key={dim.key} className="text-center">
-                    <div className={`text-lg font-bold ${
-                      val >= 80 ? 'text-emerald-400' : val >= 60 ? 'text-amber-400' : 'text-red-400'
-                    }`}>{val}</div>
-                    <div className="text-[11px] text-slate-500">{dim.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {fallbackSteps.size > 0 && result && (
           <div className="mb-6 rounded-xl border border-amber-800 bg-amber-950/50 p-4">
             <p className="text-sm text-amber-300">
-              ⚠ 部分推理阶段使用了降级方案（{Array.from(fallbackSteps).map(s => CHAIN.find(c => c.key === s)?.label || s).join('、')}）。
-              生成结果仍可用，但精度可能降低。点击「重新生成」可重试。
+              部分阶段使用了降级方案（{Array.from(fallbackSteps).map(s => CHAIN.find(c => c.key === s)?.label || s).join('、')}），
+              结果仍可用但精度可能降低。
             </p>
           </div>
         )}
@@ -402,7 +342,7 @@ export default function PromptPage() {
         {result && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-white">编译结果</h2>
+              <h2 className="text-base font-semibold text-white">Context Pack</h2>
               <div className="flex items-center gap-2">
                 {saved && (
                   <span className="rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-[11px] text-emerald-400">
@@ -423,118 +363,41 @@ export default function PromptPage() {
           </div>
         )}
 
-        {result && (intent || architecture || opinion) && (
+        {result && intent && (
           <div className="mb-6">
             <button
               onClick={() => setShowReasoning(!showReasoning)}
               className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition"
             >
               <span>{showReasoning ? '▾' : '▸'}</span>
-              推理过程详情
+              推理详情
             </button>
             {showReasoning && (
               <div className="mt-3 space-y-3">
-                {intent && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-cyan-400">意图识别</h3>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-slate-500">业务目标：</span><span className="text-slate-300">{String(intent.businessGoal || '-')}</span></div>
-                      <div><span className="text-slate-500">用户类型：</span><span className="text-slate-300">{String(intent.userType || '-')}</span></div>
-                      <div><span className="text-slate-500">产品形态：</span><span className="text-slate-300">{String(intent.productShape || '-')}</span></div>
-                      <div><span className="text-slate-500">生命周期：</span><span className="text-slate-300">{String(intent.lifecycle || '-')}</span></div>
-                    </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                  <h3 className="mb-2 text-xs font-semibold text-cyan-400">意图 + 架构</h3>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-slate-500">业务目标：</span><span className="text-slate-300">{String(intent.businessGoal || '-')}</span></div>
+                    <div><span className="text-slate-500">用户类型：</span><span className="text-slate-300">{String(intent.userType || '-')}</span></div>
+                    <div><span className="text-slate-500">产品形态：</span><span className="text-slate-300">{String(intent.productShape || '-')}</span></div>
+                    <div><span className="text-slate-500">生命周期：</span><span className="text-slate-300">{String(intent.lifecycle || '-')}</span></div>
+                    <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{String(intent.architecture.frontend || '-')}</span></div>
+                    <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{String(intent.architecture.backend || '-')}</span></div>
+                    <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{String(intent.architecture.db || '-')}</span></div>
+                    <div><span className="text-slate-500">基础设施：</span><span className="text-slate-300">{intent.architecture.infra.join('、') || '-'}</span></div>
                   </div>
-                )}
-                {architecture && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-emerald-400">架构决策</h3>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{String(architecture.frontend || '-')}</span></div>
-                      <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{String(architecture.backend || '-')}</span></div>
-                      <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{String(architecture.db || '-')}</span></div>
-                    </div>
-                    {Array.isArray(architecture.rejectedAlternatives) && architecture.rejectedAlternatives.length > 0 && (
-                      <div className="mt-2 text-xs">
-                        <span className="text-slate-500">被拒绝方案：</span>
-                        {architecture.rejectedAlternatives.map((alt, i) => (
-                          <div key={i} className="ml-2 text-slate-400">• {alt}</div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {opinion && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-purple-400">架构师判断</h3>
-                    <div className="space-y-2 text-xs">
-                      <div>
-                        <span className="text-emerald-500">推荐：</span>
-                        <span className="text-slate-300">{String(opinion.recommendation || '-')}</span>
-                      </div>
-                      <div>
-                        <span className="text-red-500">不建议：</span>
-                        <span className="text-slate-400">{String(opinion.avoid || '-')}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">理由：</span>
-                        <span className="text-slate-300">{String(opinion.rationale || '-')}</span>
-                      </div>
-                      {opinion.riskNotes && (
-                        <div>
-                          <span className="text-amber-500">风险提醒：</span>
-                          <span className="text-slate-300">{String(opinion.riskNotes)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                </div>
                 {decompose && Array.isArray(decompose.tasks) && decompose.tasks.length > 0 && (
                   <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
                     <h3 className="mb-2 text-xs font-semibold text-amber-400">任务拆解</h3>
                     <div className="space-y-1 text-xs">
                       {decompose.tasks.map((task, i) => (
                         <div key={i} className="flex items-start gap-2">
-                          <span className="text-slate-500 shrink-0">Phase {task.phase}</span>
+                          <span className="text-slate-500 shrink-0">P{task.phase}</span>
                           <span className="text-slate-400 font-mono">{task.file}</span>
                           <span className="text-slate-500">—</span>
                           <span className="text-slate-300">{task.responsibility}</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {reality && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-blue-400">项目现实</h3>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-slate-500">团队规模：</span><span className="text-slate-300">{reality.teamSize === 'solo' ? '个人开发' : reality.teamSize === 'small' ? '小团队' : reality.teamSize === 'medium' ? '中型团队' : '大型团队'}</span></div>
-                      <div><span className="text-slate-500">紧急程度：</span><span className="text-slate-300">{reality.urgency === 'low' ? '不急' : reality.urgency === 'medium' ? '正常' : reality.urgency === 'high' ? '紧急' : '非常紧急'}</span></div>
-                      <div><span className="text-slate-500">验证阶段：</span><span className="text-slate-300">{reality.validationStage === 'idea' ? '想法验证' : reality.validationStage === 'prototype' ? '原型开发' : reality.validationStage === 'mvp' ? 'MVP' : reality.validationStage === 'growth' ? '增长期' : '规模化'}</span></div>
-                      <div><span className="text-slate-500">工程成熟度：</span><span className="text-slate-300">{reality.engineeringMaturity === 'starter' ? '入门级' : reality.engineeringMaturity === 'intermediate' ? '中级' : '高级'}</span></div>
-                      <div className="col-span-2"><span className="text-slate-500">真实目标：</span><span className="text-slate-300">{reality.likelyGoal}</span></div>
-                    </div>
-                  </div>
-                )}
-                {reminders.length > 0 && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-orange-400">开发提醒</h3>
-                    <div className="space-y-2 text-xs">
-                      {reminders.map((reminder, i) => (
-                        <div key={i} className="border-l-2 border-orange-500 pl-3">
-                          <div className="font-medium text-slate-300">{reminder.pitfall}</div>
-                          <div className="text-slate-400 mt-1">为什么：{reminder.why}</div>
-                          <div className="text-slate-400">怎么避免：{reminder.howToAvoid}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {complexityWarnings.length > 0 && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
-                    <h3 className="mb-2 text-xs font-semibold text-red-400">复杂度警告</h3>
-                    <div className="space-y-1 text-xs">
-                      {complexityWarnings.map((warning, i) => (
-                        <div key={i} className="text-slate-300">• {warning}</div>
                       ))}
                     </div>
                   </div>
@@ -547,8 +410,8 @@ export default function PromptPage() {
         {!result && !loading && !error && (
           <div className="mt-16 text-center text-slate-600">
             <div className="text-4xl mb-3">⚡</div>
-            <p>输入需求，启动深度推理编译</p>
-            <p className="text-sm mt-1">8 步推理链：意图识别 → 架构决策 → 架构判断 → 任务拆解 → 项目现实 → 开发提醒 → 复杂度控制 → Prompt 编译</p>
+            <p>输入需求，生成 AI 可消费的项目上下文</p>
+            <p className="text-sm mt-1">3 步流程：理解需求 → 任务拆解 → 编译输出</p>
           </div>
         )}
       </div>

@@ -19,11 +19,7 @@ function PromptOutput({ phase, phaseIndex, totalPhases, savedAssetId }: PromptOu
 
   const handleSendToPlayground = () => {
     if (!phase) return;
-    const encoded = encodeURIComponent(phase.prompt);
-    const url = savedAssetId
-      ? `/playground?prompt=${encoded}&assetId=${savedAssetId}`
-      : `/playground?prompt=${encoded}`;
-    router.push(url);
+    navigator.clipboard.writeText(phase.prompt);
   };
 
   const handleCopyExecution = useCallback(async () => {

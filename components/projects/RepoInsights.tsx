@@ -210,15 +210,6 @@ export default function RepoInsights({ repoMeta, codeAnalysis, maturity, recomme
                   <span className="font-medium text-indigo-300">{rec.title}</span>
                   <div className="flex items-center gap-2">
                     <CopyPromptButton text={rec.prompt} label="复制" variant="compact" />
-                    <a
-                      href={`/playground?prompt=${encodeURIComponent(rec.prompt)}`}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-400 text-xs transition-colors"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      执行
-                    </a>
                   </div>
                 </div>
               </div>

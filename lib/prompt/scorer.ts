@@ -3,12 +3,15 @@ import { CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
 export interface QualityScore {
   overall: number;
   dimensions: {
-    executionPrecision: number;
-    boundaryStrictness: number;
-    stepControl: number;
-    copyToAgent: number;
-    repairability: number;
+    sectionCompleteness: number;
+    taskSpecificity: number;
+    fileGranularity: number;
+    antiGeneric: number;
+    executableScore: number;
+    dependencyClarity: number;
+    architectureConsistency: number;
   };
+  penalties: string[];
   feedback: string[];
 }
 
@@ -20,146 +23,272 @@ function clamp(v: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, Math.round(v)));
 }
 
-function scoreExecutionPrecision(prompt: string, pack: CompiledPack): number {
+const GENERIC_EXPRESSIONS = [
+  '适合 MVP', '适合mvp',
+  '开发效率高',
+  '可扩展',
+  '简单易用',
+  '性能优异',
+  '稳定可靠',
+  '社区活跃',
+  '文档丰富',
+  '生态完善',
+  '我建议',
+  '可能',
+  '通常',
+  '一般来说',
+  '这样更好',
+  '推荐使用',
+  '建议采用',
+  '比较合适',
+];
+
+const REQUIRED_SECTIONS = [
+  '项目背景', '技术方案', '文件任务', '推进节奏',
+  '开发提醒', '交付格式', '验收确认', '边界约束',
+];
+
+function scoreSectionCompleteness(prompt: string): number {
   let score = 0;
+  const sectionMatches = prompt.match(/##\s+.+/g) || [];
+  score += Math.min(sectionMatches.length * 12, 60);
 
-  const fileTreeMatch = prompt.match(/##\s*(?:Section\s*4|TARGET FILE TREE|文件结构|File Tree)/i);
-  if (fileTreeMatch) score += 20;
-
-  const fileCount = countPattern(prompt, /[\w-]+\.(ts|tsx|js|jsx|vue|py|go|css|scss)/g);
-  score += Math.min(fileCount * 3, 30);
-
-  const hasFileTasks = /##\s*(?:Section\s*5|FILE TASKS|文件任务)/i.test(prompt);
-  if (hasFileTasks) score += 15;
-
-  const taskCards = countPattern(prompt, /(?:文件|file)\s*[:：]/gi);
-  score += Math.min(taskCards * 3, 20);
-
-  if (pack.decompose && pack.decompose.tasks.length > 0) {
-    score += Math.min(pack.decompose.tasks.length * 2, 15);
+  // Each matched required section adds points
+  for (const section of REQUIRED_SECTIONS) {
+    if (prompt.includes(section)) score += 5;
   }
 
   return clamp(score);
 }
 
-function scoreBoundaryStrictness(prompt: string): number {
+function scoreTaskSpecificity(prompt: string, pack: CompiledPack): number {
   let score = 0;
 
-  const forbiddenSection = /##\s*(?:Section\s*9|BOUNDARY|禁止|Boundary)/i.test(prompt);
-  if (forbiddenSection) score += 25;
+  const tasks = pack.decompose?.tasks || [];
+  if (tasks.length >= 5) score += 20;
+  if (tasks.length >= 8) score += 10;
+  if (tasks.length < 3) score -= 25;
 
-  const forbiddenCount = countPattern(prompt, /禁止|不得|不允许|must not|forbidden/gi);
-  score += Math.min(forbiddenCount * 4, 30);
+  // Check for concrete implementation requirements (function signatures)
+  for (const task of tasks) {
+    for (const req of (task.implementationRequirements || [])) {
+      if (/function|=>|export|interface|type/.test(req)) score += 2;
+    }
+  }
+  score = Math.min(score, 40);
 
-  const hasRole = /##\s*(?:Section\s*1|ROLE|角色)/i.test(prompt);
-  if (hasRole) score += 15;
+  // Check for forbidden items per task
+  const tasksWithForbidden = tasks.filter(t => t.forbiddenItems && t.forbiddenItems.length > 0).length;
+  score += Math.min(tasksWithForbidden * 3, 15);
 
-  const hasContract = /##\s*(?:Section\s*7|OUTPUT CONTRACT|输出协议)/i.test(prompt);
-  if (hasContract) score += 15;
-
-  const explicitTech = countPattern(prompt, /(?:选型|技术栈|tech stack|framework)/gi);
-  score += Math.min(explicitTech * 3, 15);
+  // Check for dependency tracking
+  const tasksWithDeps = tasks.filter(t => t.dependencies && t.dependencies.length > 0).length;
+  score += Math.min(tasksWithDeps * 2, 10);
 
   return clamp(score);
 }
 
-function scoreStepControl(prompt: string, pack: CompiledPack): number {
+function scoreFileGranularity(prompt: string, pack: CompiledPack): number {
   let score = 0;
 
-  const hasExecOrder = /##\s*(?:Section\s*6|EXECUTION ORDER|执行顺序|Execution Order)/i.test(prompt);
-  if (hasExecOrder) score += 25;
+  const filePathPattern = /[\w-]+\/[\w-]+\.(ts|tsx|js|jsx|vue|py|go)/g;
+  const filePaths = prompt.match(filePathPattern) || [];
+  score += Math.min(filePaths.length * 6, 40);
 
-  const phaseCount = countPattern(prompt, /Phase\s*\d|阶段\s*\d|步骤\s*\d/gi);
-  score += Math.min(phaseCount * 8, 40);
+  const fileTaskCards = countPattern(prompt, /###\s+[\w-/]+\.\w+/g);
+  score += Math.min(fileTaskCards * 8, 40);
 
-  const hasPause = /DONE_PHASE|等待确认|pause|checkpoint/gi.test(prompt);
-  if (hasPause) score += 20;
-
-  if (pack.decompose && pack.decompose.phases.length > 0) {
-    score += Math.min(pack.decompose.phases.length * 5, 15);
+  const tasks = pack.decompose?.tasks || [];
+  if (tasks.length > 0) {
+    const hasFilePerTask = tasks.every(t => t.file && t.file.includes('.'));
+    if (hasFilePerTask) score += 20;
   }
 
   return clamp(score);
 }
 
-function scoreCopyToAgent(prompt: string): number {
+function scoreAntiGeneric(prompt: string): number {
+  let score = 100;
+  let genericCount = 0;
+
+  for (const expr of GENERIC_EXPRESSIONS) {
+    const matches = prompt.match(new RegExp(expr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+    if (matches) genericCount += matches.length;
+  }
+
+  score -= genericCount * 5;
+
+  // Extra penalty for "适合 MVP" or "开发效率高" without concrete reasoning
+  const mvpMatch = prompt.match(/适合\s*MVP/gi);
+  if (mvpMatch) score -= mvpMatch.length * 10;
+
+  const efficiencyMatch = prompt.match(/开发效率高/gi);
+  if (efficiencyMatch) score -= efficiencyMatch.length * 10;
+
+  const extendableMatch = prompt.match(/可扩展(?!性)/gi);
+  if (extendableMatch) score -= extendableMatch.length * 8;
+
+  return clamp(score);
+}
+
+function scoreExecutableScore(prompt: string, pack: CompiledPack): number {
   let score = 0;
 
-  if (prompt.length > 2000) score += 15;
-  if (prompt.length > 4000) score += 10;
+  // Has phase-based execution order
+  const phases = pack.decompose?.phases || [];
+  if (phases.length >= 2) score += 25;
+  if (phases.length >= 4) score += 10;
 
-  const hasValidation = /##\s*(?:Section\s*8|VALIDATION|验证|Checklist)/i.test(prompt);
-  if (hasValidation) score += 20;
+  // Has pause/checkpoint markers
+  if (/DONE_PHASE|暂停确认|checkpoint|等我确认/gi.test(prompt)) score += 15;
 
-  const hasErrorTemplate = /##\s*(?:Section\s*10|ERROR|错误反馈)/i.test(prompt);
-  if (hasErrorTemplate) score += 15;
-
+  // Has acceptance checklist with checkboxes
   const checkboxCount = countPattern(prompt, /\[[ x]\]/g);
-  score += Math.min(checkboxCount * 4, 20);
+  score += Math.min(checkboxCount * 5, 20);
 
-  const hasOutputContract = /Modified Files|Code|Verification|Risks/gi.test(prompt);
-  if (hasOutputContract) score += 20;
+  // Has concrete output format
+  if (/Modified Files|修改的文件|Code|代码|Verification|验证方式/gi.test(prompt)) score += 15;
+
+  // Has error handling instructions
+  if (/错误|error|问题|Exception/gi.test(prompt)) score += 15;
 
   return clamp(score);
 }
 
-function scoreRepairability(prompt: string, pack: CompiledPack): number {
+function scoreDependencyClarity(prompt: string, pack: CompiledPack): number {
   let score = 0;
 
-  const hasErrorTemplate = /##\s*(?:Section\s*10|ERROR|错误反馈)/i.test(prompt);
-  if (hasErrorTemplate) score += 30;
+  const tasks = pack.decompose?.tasks || [];
+  const tasksWithDeps = tasks.filter(t => t.dependencies && t.dependencies.length > 0).length;
 
-  const hasBoundary = /##\s*(?:Section\s*9|BOUNDARY|禁止)/i.test(prompt);
-  if (hasBoundary) score += 25;
-
-  const hasPhases = /Phase|阶段|步骤/gi.test(prompt);
-  if (hasPhases) score += 20;
-
-  if (pack.decompose && pack.decompose.tasks.length > 0) {
-    const hasDeps = pack.decompose.tasks.some(t => t.dependencies && t.dependencies.length > 0);
-    if (hasDeps) score += 15;
+  if (tasks.length > 0) {
+    const depRatio = tasksWithDeps / tasks.length;
+    score += Math.round(depRatio * 50);
   }
 
-  const hasVerification = /验证|verify|test|check/gi.test(prompt);
-  if (hasVerification) score += 10;
+  // Check if dependencies are explicitly listed in prompt
+  const depMentions = countPattern(prompt, /前置依赖|依赖|depends on|requires/gi);
+  score += Math.min(depMentions * 8, 30);
+
+  // Phase ordering clarity
+  const phaseMentions = countPattern(prompt, /Phase\s*\d|第\s*\d\s*阶段/gi);
+  score += Math.min(phaseMentions * 5, 20);
+
+  return clamp(score);
+}
+
+function scoreArchitectureConsistency(prompt: string, pack: CompiledPack): number {
+  let score = 50; // baseline
+
+  const arch = pack.architecture;
+  if (arch) {
+    // Check if frontend is mentioned in tasks
+    if (arch.frontend) {
+      const feKey = arch.frontend.split('—')[0].split('（')[0].trim().toLowerCase();
+      if (prompt.toLowerCase().includes(feKey)) score += 15;
+    }
+
+    // Check if backend is mentioned
+    if (arch.backend) {
+      const beKey = arch.backend.split('—')[0].split('（')[0].trim().toLowerCase();
+      if (prompt.toLowerCase().includes(beKey)) score += 10;
+    }
+
+    // Rejected alternatives mentioned
+    if (arch.rejectedAlternatives && arch.rejectedAlternatives.length > 0) {
+      score += Math.min(arch.rejectedAlternatives.length * 5, 15);
+    }
+  }
+
+  // Consistency: no contradictory tech mentions
+  if ((prompt.includes('React') || prompt.includes('Next')) && prompt.includes('Vue') && !prompt.includes('对比')) {
+    score -= 20;
+  }
 
   return clamp(score);
 }
 
 export function evaluatePromptQuality(prompt: string, pack: CompiledPack): QualityScore {
-  const executionPrecision = scoreExecutionPrecision(prompt, pack);
-  const boundaryStrictness = scoreBoundaryStrictness(prompt);
-  const stepControl = scoreStepControl(prompt, pack);
-  const copyToAgent = scoreCopyToAgent(prompt);
-  const repairability = scoreRepairability(prompt, pack);
+  const penalties: string[] = [];
 
-  const overall = clamp(
-    executionPrecision * 0.30 +
-    boundaryStrictness * 0.20 +
-    stepControl * 0.20 +
-    copyToAgent * 0.20 +
-    repairability * 0.10
+  // Critical data-leak checks (hard penalties)
+  if (prompt.includes('[object Object]')) {
+    penalties.push('检测到 [object Object]：数据未正确字符串化');
+  }
+  if (prompt.includes('undefined')) {
+    penalties.push('检测到 undefined：字段值未正确填充');
+  }
+  if (prompt.includes('null') && prompt.includes('"null"') === false && !prompt.includes('nullable')) {
+    penalties.push('检测到 null 值暴露：字段可能缺失');
+  }
+
+  // Generic expressions count
+  let genericTotal = 0;
+  for (const expr of GENERIC_EXPRESSIONS) {
+    genericTotal += countPattern(prompt, new RegExp(expr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+  }
+  if (genericTotal > 8) {
+    penalties.push(`泛化表达过多（${genericTotal}处）："${GENERIC_EXPRESSIONS.slice(0, 3).join('""')}"等`);
+  }
+
+  const tasks = pack.decompose?.tasks || [];
+  const phases = pack.decompose?.phases || [];
+
+  if (tasks.length < 3) {
+    penalties.push(`文件任务仅 ${tasks.length} 个，至少需要 3 个`);
+  }
+  if (phases.length < 2) {
+    penalties.push(`开发阶段仅 ${phases.length} 个，至少需要 2 个`);
+  }
+  if (!/\[[ x]\]/.test(prompt)) {
+    penalties.push('缺少 checkbox 式验收标准');
+  }
+  if ((prompt.match(/禁止|不要做|避免/gi) || []).length < 2) {
+    penalties.push('禁止事项少于 2 条');
+  }
+  if (!/风险|risk|注意|提醒/gi.test(prompt)) {
+    penalties.push('缺少风险提醒');
+  }
+  if (prompt.length < 1000) {
+    penalties.push(`Prompt 过短（${prompt.length}字符），内容不足`);
+  }
+
+  const dimensions = {
+    sectionCompleteness: scoreSectionCompleteness(prompt),
+    taskSpecificity: scoreTaskSpecificity(prompt, pack),
+    fileGranularity: scoreFileGranularity(prompt, pack),
+    antiGeneric: scoreAntiGeneric(prompt),
+    executableScore: scoreExecutableScore(prompt, pack),
+    dependencyClarity: scoreDependencyClarity(prompt, pack),
+    architectureConsistency: scoreArchitectureConsistency(prompt, pack),
+  };
+
+  let overall = clamp(
+    dimensions.sectionCompleteness * 0.15 +
+    dimensions.taskSpecificity * 0.20 +
+    dimensions.fileGranularity * 0.15 +
+    dimensions.antiGeneric * 0.15 +
+    dimensions.executableScore * 0.15 +
+    dimensions.dependencyClarity * 0.10 +
+    dimensions.architectureConsistency * 0.10
   );
 
+  // Apply penalties
+  overall = Math.max(0, overall - penalties.length * 5);
+
   const feedback: string[] = [];
+  if (dimensions.sectionCompleteness < 60) feedback.push('Section 完整性不足，建议补充缺失章节');
+  if (dimensions.taskSpecificity < 60) feedback.push('任务不够具体，缺少函数签名和实现要求');
+  if (dimensions.fileGranularity < 60) feedback.push('文件级粒度不够，缺少具体文件路径');
+  if (dimensions.antiGeneric < 60) feedback.push('存在较多泛化表达，减少"适合MVP""开发效率高"等');  if (dimensions.executableScore < 60) feedback.push('可执行性不足，缺少阶段划分和暂停确认点');
+  if (dimensions.dependencyClarity < 60) feedback.push('依赖关系不够清晰，Agent可能按错误顺序执行');
+  if (dimensions.architectureConsistency < 60) feedback.push('技术选型与任务描述不一致');
 
-  if (executionPrecision < 60) feedback.push('文件级任务粒度不够精确，缺少具体文件路径或函数签名');
-  if (boundaryStrictness < 60) feedback.push('约束不够严格，缺少禁止项或角色定义');
-  if (stepControl < 60) feedback.push('缺少分阶段执行和暂停确认点');
-  if (copyToAgent < 60) feedback.push('可复制性不足，缺少输出格式或验证清单');
-  if (repairability < 60) feedback.push('可修复性不足，缺少错误反馈模板或边界约束');
-
-  if (prompt.length < 1000) feedback.push('总长度过短，可能遗漏关键细节');
-  if (prompt.length > 8000) feedback.push('总长度过长，可能包含冗余信息');
-
-  const sectionCount = countPattern(prompt, /##\s*(?:Section|第)/g);
-  if (sectionCount < 5) feedback.push(`仅包含 ${sectionCount} 个章节，建议补充到 10 个`);
-
-  return { overall, dimensions: { executionPrecision, boundaryStrictness, stepControl, copyToAgent, repairability }, feedback };
+  return { overall, dimensions, penalties, feedback };
 }
 
 export function isVerified(score: QualityScore): boolean {
-  return score.overall >= 80;
+  return score.overall >= 80 && score.penalties.length === 0;
 }
 
 export interface PromptScore {
@@ -188,16 +317,16 @@ export function calculatePromptScore(input: PromptScoreInput): PromptScore {
   if (len > 1500) structure += 15;
   const sections = countPattern(prompt, /##/g);
   structure += Math.min(sections * 8, 40);
-  if (/ROLE|角色/i.test(prompt)) structure += 10;
-  if (/BOUNDARY|禁止/i.test(prompt)) structure += 15;
+  if (/角色|合作/.test(prompt)) structure += 10;
+  if (/禁止|不要做/.test(prompt)) structure += 15;
   structure = clamp(structure);
 
   let professionalism = 0;
   if (/##/.test(prompt)) professionalism += 15;
   if (len > 1000) professionalism += 15;
-  if (/Section|第.{1,3}章/.test(prompt)) professionalism += 15;
-  if (/```/.test(prompt)) professionalism += 10;
   if (/(Phase|阶段)/i.test(prompt)) professionalism += 15;
+  if (/```/.test(prompt)) professionalism += 10;
+  if (/风险|tradeoff|取舍/i.test(prompt)) professionalism += 15;
   if (len > 3000) professionalism += 10;
   professionalism = clamp(professionalism);
 

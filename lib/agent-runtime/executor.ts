@@ -37,7 +37,7 @@ export async function executeAgent(
   const startTime = Date.now();
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-  const model = process.env.OPENAI_MODEL || 'glm-4.5-air';
+  const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
   if (!apiKey) {
     return {
@@ -122,7 +122,7 @@ async function retryWithCorrection(
 ): Promise<ExecutionResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-  const model = process.env.OPENAI_MODEL || 'glm-4.5-air';
+  const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
   if (!apiKey) {
     return { output: '', success: false, source: 'failed', error: '未配置 API Key', duration: 0 };
@@ -174,7 +174,7 @@ export async function executeAgentStreaming(
   const startTime = Date.now();
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-  const model = process.env.OPENAI_MODEL || 'glm-4.5-air';
+  const model = process.env.OPENAI_MODEL || 'glm-4-flash';
 
   if (!apiKey) {
     onSource?.('failed');

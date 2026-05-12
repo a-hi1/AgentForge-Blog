@@ -3,15 +3,12 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { createConversation } from '@/lib/session/conversations';
 
 const navItems = [
-  { href: '/', label: '工作台' },
-  { href: '/projects', label: '项目中心' },
-  { href: '/prompt', label: 'Prompt Studio' },
-  { href: '/prompt/history', label: '资产库' },
-  { href: '/lab', label: '执行实验室' },
-  { href: '/fix', label: '问题修复' },
+  { href: '/', label: '首页' },
+  { href: '/prompt/discovery', label: '方向探索' },
+  { href: '/memory', label: '项目记忆' },
+  { href: '/prompt', label: 'AI 导出' },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -19,21 +16,19 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-type IntentType = 'idea' | 'fix' | 'optimize' | 'continue';
+type IntentType = 'idea' | 'fix' | 'continue';
 
 function detectIntent(text: string): IntentType {
   const lower = text.toLowerCase();
   if (/\b(bug|fix|修复|报错|错误|崩溃|crash|error|问题|异常|失败|fail)\b/i.test(lower)) return 'fix';
-  if (/\b(优化|optimize|性能|performance|改进|改善|提升|加速|reduce|improve)\b/i.test(lower)) return 'optimize';
-  if (/\b(继续|continue|接着|上次|resume|恢复|接着做)\b/i.test(lower)) return 'continue';
+  if (/\b(继续|continue|接着|上次|resume|恢复|接着做|记忆|memory)\b/i.test(lower)) return 'continue';
   return 'idea';
 }
 
 const INTENT_CONFIG: Record<IntentType, { path: string; label: string; desc: string; color: string }> = {
-  idea: { path: '/prompt', label: 'Prompt Studio', desc: '生成精准 Prompt', color: 'text-purple-400' },
-  fix: { path: '/fix', label: '问题修复', desc: '分析并修复问题', color: 'text-red-400' },
-  optimize: { path: '/playground', label: 'Playground', desc: '执行优化测试', color: 'text-amber-400' },
-  continue: { path: '/', label: '工作台', desc: '恢复上下文', color: 'text-emerald-400' },
+  idea: { path: '/prompt/discovery', label: '方向探索', desc: '探索产品方向', color: 'text-purple-400' },
+  fix: { path: '/prompt', label: 'AI 导出', desc: '生成项目上下文', color: 'text-amber-400' },
+  continue: { path: '/memory', label: '项目记忆', desc: '查看项目上下文', color: 'text-emerald-400' },
 };
 
 export default function Header() {
@@ -126,8 +121,8 @@ export default function Header() {
               <span className="text-white font-bold text-sm">AF</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-white">AgentForge DevOS</span>
-              <span className="text-xs text-gray-400 -mt-1">Prompt 驱动的个人开发操作系统</span>
+              <span className="text-lg font-bold text-white">AgentForge</span>
+              <span className="text-xs text-gray-400 -mt-1">AI Context Engine</span>
             </div>
           </Link>
 
@@ -141,18 +136,6 @@ export default function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <span>Ctrl+K</span>
-            </button>
-            <button
-              onClick={() => {
-                const conv = createConversation();
-                router.push(`/playground?conv=${conv.id}`);
-              }}
-              className="ml-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[rgba(139,92,246,0.15)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.25)] transition-all text-xs font-medium"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              新会话
             </button>
           </nav>
 
@@ -204,7 +187,7 @@ export default function Header() {
               value={cmdInput}
               onChange={e => setCmdInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCmdSubmit(); }}
-              placeholder="输入想法、Bug 描述或优化需求..."
+              placeholder="输入想法、问题或需求..."
               className="flex-1 bg-transparent text-sm text-[#FAFAFA] placeholder-[#52525B] focus:outline-none"
             />
             <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.06)] text-[#52525B] border border-[rgba(255,255,255,0.08)]">ESC</kbd>
@@ -235,7 +218,7 @@ export default function Header() {
           <div className="px-4 py-3">
             <p className="text-[10px] text-[#52525B] uppercase tracking-wider mb-2">快捷导航</p>
             <div className="space-y-1">
-              {navItems.slice(0, 4).map(item => (
+              {navItems.map(item => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -258,7 +241,6 @@ export default function Header() {
                 <kbd className="px-1 py-0.5 rounded bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.08)]">↵</kbd> 跳转
               </span>
             </div>
-            <span className="text-[10px] text-[#52525B]">idea / fix / optimize</span>
           </div>
         </div>
       </div>

@@ -56,10 +56,9 @@ const PHASE_USAGE_TIPS: Record<string, { suitable: string; notSuitable: string; 
 };
 
 const FLOW_STEPS = [
-  { step: 1, text: '在 Prompt Studio 生成', href: '/prompt' },
-  { step: 2, text: '复制到 Agent 工具执行' },
-  { step: 3, text: '反馈问题 → 生成修复 Prompt', href: '/playground' },
-  { step: 4, text: '验证通过 → 沉淀为 Skill' },
+  { step: 1, text: '在 AI 导出中生成上下文', href: '/prompt' },
+  { step: 2, text: '复制到 AI 工具执行' },
+  { step: 3, text: '验证通过 → 沉淀为 Skill' },
 ];
 
 export default function PromptHistoryPage() {
@@ -271,7 +270,7 @@ export default function PromptHistoryPage() {
   };
 
   const sendToPlayground = (asset: PromptAsset) => {
-    window.location.href = `/playground?prompt=${encodeURIComponent(asset.fullPrompt)}&assetId=${asset.id}`;
+    navigator.clipboard.writeText(asset.fullPrompt);
   };
 
   const handleEditSave = async () => {
@@ -444,9 +443,9 @@ export default function PromptHistoryPage() {
               skills.length === 0 ? (
                 <div className="py-16 text-center bg-[#111113] rounded-xl border border-[rgba(255,255,255,0.06)]">
                   <p className="text-[#71717A] mb-2">还没有沉淀的 Skill</p>
-                  <p className="text-[10px] text-[#52525B] mb-4">在 Workbench 中验证 Prompt 后，可沉淀为可复用 Skill</p>
-                  <Link href="/playground" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] text-white text-sm">
-                    前往 Workbench
+                  <p className="text-[10px] text-[#52525B] mb-4">在 AI 导出中生成上下文后，可沉淀为可复用 Skill</p>
+                  <Link href="/prompt" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] text-white text-sm">
+                    前往 AI 导出
                   </Link>
                 </div>
               ) : (

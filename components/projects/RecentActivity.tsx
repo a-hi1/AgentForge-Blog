@@ -73,15 +73,9 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
                   </span>
                 </div>
                 {activity.relatedId && (
-                  <Link 
-                    href={`/lab/${activity.relatedId}`}
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-[#60A5FA] hover:text-[#3B82F6] transition-colors"
-                  >
-                    查看详情
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
+                  <span className="mt-2 inline-flex items-center gap-1 text-xs text-[#52525B]">
+                    {activity.relatedId}
+                  </span>
                 )}
               </div>
             );
