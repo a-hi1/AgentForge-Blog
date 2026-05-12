@@ -64,7 +64,7 @@ export default function IdeaDiscoveryPage() {
           if (!payload) continue;
 
           try {
-            const data = JSON.parse(payload);
+            const data = JSON.parse(payload) as any;
 
             if (data.type === 'phase_start') {
               // 阶段开始
@@ -72,12 +72,12 @@ export default function IdeaDiscoveryPage() {
               // 分析中，记录数据
               setPhaseHistory((prev) => [
                 ...prev,
-                { phase: data.phase, data: data.data },
+                { phase: data.phase as DiscoveryPhase, data: data.data },
               ]);
             } else if (data.type === 'phase_complete') {
               // 阶段完成
             } else if (data.type === 'complete') {
-              setSession(data.session);
+              setSession(data.session as DiscoverySession);
             } else if (data.type === 'error') {
               throw new Error(data.error);
             }
@@ -133,15 +133,15 @@ export default function IdeaDiscoveryPage() {
           if (!payload) continue;
 
           try {
-            const data = JSON.parse(payload);
+            const data = JSON.parse(payload) as any;
 
             if (data.type === 'phase_analysis') {
               setPhaseHistory((prev) => [
                 ...prev,
-                { phase: data.phase, data: data.data },
+                { phase: data.phase as DiscoveryPhase, data: data.data },
               ]);
             } else if (data.type === 'complete') {
-              setSession(data.session);
+              setSession(data.session as DiscoverySession);
               setCurrentAnswers({});
             } else if (data.type === 'error') {
               throw new Error(data.error);
