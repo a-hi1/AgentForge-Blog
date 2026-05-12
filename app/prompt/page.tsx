@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, Component, ReactNode } from '
 import { useRouter } from 'next/navigation';
 import { savePrompt } from '@/lib/prompt/history';
 import { compilePromptPack, CompiledPack } from '@/lib/prompt-orchestrator/promptCompiler';
-import { IntentResult, ArchitectureResult, ArchitectOpinion, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
+import { IntentResult, ArchitectureResult, ArchitectOpinion, DecomposeResult, ProjectReality, EngineeringReminder } from '@/lib/prompt-orchestrator/reasoner';
 import { evaluatePromptQuality, QualityScore } from '@/lib/prompt/scorer';
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
@@ -20,6 +20,9 @@ const CHAIN = [
   { key: 'architecture', label: '架构决策' },
   { key: 'opinion', label: '架构判断' },
   { key: 'decompose', label: '任务拆解' },
+  { key: 'reality', label: '项目现实' },
+  { key: 'reminders', label: '开发提醒' },
+  { key: 'complexity', label: '复杂度控制' },
   { key: 'compile', label: 'Prompt 编译' },
 ] as const;
 
@@ -38,6 +41,9 @@ export default function PromptPage() {
   const [architecture, setArchitecture] = useState<ArchitectureResult | null>(null);
   const [opinion, setOpinion] = useState<ArchitectOpinion | null>(null);
   const [decompose, setDecompose] = useState<DecomposeResult | null>(null);
+  const [reality, setReality] = useState<ProjectReality | null>(null);
+  const [reminders, setReminders] = useState<EngineeringReminder[]>([]);
+  const [complexityWarnings, setComplexityWarnings] = useState<string[]>([]);
   const [quality, setQuality] = useState<QualityScore | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -61,6 +67,9 @@ export default function PromptPage() {
     setArchitecture(null);
     setOpinion(null);
     setDecompose(null);
+    setReality(null);
+    setReminders([]);
+    setComplexityWarnings([]);
     setQuality(null);
 
     try {
@@ -110,6 +119,9 @@ export default function PromptPage() {
                   if (data.step === 'architecture') setArchitecture(data.result as ArchitectureResult);
                   if (data.step === 'opinion') setOpinion(data.result as ArchitectOpinion);
                   if (data.step === 'decompose') setDecompose(data.result as DecomposeResult);
+                  if (data.step === 'reality') setReality(data.result as ProjectReality);
+                  if (data.step === 'reminders') setReminders(data.result as EngineeringReminder[]);
+                  if (data.step === 'complexity') setComplexityWarnings(data.result as string[]);
                 }
               }
             }
@@ -135,11 +147,17 @@ export default function PromptPage() {
               const archData = data.architecture && typeof data.architecture === 'object' ? data.architecture as ArchitectureResult : architecture;
               const decomposeData = data.decompose && typeof data.decompose === 'object' ? data.decompose as DecomposeResult : null;
               const opinionData = data.opinion && typeof data.opinion === 'object' ? data.opinion as ArchitectOpinion : null;
+              const realityData = data.reality && typeof data.reality === 'object' ? data.reality as ProjectReality : null;
+              const remindersData = Array.isArray(data.reminders) ? data.reminders as EngineeringReminder[] : [];
+              const complexityData = Array.isArray(data.complexityWarnings) ? data.complexityWarnings as string[] : [];
 
               if (intentData) setIntent(intentData);
               if (archData) setArchitecture(archData);
               if (opinionData) setOpinion(opinionData);
               if (decomposeData) setDecompose(decomposeData);
+              if (realityData) setReality(realityData);
+              if (remindersData.length > 0) setReminders(remindersData);
+              if (complexityData.length > 0) setComplexityWarnings(complexityData);
 
               if (intentData && archData && promptText) {
                 try {
@@ -276,6 +294,9 @@ export default function PromptPage() {
                   setArchitecture(null);
                   setOpinion(null);
                   setDecompose(null);
+                  setReality(null);
+                  setReminders([]);
+                  setComplexityWarnings([]);
                   setFallbackSteps(new Set());
                 }}
                 className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 transition"
@@ -482,6 +503,42 @@ export default function PromptPage() {
                     </div>
                   </div>
                 )}
+                {reality && (
+                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                    <h3 className="mb-2 text-xs font-semibold text-blue-400">项目现实</h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div><span className="text-slate-500">团队规模：</span><span className="text-slate-300">{reality.teamSize === 'solo' ? '个人开发' : reality.teamSize === 'small' ? '小团队' : reality.teamSize === 'medium' ? '中型团队' : '大型团队'}</span></div>
+                      <div><span className="text-slate-500">紧急程度：</span><span className="text-slate-300">{reality.urgency === 'low' ? '不急' : reality.urgency === 'medium' ? '正常' : reality.urgency === 'high' ? '紧急' : '非常紧急'}</span></div>
+                      <div><span className="text-slate-500">验证阶段：</span><span className="text-slate-300">{reality.validationStage === 'idea' ? '想法验证' : reality.validationStage === 'prototype' ? '原型开发' : reality.validationStage === 'mvp' ? 'MVP' : reality.validationStage === 'growth' ? '增长期' : '规模化'}</span></div>
+                      <div><span className="text-slate-500">工程成熟度：</span><span className="text-slate-300">{reality.engineeringMaturity === 'starter' ? '入门级' : reality.engineeringMaturity === 'intermediate' ? '中级' : '高级'}</span></div>
+                      <div className="col-span-2"><span className="text-slate-500">真实目标：</span><span className="text-slate-300">{reality.likelyGoal}</span></div>
+                    </div>
+                  </div>
+                )}
+                {reminders.length > 0 && (
+                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                    <h3 className="mb-2 text-xs font-semibold text-orange-400">开发提醒</h3>
+                    <div className="space-y-2 text-xs">
+                      {reminders.map((reminder, i) => (
+                        <div key={i} className="border-l-2 border-orange-500 pl-3">
+                          <div className="font-medium text-slate-300">{reminder.pitfall}</div>
+                          <div className="text-slate-400 mt-1">为什么：{reminder.why}</div>
+                          <div className="text-slate-400">怎么避免：{reminder.howToAvoid}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {complexityWarnings.length > 0 && (
+                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                    <h3 className="mb-2 text-xs font-semibold text-red-400">复杂度警告</h3>
+                    <div className="space-y-1 text-xs">
+                      {complexityWarnings.map((warning, i) => (
+                        <div key={i} className="text-slate-300">• {warning}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -491,7 +548,7 @@ export default function PromptPage() {
           <div className="mt-16 text-center text-slate-600">
             <div className="text-4xl mb-3">⚡</div>
             <p>输入需求，启动深度推理编译</p>
-            <p className="text-sm mt-1">5 步推理链：意图识别 → 架构决策 → 架构判断 → 任务拆解 → Prompt 编译</p>
+            <p className="text-sm mt-1">8 步推理链：意图识别 → 架构决策 → 架构判断 → 任务拆解 → 项目现实 → 开发提醒 → 复杂度控制 → Prompt 编译</p>
           </div>
         )}
       </div>

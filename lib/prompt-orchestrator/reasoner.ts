@@ -50,6 +50,16 @@ export interface DecomposeResult {
   phases: { phase: number; label: string; files: string[] }[];
 }
 
+export interface ProjectReality {
+  teamSize: 'solo' | 'small' | 'medium' | 'large';
+  urgency: 'low' | 'medium' | 'high' | 'critical';
+  validationStage: 'idea' | 'prototype' | 'mvp' | 'growth' | 'scale';
+  likelyGoal: string;
+  engineeringMaturity: 'starter' | 'intermediate' | 'advanced';
+  complexityBudget: 'minimal' | 'moderate' | 'full';
+  testingStrategy: 'none' | 'smoke' | 'integration' | 'full';
+}
+
 export interface ReasoningStep {
   type: ReasoningStepType;
   label: string;
@@ -287,6 +297,211 @@ ${JSON.stringify(intent, null, 2)}
 
 export function extractRejectionReasons(architecture: ArchitectureResult): string[] {
   return architecture.rejectedAlternatives.filter(r => r.length > 0);
+}
+
+export function detectProjectReality(
+  intent: IntentResult,
+  userInput: string
+): ProjectReality {
+  const input = userInput.toLowerCase();
+  const lifecycle = intent.lifecycle.toLowerCase();
+
+  // 检测团队规模
+  let teamSize: ProjectReality['teamSize'] = 'solo';
+  if (input.includes('团队') || input.includes('公司') || input.includes('组队') ||
+      input.includes('多人') || input.includes('协作')) {
+    teamSize = 'small';
+  }
+  if (input.includes('企业') || input.includes('公司级') || input.includes('部门') ||
+      input.includes('多人协作')) {
+    teamSize = 'medium';
+  }
+  if (input.includes('大型') || input.includes('集团') || input.includes('上市公司')) {
+    teamSize = 'large';
+  }
+
+  // 检测紧急程度
+  let urgency: ProjectReality['urgency'] = 'medium';
+  if (input.includes('紧急') || input.includes('马上') || input.includes('立即') ||
+      input.includes('尽快') || input.includes('asap')) {
+    urgency = 'high';
+  }
+  if (input.includes('赶工') || input.includes('加班') || input.includes('截止日期')) {
+    urgency = 'critical';
+  }
+  if (input.includes('慢慢来') || input.includes('不急') || input.includes('有时间')) {
+    urgency = 'low';
+  }
+
+  // 检测验证阶段
+  let validationStage: ProjectReality['validationStage'] = 'mvp';
+  if (lifecycle.includes('想法') || lifecycle.includes('概念') || lifecycle.includes('验证')) {
+    validationStage = 'idea';
+  }
+  if (lifecycle.includes('原型') || lifecycle.includes('demo') || lifecycle.includes('试验')) {
+    validationStage = 'prototype';
+  }
+  if (lifecycle.includes('增长') || lifecycle.includes('扩展') || lifecycle.includes('规模化')) {
+    validationStage = 'growth';
+  }
+  if (lifecycle.includes('成熟') || lifecycle.includes('稳定') || lifecycle.includes('企业级')) {
+    validationStage = 'scale';
+  }
+
+  // 推断真实目标
+  let likelyGoal = '快速验证核心价值';
+  if (validationStage === 'idea') {
+    likelyGoal = '验证想法是否可行';
+  } else if (validationStage === 'prototype') {
+    likelyGoal = '制作可演示的原型';
+  } else if (validationStage === 'mvp') {
+    likelyGoal = '发布最小可行产品';
+  } else if (validationStage === 'growth') {
+    likelyGoal = '支撑用户增长';
+  } else if (validationStage === 'scale') {
+    likelyGoal = '系统稳定性和可维护性';
+  }
+
+  // 检测工程成熟度
+  let engineeringMaturity: ProjectReality['engineeringMaturity'] = 'intermediate';
+  if (input.includes('学习') || input.includes('练手') || input.includes('入门') ||
+      input.includes('第一个项目')) {
+    engineeringMaturity = 'starter';
+  }
+  if (input.includes('企业级') || input.includes('生产环境') || input.includes('高并发') ||
+      input.includes('分布式')) {
+    engineeringMaturity = 'advanced';
+  }
+
+  // 复杂度预算
+  let complexityBudget: ProjectReality['complexityBudget'] = 'moderate';
+  if (teamSize === 'solo' && (validationStage === 'idea' || validationStage === 'prototype')) {
+    complexityBudget = 'minimal';
+  }
+  if (teamSize === 'large' || validationStage === 'scale') {
+    complexityBudget = 'full';
+  }
+
+  // 测试策略
+  let testingStrategy: ProjectReality['testingStrategy'] = 'smoke';
+  if (validationStage === 'idea' || validationStage === 'prototype') {
+    testingStrategy = 'none';
+  }
+  if (validationStage === 'growth' || validationStage === 'scale') {
+    testingStrategy = 'integration';
+  }
+  if (engineeringMaturity === 'advanced' && (validationStage === 'growth' || validationStage === 'scale')) {
+    testingStrategy = 'full';
+  }
+
+  return {
+    teamSize,
+    urgency,
+    validationStage,
+    likelyGoal,
+    engineeringMaturity,
+    complexityBudget,
+    testingStrategy,
+  };
+}
+
+export interface EngineeringReminder {
+  pitfall: string;
+  why: string;
+  howToAvoid: string;
+  relatedTech: string;
+}
+
+export function generateEngineeringReminders(
+  architecture: ArchitectureResult,
+  decompose: DecomposeResult,
+  reality: ProjectReality
+): EngineeringReminder[] {
+  const reminders: EngineeringReminder[] = [];
+  const frontend = architecture.frontend.toLowerCase();
+  const backend = architecture.backend.toLowerCase();
+  const db = architecture.db.toLowerCase();
+
+  // React/Next.js 相关提醒
+  if (frontend.includes('react') || frontend.includes('next')) {
+    if (reality.validationStage === 'idea' || reality.validationStage === 'prototype') {
+      reminders.push({
+        pitfall: '过早引入状态管理库',
+        why: '原型阶段用 useState + useContext 就够了，Redux/Zustand 会增加不必要的样板代码',
+        howToAvoid: '先用 React 内置方案，等状态确实难以管理时再引入',
+        relatedTech: 'React',
+      });
+    }
+    if (reality.teamSize === 'solo') {
+      reminders.push({
+        pitfall: '过度组件化',
+        why: '一个人开发时，过细的组件拆分会增加文件跳转成本，降低开发效率',
+        howToAvoid: '单个组件 200 行以内即可，不要为了复用而复用',
+        relatedTech: 'React',
+      });
+    }
+  }
+
+  // 数据库相关提醒
+  if (db.includes('postgres') || db.includes('mysql') || db.includes('supabase')) {
+    if (reality.validationStage === 'idea') {
+      reminders.push({
+        pitfall: '过早设计复杂表结构',
+        why: '想法阶段需求变动频繁，复杂的关系设计会成为负担',
+        howToAvoid: '先用最少的表验证核心流程，稳定后再优化 schema',
+        relatedTech: 'Database',
+      });
+    }
+    reminders.push({
+      pitfall: 'N+1 查询问题',
+      why: '列表页展示关联数据时容易触发，数据量上来后会明显变慢',
+      howToAvoid: '使用 include/join 预加载关联数据，或者用 dataloader 批量查询',
+      relatedTech: 'Database',
+    });
+  }
+
+  // 认证相关提醒
+  if (backend.includes('auth') || backend.includes('jwt') || backend.includes('session')) {
+    reminders.push({
+      pitfall: '自己实现密码加密和 session 管理',
+      why: '容易出安全漏洞，且维护成本高',
+      howToAvoid: '用 NextAuth/Clerk/Supabase Auth 等成熟方案，除非有特殊需求',
+      relatedTech: 'Auth',
+    });
+  }
+
+  // 部署相关提醒
+  if (reality.teamSize === 'solo' && reality.complexityBudget === 'minimal') {
+    reminders.push({
+      pitfall: '过早考虑容器化和 CI/CD',
+      why: '个人项目用 Vercel/Netlify 一键部署即可，Docker + GitHub Actions 会消耗大量配置时间',
+      howToAvoid: '先手动部署，等确实需要自动化时再配置',
+      relatedTech: 'DevOps',
+    });
+  }
+
+  // 通用工程提醒
+  if (reality.testingStrategy === 'none' || reality.testingStrategy === 'smoke') {
+    reminders.push({
+      pitfall: '没有基本的错误处理',
+      why: '用户遇到白屏或无响应时会直接离开，没有反馈你也不知道出了问题',
+      howToAvoid: '至少在 API 调用和关键操作加 try-catch，给用户友好的错误提示',
+      relatedTech: 'General',
+    });
+  }
+
+  // 根据任务拆解检测潜在问题
+  const taskCount = decompose.tasks.length;
+  if (taskCount > 10 && reality.teamSize === 'solo') {
+    reminders.push({
+      pitfall: '任务拆分过细导致失去全局视角',
+      why: `${taskCount} 个文件任务对于个人开发来说太多了，容易陷入细节而忽略整体进度`,
+      howToAvoid: '优先完成核心流程的 3-5 个文件，确保能跑通后再扩展',
+      relatedTech: 'Project Management',
+    });
+  }
+
+  return reminders;
 }
 
 export async function generateChain(
