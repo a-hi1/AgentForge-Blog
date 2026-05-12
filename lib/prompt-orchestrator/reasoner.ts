@@ -2,7 +2,7 @@ import { buildAgentContract, formatContractAsMarkdown } from './agentContract';
 
 const API_URL = `${process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4'}/chat/completions`;
 const API_KEY = process.env.OPENAI_API_KEY || '';
-const MODEL = process.env.OPENAI_MODEL || 'glm-4-flash';
+const MODEL = process.env.OPENAI_MODEL || 'glm-4.5-air';
 
 export type Complexity = 'low' | 'medium' | 'high' | 'very-high';
 
