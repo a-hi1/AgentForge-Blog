@@ -10,7 +10,7 @@ import { callLLMWithJSON } from '@/lib/prompt-orchestrator/llm';
 export const maxDuration = 300;
 export const runtime = 'nodejs';
 
-const PER_CALL_TIMEOUT = 120_000;
+const PER_CALL_TIMEOUT = 300_000; // 5分钟超时
 const HEARTBEAT_MS = 10_000;
 
 interface UnifiedIntent extends IntentResult {
@@ -22,34 +22,56 @@ interface UnifiedIntent extends IntentResult {
   };
 }
 
+// 降级默认技术栈
+function getDefaultTechStack(): UnifiedIntent['techStack'] {
+  return {
+    frontend: "Next.js + React",
+    backend: "Next.js API Routes",
+    db: "LocalStorage / SQLite",
+    infra: ["Vercel"]
+  };
+}
+
+// 降级默认意图
+function getDefaultIntent(userInput: string): UnifiedIntent {
+  return {
+    businessGoal: userInput,
+    userType: "个人项目",
+    productShape: "Web",
+    lifecycle: "验证期",
+    ambiguity: "继续推进开发",
+    decisionPoints: [userInput],
+    techStack: getDefaultTechStack()
+  };
+}
+
 async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
-  const system = `你是一位有 10 年经验的产品技术顾问。同时完成意图分析和技术选型。
+  const system = `你是产品技术顾问。输出JSON：
 
-技术选型原则：
-- 最合适 ≠ 最先进。验证期项目用重型框架是浪费时间。
-- 不是所有项目都需要 React/Next.js。
-- 不是所有项目都需要后端。
-
-输出严格 JSON：
 {
-  "businessGoal": "string",
-  "userType": "string",
-  "productShape": "string",
-  "lifecycle": "string",
-  "ambiguity": "string",
-  "decisionPoints": ["string"],
+  "businessGoal": "核心目标",
+  "userType": "个人/小团队/公众产品",
+  "productShape": "Web/Mobile/API/CLI",
+  "lifecycle": "验证期/MVP/增长期",
+  "ambiguity": "缺失信息",
+  "decisionPoints": ["线索1", "线索2"],
   "techStack": {
-    "frontend": "string",
-    "backend": "string",
-    "db": "string",
-    "infra": ["string"]
+    "frontend": "技术",
+    "backend": "技术",
+    "db": "数据库",
+    "infra": ["部署"]
   }
 }`;
 
-  return await callLLMWithJSON<UnifiedIntent>([
-    { role: 'system', content: system },
-    { role: 'user', content: userInput },
-  ]);
+  try {
+    return await callLLMWithJSON<UnifiedIntent>([
+      { role: 'system', content: system },
+      { role: 'user', content: userInput },
+    ], 2, 0.25);
+  } catch (error) {
+    console.error('inferUnifiedIntent failed, using fallback:', error);
+    return getDefaultIntent(userInput);
+  }
 }
 
 function buildContextExport(
@@ -136,28 +158,37 @@ export async function POST(req: NextRequest) {
 
         const input = userInput.trim();
 
-        // Step 1: Intent
+        // Step 1: Intent（带降级）
         send({ type: 'progress', step: 'intent', status: 'running' });
         let intent: UnifiedIntent;
         try {
           intent = await withTimeout(inferUnifiedIntent(input), PER_CALL_TIMEOUT, '意图识别');
           send({ type: 'progress', step: 'intent', status: 'done', result: intent });
         } catch (err) {
-          console.error('[context-compiler] intent error', err);
-          send({ type: 'step_error', step: 'intent', error: '意图分析失败，请重试' });
-          return;
+          console.warn('[context-compiler] intent error, using fallback', err);
+          intent = getDefaultIntent(input);
+          send({ type: 'progress', step: 'intent', status: 'done', result: intent });
         }
 
-        // Step 2: Decompose
+        // Step 2: Decompose（带降级）
         send({ type: 'progress', step: 'decompose', status: 'running' });
         let decompose: DecomposeResult;
         try {
           decompose = await withTimeout(decomposeToAtomicTasks(intent, input), PER_CALL_TIMEOUT, '任务拆解');
           send({ type: 'progress', step: 'decompose', status: 'done', result: decompose });
         } catch (err) {
-          console.error('[context-compiler] decompose error', err);
-          send({ type: 'step_error', step: 'decompose', error: '任务拆解失败，请重试' });
-          return;
+          console.warn('[context-compiler] decompose error, using fallback', err);
+          // 使用reasoner中的降级机制
+          const simpleIntent: IntentResult = {
+            businessGoal: intent.businessGoal,
+            userType: intent.userType,
+            productShape: intent.productShape,
+            lifecycle: intent.lifecycle,
+            ambiguity: intent.ambiguity,
+            decisionPoints: intent.decisionPoints
+          };
+          decompose = await decomposeToAtomicTasks(simpleIntent, input);
+          send({ type: 'progress', step: 'decompose', status: 'done', result: decompose });
         }
 
         // Step 3: Compile

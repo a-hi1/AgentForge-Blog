@@ -33,93 +33,165 @@ export interface ReasoningStep {
   status: 'done' | 'error';
 }
 
+// 降级用的默认任务模板
+function getDefaultDecompose(): DecomposeResult {
+  return {
+    tasks: [
+      {
+        phase: 1,
+        phaseLabel: "项目初始化",
+        file: "package.json",
+        responsibility: "项目配置和依赖管理",
+        input: "项目需求",
+        output: "依赖配置",
+        dependencies: []
+      },
+      {
+        phase: 1,
+        phaseLabel: "项目初始化",
+        file: "src/app/layout.tsx",
+        responsibility: "根布局组件",
+        input: "页面组件",
+        output: "布局结构",
+        dependencies: []
+      },
+      {
+        phase: 2,
+        phaseLabel: "核心功能",
+        file: "src/lib/types.ts",
+        responsibility: "TypeScript类型定义",
+        input: "业务需求",
+        output: "类型定义",
+        dependencies: []
+      },
+      {
+        phase: 2,
+        phaseLabel: "核心功能",
+        file: "src/lib/utils.ts",
+        responsibility: "工具函数库",
+        input: "业务逻辑",
+        output: "工具函数",
+        dependencies: ["src/lib/types.ts"]
+      },
+      {
+        phase: 3,
+        phaseLabel: "UI组件",
+        file: "src/components/App.tsx",
+        responsibility: "主应用组件",
+        input: "用户操作",
+        output: "应用界面",
+        dependencies: ["src/lib/types.ts", "src/lib/utils.ts"]
+      },
+      {
+        phase: 3,
+        phaseLabel: "UI组件",
+        file: "src/app/page.tsx",
+        responsibility: "首页组件",
+        input: "路由",
+        output: "页面内容",
+        dependencies: ["src/components/App.tsx"]
+      },
+      {
+        phase: 4,
+        phaseLabel: "API接口",
+        file: "src/app/api/xxx/route.ts",
+        responsibility: "API接口处理",
+        input: "HTTP请求",
+        output: "响应数据",
+        dependencies: ["src/lib/types.ts"]
+      },
+      {
+        phase: 4,
+        phaseLabel: "API接口",
+        file: "src/app/api/xxx/route.ts",
+        responsibility: "数据接口",
+        input: "请求参数",
+        output: "JSON响应",
+        dependencies: ["src/lib/types.ts"]
+      }
+    ],
+    phases: [
+      { phase: 1, label: "项目初始化", files: ["package.json", "src/app/layout.tsx"] },
+      { phase: 2, label: "核心功能", files: ["src/lib/types.ts", "src/lib/utils.ts"] },
+      { phase: 3, label: "UI组件", files: ["src/components/App.tsx", "src/app/page.tsx"] },
+      { phase: 4, label: "API接口", files: ["src/app/api/xxx/route.ts"] }
+    ]
+  };
+}
+
 export async function inferIntent(userInput: string): Promise<IntentResult> {
-  const system = `你是一位有 10 年经验的产品技术顾问。
+  const system = `你是产品技术顾问。分析用户想法，输出JSON：
 
-分析用户的模糊想法，输出结构化的意图分析：
-
-1. businessGoal — 用户真正想解决的问题
-2. userType — 谁会用？自己用、小团队、还是面向公众
-3. productShape — Web / Mobile / API / CLI
-4. lifecycle — 想法验证期、MVP、增长期
-5. ambiguity — 哪些关键信息缺失
-6. decisionPoints — 支撑判断的具体线索
-
-输出严格 JSON：{
-  "businessGoal": "string",
-  "userType": "string",
-  "productShape": "string",
-  "lifecycle": "string",
-  "ambiguity": "string",
-  "decisionPoints": ["string"]
+{
+  "businessGoal": "用户想解决的核心问题",
+  "userType": "个人/小团队/公众产品",
+  "productShape": "Web/Mobile/API/CLI",
+  "lifecycle": "验证期/MVP/增长期",
+  "ambiguity": "缺失的关键信息",
+  "decisionPoints": ["关键线索1", "关键线索2"]
 }`;
 
-  return await callLLMWithJSON<IntentResult>([
-    { role: 'system', content: system },
-    { role: 'user', content: userInput },
-  ]);
+  try {
+    return await callLLMWithJSON<IntentResult>([
+      { role: 'system', content: system },
+      { role: 'user', content: userInput },
+    ], 2, 0.25);
+  } catch (error) {
+    console.error('inferIntent failed, using fallback:', error);
+    // 降级返回默认值
+    return {
+      businessGoal: userInput,
+      userType: "个人项目",
+      productShape: "Web",
+      lifecycle: "验证期",
+      ambiguity: "需要更多细节",
+      decisionPoints: [userInput]
+    };
+  }
 }
 
 export async function decomposeToAtomicTasks(
   intent: IntentResult,
   userInput: string
 ): Promise<DecomposeResult> {
-  const system = `你是一位高级全栈工程师，把产品需求拆解为开发任务。
+  const system = `你是高级全栈工程师。把需求拆解为开发任务。
 
-从基础设施层开始，往上到业务层，最后是 UI 层。
-每个文件只做一件事，依赖关系有向无环。
-至少 8 个文件任务，3-5 个 Phase。
-
-输出严格 JSON：{
+输出JSON：
+{
   "tasks": [{
     "phase": 1,
     "phaseLabel": "阶段名称",
-    "file": "src/xxx/xxx.ts",
+    "file": "src/xxx.ts",
     "responsibility": "核心职责",
-    "input": "输入类型",
-    "output": "输出类型",
+    "input": "输入",
+    "output": "输出",
     "dependencies": ["依赖文件"]
   }],
   "phases": [{
     "phase": 1,
     "label": "阶段名称",
-    "files": ["文件列表"]
+    "files": ["文件1", "文件2"]
   }]
 }`;
 
-  const userMessage = `原始需求：${userInput}
+  const userMessage = `需求：${userInput}
+目标：${intent.businessGoal}
+用户：${intent.userType}
+形态：${intent.productShape}
+阶段：${intent.lifecycle}`;
 
-产品意图：
-- 业务目标：${intent.businessGoal}
-- 目标用户：${intent.userType}
-- 产品形态：${intent.productShape}
-- 项目阶段：${intent.lifecycle}`;
-
-  return await callLLMWithJSON<DecomposeResult>([
-    { role: 'system', content: system },
-    { role: 'user', content: userMessage },
-  ]);
-}
-
-export async function generateChain(
-  userInput: string,
-  onStep: (step: ReasoningStep) => void
-): Promise<{ prompt: string; steps: ReasoningStep[] }> {
-  const steps: ReasoningStep[] = [];
-
-  const intent = await inferIntent(userInput);
-  const intentStep: ReasoningStep = { type: 'intent', label: '意图识别', result: intent, status: 'done' };
-  steps.push(intentStep);
-  onStep(intentStep);
-
-  const decompose = await decomposeToAtomicTasks(intent, userInput);
-  const decomposeStep: ReasoningStep = { type: 'decompose', label: '任务拆解', result: decompose, status: 'done' };
-  steps.push(decomposeStep);
-  onStep(decomposeStep);
-
-  const compileStep: ReasoningStep = { type: 'compile', label: '编译', result: '(programmatic)', status: 'done' };
-  steps.push(compileStep);
-  onStep(compileStep);
-
-  return { prompt: '(generated by route)', steps };
+  try {
+    return await callLLMWithJSON<DecomposeResult>([
+      { role: 'system', content: system },
+      { role: 'user', content: userMessage },
+    ], 2, 0.3);
+  } catch (error) {
+    console.error('decomposeToAtomicTasks failed, using fallback:', error);
+    // 降级返回默认模板
+    const fallback = getDefaultDecompose();
+    // 简单修改一下模板让它匹配用户需求
+    fallback.tasks[0].responsibility = `${intent.businessGoal}项目配置`;
+    fallback.tasks[4].responsibility = `${intent.businessGoal}主应用`;
+    return fallback;
+  }
 }

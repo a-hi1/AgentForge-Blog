@@ -6,7 +6,8 @@ const MODEL = process.env.OPENAI_MODEL || 'glm-4.5-air';
 
 export async function callLLMWithJSON<T>(
   messages: { role: string; content: string }[],
-  maxRetries: number = 2
+  maxRetries: number = 2,
+  temperature: number = 0.3
 ): Promise<T> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -16,8 +17,9 @@ export async function callLLMWithJSON<T>(
         body: JSON.stringify({
           model: MODEL,
           messages,
-          temperature: 0.4 + attempt * 0.1,
-          max_tokens: 2000,
+          temperature: temperature + attempt * 0.15,
+          max_tokens: 3500,
+          top_p: 0.9,
         }),
       });
 
@@ -32,6 +34,7 @@ export async function callLLMWithJSON<T>(
       const content = result.choices?.[0]?.message?.content || '';
 
       if (!content) {
+        console.warn(`Empty response from LLM, attempt ${attempt + 1}/${maxRetries + 1}`);
         if (attempt === maxRetries) throw new Error('Empty response from LLM');
         continue;
       }
@@ -41,8 +44,10 @@ export async function callLLMWithJSON<T>(
         return parsed;
       }
 
+      console.warn(`Failed to parse JSON, attempt ${attempt + 1}/${maxRetries + 1}`, content.slice(0, 200));
       if (attempt === maxRetries) throw new Error('Failed to parse JSON from LLM response');
     } catch (e) {
+      console.error(`Error in LLM call, attempt ${attempt + 1}/${maxRetries + 1}:`, e);
       if (attempt === maxRetries) throw e;
     }
   }
