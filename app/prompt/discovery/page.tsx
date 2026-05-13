@@ -56,9 +56,7 @@ export default function IdeaDiscoveryPage() {
           } else if (data.type === 'error') {
             throw new Error(data.error || '未知错误');
           }
-        } catch (parseError) {
-          console.error('SSE parse error:', parseError);
-        }
+        } catch { /* ignore parse errors */ }
       }
     }
   }, []);
@@ -188,11 +186,6 @@ export default function IdeaDiscoveryPage() {
               <textarea
                 value={idea}
                 onChange={(e) => setIdea(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !loading) {
-                    handleStartDiscovery();
-                  }
-                }}
                 placeholder="你现在最想解决什么问题？描述你的想法..."
                 className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-4 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
                 rows={4}
@@ -205,15 +198,6 @@ export default function IdeaDiscoveryPage() {
                 >
                   {loading ? '探索中...' : '开始探索'}
                 </button>
-                {['想做习惯追踪 App', '想做笔记工具', '想做 AI 工具站'].map((ex) => (
-                  <button
-                    key={ex}
-                    onClick={() => setIdea(ex)}
-                    className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 transition"
-                  >
-                    {ex}
-                  </button>
-                ))}
               </div>
             </div>
           )}
@@ -222,12 +206,7 @@ export default function IdeaDiscoveryPage() {
         {error && (
           <div className="mb-6 rounded-xl border border-red-800 bg-red-950 p-4">
             <p className="text-sm text-red-300">{error}</p>
-            <button
-              onClick={reset}
-              className="mt-2 rounded-lg bg-red-800 px-4 py-1.5 text-xs text-white hover:bg-red-700 transition"
-            >
-              重试
-            </button>
+            <button onClick={reset} className="mt-2 rounded-lg bg-red-800 px-4 py-1.5 text-xs text-white hover:bg-red-700 transition">重试</button>
           </div>
         )}
 
@@ -237,16 +216,11 @@ export default function IdeaDiscoveryPage() {
               {allPhases.map((phase) => {
                 const status = getPhaseStatus(phase);
                 return (
-                  <div
-                    key={phase}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
-                      status === 'active'
-                        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/50'
-                        : status === 'completed'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
-                        : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
-                    }`}
-                  >
+                  <div key={phase} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
+                    status === 'active' ? 'bg-violet-500/20 text-violet-300 border border-violet-500/50' :
+                    status === 'completed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' :
+                    'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                  }`}>
                     {status === 'completed' && '✓'}
                     {getPhaseName(phase)}
                   </div>
@@ -255,64 +229,37 @@ export default function IdeaDiscoveryPage() {
             </div>
 
             {phaseHistory.map((entry, index) => (
-              <PhaseCard
-                key={index}
-                phase={entry.phase}
-                isActive={false}
-                isCompleted={true}
-                analysis={entry.analysis}
-                data={entry.data}
-              />
+              <PhaseCard key={index} phase={entry.phase} isActive={false} isCompleted={true} analysis={entry.analysis} data={entry.data} />
             ))}
 
             {session.unresolvedQuestions.length > 0 && (
               <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-6">
-                <h3 className="text-lg font-semibold text-violet-300 mb-4">
-                  请回答以下问题
-                </h3>
+                <h3 className="text-lg font-semibold text-violet-300 mb-4">请回答以下问题</h3>
                 <div className="space-y-6">
                   {session.unresolvedQuestions.map((question) => (
-                    <QuestionRenderer
-                      key={question.id}
-                      question={question}
+                    <QuestionRenderer key={question.id} question={question}
                       answer={(currentAnswers as Record<string, unknown>)[question.id]}
-                      onChange={(value) =>
-                        setCurrentAnswers((prev) => ({
-                          ...prev,
-                          [question.id]: value,
-                        }))
-                      }
+                      onChange={(value) => setCurrentAnswers((prev) => ({ ...prev, [question.id]: value }))}
                     />
                   ))}
                 </div>
-                <button
-                  onClick={handleSubmitAnswers}
-                  disabled={loading}
-                  className="mt-6 rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
-                >
+                <button onClick={handleSubmitAnswers} disabled={loading}
+                  className="mt-6 rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition">
                   {loading ? '处理中...' : '继续'}
                 </button>
               </div>
             )}
 
-            {session.currentPhase === 'complete' &&
-              session.collectedFacts.finalReport && (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
-                  <div className="text-4xl mb-4">🎉</div>
-                  <h3 className="text-xl font-semibold text-emerald-300 mb-2">
-                    探索完成！
-                  </h3>
-                  <p className="text-zinc-300">
-                    {session.collectedFacts.finalReport.summary}
-                  </p>
-                  <Link
-                    href="/prompt"
-                    className="mt-4 inline-block rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-violet-500 transition"
-                  >
-                    确认方向，开始开发
-                  </Link>
-                </div>
-              )}
+            {session.currentPhase === 'complete' && session.collectedFacts.finalReport && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
+                <div className="text-4xl mb-4">🎉</div>
+                <h3 className="text-xl font-semibold text-emerald-300 mb-2">探索完成！</h3>
+                <p className="text-zinc-300">{session.collectedFacts.finalReport.summary}</p>
+                <Link href="/prompt" className="mt-4 inline-block rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-violet-500 transition">
+                  确认方向，开始开发
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>

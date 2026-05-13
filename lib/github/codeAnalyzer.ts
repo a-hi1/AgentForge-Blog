@@ -12,6 +12,12 @@ export interface RepoHealth {
   suggestions: { issue: string; prompt: string }[];
 }
 
+export interface TechDecision {
+  decision: string;
+  why: string;
+  source: 'package.json' | 'readme' | 'config' | 'commit';
+}
+
 export interface CodeAnalysis {
   techStack: string[];
   architecture: 'monolith' | 'fullstack' | 'frontend' | 'api-first';
@@ -19,12 +25,81 @@ export interface CodeAnalysis {
   missingModules: string[];
   directorySummary: string;
   health: RepoHealth;
+  techDecisions: TechDecision[];
+  todos: string[];
+}
+
+export function scanTodos(items: { path: string }[]): string[] {
+  const todoFiles = items.filter(i =>
+    /\.(ts|tsx|js|jsx|py|rb|go|rs|java|swift|kt)$/.test(i.path) &&
+    !i.path.includes('node_modules') &&
+    !i.path.includes('dist') &&
+    !i.path.includes('.next')
+  );
+  return todoFiles.map(f => f.path);
+}
+
+export function extractTechDecisions(tree: RepoTree): TechDecision[] {
+  const decisions: TechDecision[] = [];
+  const pkg = tree.keyFiles.packageJson;
+  const readme = tree.keyFiles.readme;
+
+  if (pkg) {
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies } as Record<string, string>;
+
+    if (deps['next']) {
+      decisions.push({ decision: 'Next.js', why: '选择 Next.js 作为全栈框架（SSR/ISR/API Routes）', source: 'package.json' });
+    }
+    if (deps['tailwindcss']) {
+      decisions.push({ decision: 'Tailwind CSS', why: '使用原子化 CSS 框架，避免维护独立 CSS 文件', source: 'package.json' });
+    }
+    if (deps['prisma'] || deps['@prisma/client']) {
+      decisions.push({ decision: 'Prisma', why: '使用 Prisma ORM 管理数据库 Schema 和迁移', source: 'package.json' });
+    }
+    if (deps['@supabase/supabase-js']) {
+      decisions.push({ decision: 'Supabase', why: '选择 Supabase 作为 BaaS（认证/数据库/存储）', source: 'package.json' });
+    }
+    if (deps['firebase']) {
+      decisions.push({ decision: 'Firebase', why: '选择 Firebase 作为 BaaS', source: 'package.json' });
+    }
+    if (deps['zustand']) {
+      decisions.push({ decision: 'Zustand', why: '选择 Zustand 作为轻量级状态管理', source: 'package.json' });
+    }
+    if (deps['react-hook-form']) {
+      decisions.push({ decision: 'React Hook Form', why: '选择 RHF 管理表单状态', source: 'package.json' });
+    }
+    if (deps['zustand']) {
+      decisions.push({ decision: 'Zustand', why: '选择 Zustand 轻量状态管理，避免 Redux 样板代码', source: 'package.json' });
+    }
+  }
+
+  if (readme) {
+    if (/typescript/i.test(readme)) {
+      decisions.push({ decision: 'TypeScript', why: '项目使用 TypeScript 保证类型安全', source: 'readme' });
+    }
+    if (/monorepo/i.test(readme)) {
+      decisions.push({ decision: 'Monorepo', why: '项目采用 Monorepo 架构管理多包', source: 'readme' });
+    }
+  }
+
+  if (tree.keyFiles.nextConfig) {
+    decisions.push({ decision: 'Next.js Config', why: '自定义 Next.js 配置（可能存在特殊部署需求）', source: 'config' });
+  }
+  if (tree.keyFiles.dockerfile) {
+    decisions.push({ decision: 'Docker', why: '项目配置了 Docker 容器化部署', source: 'config' });
+  }
+  if (tree.keyFiles.vercelJson) {
+    decisions.push({ decision: 'Vercel', why: '项目部署在 Vercel 平台', source: 'config' });
+  }
+
+  return decisions;
 }
 
 export function analyzeCodebase(tree: RepoTree): CodeAnalysis {
   const techStack: string[] = [];
   const features: string[] = [];
   const missingModules: string[] = [];
+  const todos: string[] = scanTodos(tree.items);
 
   const paths = tree.items.map(i => i.path);
   const packageJson = tree.keyFiles.packageJson;
@@ -35,12 +110,13 @@ export function analyzeCodebase(tree: RepoTree): CodeAnalysis {
     if (deps['react']) techStack.push('React');
     if (deps['vue']) techStack.push('Vue');
     if (deps['express']) techStack.push('Express');
-    if (deps['prisma']) techStack.push('Prisma');
-    if (deps['@prisma/client']) techStack.push('PostgreSQL');
-    if (deps['mongodb']) techStack.push('MongoDB');
+    if (deps['prisma'] || deps['@prisma/client']) techStack.push('Prisma + PostgreSQL');
+    if (deps['mongodb'] || deps['mongoose']) techStack.push('MongoDB');
     if (deps['tailwindcss']) techStack.push('Tailwind CSS');
     if (deps['@supabase/supabase-js']) techStack.push('Supabase');
     if (deps['firebase']) techStack.push('Firebase');
+    if (deps['typescript'] || deps['@types/*']) techStack.push('TypeScript');
+    if (deps['zustand']) techStack.push('Zustand');
   }
 
   if (tree.keyFiles.dockerfile) techStack.push('Docker');
@@ -109,7 +185,7 @@ export function analyzeCodebase(tree: RepoTree): CodeAnalysis {
   if (!hasTests) {
     suggestions.push({
       issue: '缺失测试',
-      prompt: `为当前项目 ${techStack.join(' + ')} 生成完整的测试套件，包括单元测试和集成测试`
+      prompt: `为当前项目 ${techStack.join(' + ')} 生成完整的测试套件`
     });
   }
   if (!hasDocs) {
@@ -124,12 +200,6 @@ export function analyzeCodebase(tree: RepoTree): CodeAnalysis {
       prompt: '为当前项目配置 GitHub Actions CI/CD 流程'
     });
   }
-  if (!hasLinting) {
-    suggestions.push({
-      issue: '缺失代码规范',
-      prompt: '为当前项目配置 ESLint + Prettier 代码规范'
-    });
-  }
 
   return {
     techStack,
@@ -138,15 +208,11 @@ export function analyzeCodebase(tree: RepoTree): CodeAnalysis {
     missingModules,
     directorySummary: dirSummary || '基础结构',
     health: {
-      hasTests,
-      hasDocs,
-      hasCI,
-      hasLinting,
-      hasTypeScript,
-      hasEnvExample,
-      techDebtScore,
+      hasTests, hasDocs, hasCI, hasLinting, hasTypeScript, hasEnvExample, techDebtScore,
       openTodos: [],
       suggestions
-    }
+    },
+    techDecisions: extractTechDecisions(tree),
+    todos
   };
 }

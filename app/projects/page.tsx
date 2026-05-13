@@ -1,260 +1,251 @@
 'use client';
 
-import { useProjectState } from '@/lib/projects/projectState';
-import ProjectOverview from '@/components/projects/ProjectOverview';
-import ProgressTracker from '@/components/projects/ProgressTracker';
-import RecentActivity from '@/components/projects/RecentActivity';
-import NextActions from '@/components/projects/NextActions';
-import QuickLaunch from '@/components/projects/QuickLaunch';
-import RepoInsights from '@/components/projects/RepoInsights';
-import ProjectTimeline from '@/components/projects/ProjectTimeline';
-import Link from 'next/link';
-import { useState } from 'react';
-import { parseRepoUrl, fetchRepoMeta, fetchRepoTree } from '@/lib/github/importer';
-import { analyzeCodebase } from '@/lib/github/codeAnalyzer';
-import { analyzeMaturity, generateRecommendationPrompts } from '@/lib/projects/maturityAnalyzer';
+import { useState, useCallback } from 'react';
+import { parseRepoUrl, fetchRepoMeta, fetchRepoTree, RepoMeta } from '@/lib/github/importer';
+import { analyzeCodebase, CodeAnalysis } from '@/lib/github/codeAnalyzer';
+import { buildContextPack, ExportTarget } from '@/lib/export/contextPack';
 
 export default function ProjectsPage() {
-  const { loading, projectState, refresh } = useProjectState();
-  const [showImportModal, setShowImportModal] = useState(false);
   const [importUrl, setImportUrl] = useState('');
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState('');
-  const [importedProject, setImportedProject] = useState<any>(null);
+  const [meta, setMeta] = useState<RepoMeta | null>(null);
+  const [analysis, setAnalysis] = useState<CodeAnalysis | null>(null);
+  const [copiedLabel, setCopiedLabel] = useState('');
 
-  const handleImport = async () => {
+  const handleImport = useCallback(async () => {
     try {
       setImportError('');
       setImportLoading(true);
       const { owner, repo } = parseRepoUrl(importUrl);
-      const meta = await fetchRepoMeta(owner, repo, process.env.NEXT_PUBLIC_GITHUB_TOKEN);
-      const tree = await fetchRepoTree(owner, repo, meta.defaultBranch, process.env.NEXT_PUBLIC_GITHUB_TOKEN);
-      const analysis = analyzeCodebase(tree);
-      const maturity = analyzeMaturity(meta, tree, analysis);
-      const recommendations = generateRecommendationPrompts(analysis, maturity);
-      setImportedProject({ meta, tree, analysis, maturity, recommendations });
-      setShowImportModal(false);
-    } catch (err: any) {
-      setImportError(err.message || '导入失败');
+      const m = await fetchRepoMeta(owner, repo);
+      const tree = await fetchRepoTree(owner, repo, m.defaultBranch);
+      const a = analyzeCodebase(tree);
+      setMeta(m);
+      setAnalysis(a);
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : '导入失败');
     } finally {
       setImportLoading(false);
     }
+  }, [importUrl]);
+
+  const handleCopy = async (target: ExportTarget) => {
+    if (!meta || !analysis) return;
+    const text = buildContextPack(target, meta, analysis);
+    await navigator.clipboard.writeText(text);
+    const labels: Record<ExportTarget, string> = { claude: 'Claude', cursor: 'Cursor', gpt: 'GPT' };
+    setCopiedLabel(`${labels[target]} 已复制`);
+    setTimeout(() => setCopiedLabel(''), 2000);
   };
 
-  const handleRefreshImport = async () => {
-    if (!importedProject) return;
-    try {
-      setImportLoading(true);
-      const { meta, tree } = importedProject;
-      const newMeta = await fetchRepoMeta(meta.owner, meta.repo, process.env.NEXT_PUBLIC_GITHUB_TOKEN);
-      const newTree = await fetchRepoTree(meta.owner, meta.repo, newMeta.defaultBranch, process.env.NEXT_PUBLIC_GITHUB_TOKEN);
-      const newAnalysis = analyzeCodebase(newTree);
-      const newMaturity = analyzeMaturity(newMeta, newTree, newAnalysis);
-      const newRecommendations = generateRecommendationPrompts(newAnalysis, newMaturity);
-      setImportedProject({ meta: newMeta, tree: newTree, analysis: newAnalysis, maturity: newMaturity, recommendations: newRecommendations });
-    } catch (err: any) {
-      console.error('刷新失败', err);
-    } finally {
-      setImportLoading(false);
-    }
+  const reset = () => {
+    setMeta(null);
+    setAnalysis(null);
+    setImportUrl('');
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-[calc(100vh-80px)] py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-[rgba(24,24,27,0.72)] rounded-xl" />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 h-64 bg-[rgba(24,24,27,0.72)] rounded-xl" />
-              <div className="h-64 bg-[rgba(24,24,27,0.72)] rounded-xl" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!projectState) {
-    return (
-      <div className="min-h-[calc(100vh-80px)] py-8 px-4 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-[#FAFAFA] mb-3">加载失败</h2>
-          <p className="text-[#71717A] text-sm mb-6">无法加载项目数据，请稍后重试</p>
-          <button
-            onClick={refresh}
-            className="px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#60A5FA] transition-colors text-sm"
-          >
-            重新加载
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Import Section */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Project Hub</h1>
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg font-medium text-sm shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            导入 GitHub 项目
-          </button>
+    <div className="min-h-[calc(100vh-80px)] py-12 px-4">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-white">项目记忆</h1>
+          <p className="mt-1 text-sm text-zinc-400">导入 GitHub 仓库，让 AI 理解你的项目</p>
         </div>
 
-        {/* Imported Project */}
-        {importedProject && (
-          <div className="mb-8">
-            <RepoInsights
-              repoMeta={importedProject.meta}
-              codeAnalysis={importedProject.analysis}
-              maturity={importedProject.maturity}
-              recommendations={importedProject.recommendations}
-              onRefresh={handleRefreshImport}
+        {!meta && (
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !importLoading) handleImport(); }}
+              placeholder="https://github.com/user/repo"
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-4 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
             />
+            <button
+              onClick={handleImport}
+              disabled={importLoading || !importUrl.trim()}
+              className="rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
+            >
+              {importLoading ? '分析中...' : '导入并分析'}
+            </button>
+            {importError && (
+              <div className="rounded-xl border border-red-800 bg-red-950 p-4">
+                <p className="text-sm text-red-300">{importError}</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Workflow Guidance Banner */}
-        <div className="mb-8 p-6 rounded-xl bg-gradient-to-r from-[rgba(139,92,246,0.15)] to-[rgba(59,130,246,0.15)] border border-[rgba(139,92,246,0.25)]">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-[rgba(139,92,246,0.25)] flex items-center justify-center">
-                  <svg className="w-4.5 h-4.5 text-[#A78BFA]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-[#FAFAFA]">你当前应该做什么？</h3>
-              </div>
-              <div className="ml-10">
-                <div className="flex items-center gap-3 mb-2">
-                  <p className="text-[#A78BFA] font-medium">
-                    下一步建议: 完善 {projectState.currentPhase}
-                  </p>
-                </div>
-                <p className="text-sm text-[#A1A1AA] mb-3">
-                  原因: 当前质量评分还有提升空间，建议继续优化深度模式
-                </p>
-                <div className="flex gap-3">
-                  <Link 
-                    href="/prompt"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white hover:shadow-lg hover:shadow-[rgba(139,92,246,0.25)] transition-all"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    生成执行提示词
-                  </Link>
-                  <button
-                    onClick={refresh}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[rgba(24,24,27,0.72)] border border-[rgba(255,255,255,0.1)] text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[rgba(255,255,255,0.2)] transition-all"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    刷新数据
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {/* Top Section: Overview */}
-          <ProjectOverview projectState={projectState} />
-
-          {/* Middle Section: Quick Launch + Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <QuickLaunch />
-            <RecentActivity activities={projectState.recentActivities} />
-          </div>
-
-          {/* Timeline Section */}
-          <ProjectTimeline limit={15} />
-
-          {/* Bottom Section: Progress + Next Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <ProgressTracker phases={projectState.phases} />
-            </div>
-            <NextActions 
-              blockers={projectState.blockers} 
-              nextActions={projectState.nextActions} 
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">导入 GitHub 项目</h2>
-              <button
-                onClick={() => setShowImportModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-4">
+        {meta && analysis && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">仓库地址</label>
-                <input
-                  type="text"
-                  value={importUrl}
-                  onChange={(e) => setImportUrl(e.target.value)}
-                  placeholder="https://github.com/user/repo"
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleImport();
-                  }}
-                />
+                <h2 className="text-xl font-bold text-white">
+                  <a href={`https://github.com/${meta.owner}/${meta.repo}`} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300">
+                    {meta.owner}/{meta.name}
+                  </a>
+                </h2>
+                <p className="text-sm text-zinc-400 mt-1">{meta.description || '无描述'}</p>
               </div>
-              {importError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                  {importError}
+              <button onClick={reset} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition">重新导入</button>
+            </div>
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-4 gap-4">
+              {[
+                { label: 'Stars', value: meta.stars.toLocaleString() },
+                { label: '语言', value: meta.language || '-' },
+                { label: '架构', value: { monolith: '单体', fullstack: '全栈', frontend: '前端', 'api-first': 'API' }[analysis.architecture] },
+                { label: '技术栈数', value: String(analysis.techStack.length) },
+              ].map(s => (
+                <div key={s.label} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+                  <p className="text-xs text-zinc-500">{s.label}</p>
+                  <p className="text-lg font-bold text-white mt-1">{s.value}</p>
                 </div>
-              )}
-              <button
-                onClick={handleImport}
-                disabled={importLoading}
-                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition-all flex items-center justify-center gap-2"
-              >
-                {importLoading ? (
-                  <>
-                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    分析中...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    导入并分析
-                  </>
+              ))}
+            </div>
+
+            {/* Tech Stack */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3">技术栈</h3>
+              <div className="flex flex-wrap gap-2">
+                {analysis.techStack.map(t => (
+                  <span key={t} className="px-3 py-1 bg-violet-500/20 text-violet-300 rounded-full text-sm">{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Tech Decisions */}
+            {analysis.techDecisions.length > 0 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <h3 className="text-sm font-semibold text-white mb-3">技术决策</h3>
+                <div className="space-y-2">
+                  {analysis.techDecisions.map((d, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <span className="text-violet-400 shrink-0 mt-0.5">•</span>
+                      <span className="text-zinc-200 font-medium">{d.decision}</span>
+                      <span className="text-zinc-500">— {d.why}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* File Structure + Features */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <h3 className="text-sm font-semibold text-white mb-3">文件结构</h3>
+                <p className="font-mono text-sm text-zinc-400">{analysis.directorySummary}</p>
+                {analysis.todos.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-zinc-800">
+                    <p className="text-xs text-zinc-500 mb-2">待处理文件 ({analysis.todos.length})</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {analysis.todos.slice(0, 20).map((t, i) => (
+                        <p key={i} className="text-xs text-zinc-500 font-mono">{t}</p>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </button>
+              </div>
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+                <h3 className="text-sm font-semibold text-white mb-3">功能模块</h3>
+                <div className="space-y-2">
+                  {analysis.features.map(f => (
+                    <div key={f} className="flex items-center gap-2 text-sm text-zinc-300">
+                      <span className="text-emerald-400">✓</span> {f}
+                    </div>
+                  ))}
+                  {analysis.missingModules.map(m => (
+                    <div key={m} className="flex items-center gap-2 text-sm text-amber-400">
+                      <span>⚠</span> {m}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Export Section */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+              <h3 className="text-sm font-semibold text-white mb-4">导出给 AI</h3>
+              <div className="flex items-center gap-3">
+                {(['claude', 'cursor', 'gpt'] as ExportTarget[]).map(target => {
+                  const labels: Record<ExportTarget, string> = { claude: 'Claude', cursor: 'Cursor', gpt: 'GPT' };
+                  return (
+                    <button
+                      key={target}
+                      onClick={() => handleCopy(target)}
+                      className="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition"
+                    >
+                      复制给 {labels[target]}
+                    </button>
+                  );
+                })}
+                {copiedLabel && (
+                  <span className="text-xs text-emerald-400">{copiedLabel}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Session Memory */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3">会话记忆</h3>
+              <p className="text-sm text-zinc-500 mb-4">粘贴 Cursor / Claude / GPT 的对话记录，AI 自动提取技术决策和约束</p>
+              <SessionMemoryInput onSave={() => {}} />
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {!meta && !importLoading && (
+          <div className="mt-16 text-center text-zinc-600">
+            <div className="text-4xl mb-3">📦</div>
+            <p>导入 GitHub 仓库，自动提取技术栈、决策和结构</p>
+            <p className="text-sm mt-1">一键复制给 Claude / Cursor / GPT</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SessionMemoryInput({ onSave }: { onSave: () => void }) {
+  const [text, setText] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (!text.trim()) return;
+    try {
+      const existing = JSON.parse(localStorage.getItem('agentforge_session_memory') || '[]');
+      existing.push({ text: text.trim(), timestamp: Date.now() });
+      localStorage.setItem('agentforge_session_memory', JSON.stringify(existing.slice(-20)));
+      setSaved(true);
+      setText('');
+      onSave();
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div className="space-y-3">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="粘贴 AI 对话中关于技术决策、Bug 修复、代码约束的部分..."
+        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
+        rows={4}
+      />
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={!text.trim()}
+          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
+        >
+          保存到项目记忆
+        </button>
+        {saved && <span className="text-xs text-emerald-400">已保存</span>}
+      </div>
     </div>
   );
 }
