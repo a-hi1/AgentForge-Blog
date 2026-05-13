@@ -36,29 +36,28 @@ export async function POST(req: NextRequest) {
         let session: DiscoverySession;
 
         if (sessionId && sessionStore.has(sessionId)) {
-          // 继续现有会话
           const existingSession = sessionStore.get(sessionId)!;
           session = await continueDiscovery(
             existingSession,
             answers || {},
-            (event) => {
+            (event: any) => {
               sendSSE(controller, encoder, event);
             }
           );
         } else {
-          // 开始新会话
-          session = await startDiscovery(idea || '', (event) => {
+          session = await startDiscovery(idea || '', (event: any) => {
             sendSSE(controller, encoder, event);
           });
         }
 
-        // 保存会话
         sessionStore.set(session.id, session);
 
-        // 发送完成事件
+        const finalReport = session.collectedFacts.finalReport;
+
         sendSSE(controller, encoder, {
           type: 'complete',
           session,
+          report: finalReport,
         });
 
         controller.close();
