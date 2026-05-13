@@ -23,6 +23,49 @@ import {
 } from './stateMachine';
 import { getPhasePrompt } from './prompts';
 
+// 延迟函数
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 带重试的 LLM 调用
+async function callLLMWithJSONWithRetry(
+  messages: any[], 
+  maxRetries = 3, 
+  initialDelay = 2000
+): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // 在重试前添加延迟
+      if (attempt > 0) {
+        const delayMs = initialDelay * Math.pow(2, attempt - 1); // 指数退避
+        console.log(`Retry ${attempt}, waiting ${delayMs}ms...`);
+        await delay(delayMs);
+      }
+      
+      const result = await callLLMWithJSON(messages);
+      return result;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`LLM call failed (attempt ${attempt + 1}/${maxRetries}):`, lastError);
+      
+      // 检查是否是速率限制错误
+      const isRateLimitError = lastError.message.includes('429') || 
+                              lastError.message.includes('rate limit') ||
+                              lastError.message.includes('too many requests');
+      
+      // 如果不是速率限制错误，立即抛出
+      if (!isRateLimitError && attempt < maxRetries - 1) {
+        throw lastError;
+      }
+    }
+  }
+  
+  throw lastError || new Error('Failed to call LLM after retries');
+}
+
 // 处理第一阶段的响应
 async function handleIdeaDeconstructionResponse(
   session: DiscoverySession,
@@ -182,7 +225,7 @@ export async function executePhase(
   });
 
   try {
-    const llmResponse = await callLLMWithJSON([
+    const llmResponse = await callLLMWithJSONWithRetry([
       { role: 'system', content: system },
       { role: 'user', content: user },
     ]);

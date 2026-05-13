@@ -88,7 +88,14 @@ export default function IdeaDiscoveryPage() {
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        setError(err.message || '发生错误');
+        let errorMessage = err.message || '发生错误';
+        
+        // 为 429 错误提供更友好的提示
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+          errorMessage = 'API 请求过频繁，请稍候重试，或者稍后再试。';
+        }
+        
+        setError(errorMessage);
       }
     } finally {
       setLoading(false);
@@ -153,7 +160,14 @@ export default function IdeaDiscoveryPage() {
       }
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message || '发生错误');
+        let errorMessage = err.message || '发生错误';
+        
+        // 为 429 错误提供更友好的提示
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+          errorMessage = 'API 请求过频繁，请稍候重试，或者稍后再试。';
+        }
+        
+        setError(errorMessage);
       }
     } finally {
       setLoading(false);
