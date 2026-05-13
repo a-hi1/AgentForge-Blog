@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import {
   DiscoverySession,
   DiscoveryPhase,
@@ -14,16 +15,57 @@ export default function IdeaDiscoveryPage() {
   const [session, setSession] = useState<DiscoverySession | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [currentAnswers, setCurrentAnswers] = useState<
-    Record<string, any>
-  >({});
+  const [currentAnswers, setCurrentAnswers] = useState<Record<string, unknown>>({});
   const [phaseHistory, setPhaseHistory] = useState<
-    Array<{ phase: DiscoveryPhase; data: any }>
+    Array<{ phase: DiscoveryPhase; data: Record<string, unknown>; analysis?: string }>
   >([]);
 
   const abortRef = useRef<AbortController | null>(null);
 
-  const startDiscovery = useCallback(async () => {
+  const processSSEStream = useCallback(async (response: Response) => {
+    if (!response.body) throw new Error('No response body');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (!payload || !payload.startsWith('{')) continue;
+
+        try {
+          const data = JSON.parse(payload);
+
+          if (data.type === 'phase_analysis') {
+            setPhaseHistory((prev) => [
+              ...prev,
+              { phase: data.phase, data: data.data || {}, analysis: data.data?.analysis },
+            ]);
+          } else if (data.type === 'phase_complete') {
+            // phase completed
+          } else if (data.type === 'phase_fallback') {
+            setError('部分阶段使用降级方案，结果可能不够精确。');
+          } else if (data.type === 'complete') {
+            setSession(data.session);
+          } else if (data.type === 'error') {
+            throw new Error(data.error || '未知错误');
+          }
+        } catch (parseError) {
+          console.error('SSE parse error:', parseError);
+        }
+      }
+    }
+  }, []);
+
+  const handleStartDiscovery = useCallback(async () => {
     if (!idea.trim()) return;
 
     setLoading(true);
@@ -42,67 +84,19 @@ export default function IdeaDiscoveryPage() {
         signal: abortRef.current.signal,
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error('请求失败');
-      }
+      if (!response.ok) throw new Error('请求失败，请重试');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6).trim();
-          if (!payload) continue;
-
-          try {
-            const data = JSON.parse(payload) as any;
-
-            if (data.type === 'phase_start') {
-              // 阶段开始
-            } else if (data.type === 'phase_analysis') {
-              // 分析中，记录数据
-              setPhaseHistory((prev) => [
-                ...prev,
-                { phase: data.phase as DiscoveryPhase, data: data.data },
-              ]);
-            } else if (data.type === 'phase_complete') {
-              // 阶段完成
-            } else if (data.type === 'complete') {
-              setSession(data.session as DiscoverySession);
-            } else if (data.type === 'error') {
-              throw new Error(data.error);
-            }
-          } catch (parseError) {
-            console.error('Parse error:', parseError);
-          }
-        }
-      }
+      await processSSEStream(response);
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        let errorMessage = err.message || '发生错误';
-        
-        // 为 429 错误提供更友好的提示
-        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
-          errorMessage = 'API 请求过频繁，请稍候重试，或者稍后再试。';
-        }
-        
-        setError(errorMessage);
+        setError(err.message || '发生错误');
       }
     } finally {
       setLoading(false);
     }
-  }, [idea]);
+  }, [idea, processSSEStream]);
 
-  const submitAnswers = useCallback(async () => {
+  const handleSubmitAnswers = useCallback(async () => {
     if (!session) return;
 
     setLoading(true);
@@ -118,61 +112,18 @@ export default function IdeaDiscoveryPage() {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error('请求失败');
-      }
+      if (!response.ok) throw new Error('请求失败，请重试');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6).trim();
-          if (!payload) continue;
-
-          try {
-            const data = JSON.parse(payload) as any;
-
-            if (data.type === 'phase_analysis') {
-              setPhaseHistory((prev) => [
-                ...prev,
-                { phase: data.phase as DiscoveryPhase, data: data.data },
-              ]);
-            } else if (data.type === 'complete') {
-              setSession(data.session as DiscoverySession);
-              setCurrentAnswers({});
-            } else if (data.type === 'error') {
-              throw new Error(data.error);
-            }
-          } catch (parseError) {
-            console.error('Parse error:', parseError);
-          }
-        }
-      }
+      await processSSEStream(response);
+      setCurrentAnswers({});
     } catch (err) {
-      if (err instanceof Error) {
-        let errorMessage = err.message || '发生错误';
-        
-        // 为 429 错误提供更友好的提示
-        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
-          errorMessage = 'API 请求过频繁，请稍候重试，或者稍后再试。';
-        }
-        
-        setError(errorMessage);
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError(err.message || '发生错误');
       }
     } finally {
       setLoading(false);
     }
-  }, [session, currentAnswers]);
+  }, [session, currentAnswers, processSSEStream]);
 
   const reset = useCallback(() => {
     setIdea('');
@@ -183,12 +134,6 @@ export default function IdeaDiscoveryPage() {
     setPhaseHistory([]);
     abortRef.current?.abort();
   }, []);
-
-  // 从历史记录中获取阶段数据
-  const getPhaseData = (phase: DiscoveryPhase) => {
-    const entry = phaseHistory.find((h) => h.phase === phase);
-    return entry?.data;
-  };
 
   const allPhases: DiscoveryPhase[] = [
     'idea_deconstruction',
@@ -210,28 +155,36 @@ export default function IdeaDiscoveryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 py-8">
+    <div className="min-h-screen bg-zinc-950 py-8">
       <div className="mx-auto max-w-4xl px-6">
-        {/* 头部 */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-white">方向探索</h1>
-              <p className="mt-1 text-sm text-slate-400">
-                把模糊的想法收缩成可验证的产品方向
+              <p className="mt-1 text-sm text-zinc-400">
+                AI 联合创始人 — 把模糊想法收缩成可验证的产品方向
               </p>
             </div>
-            {session && (
-              <button
-                onClick={reset}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 transition"
-              >
-                重新开始
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {loading && (
+                <button
+                  onClick={() => abortRef.current?.abort()}
+                  className="rounded-lg border border-red-800 px-4 py-2 text-sm text-red-400 hover:bg-red-950 transition"
+                >
+                  取消
+                </button>
+              )}
+              {session && (
+                <button
+                  onClick={reset}
+                  className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition"
+                >
+                  重新开始
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* 初始输入 */}
           {!session && (
             <div className="space-y-4">
               <textarea
@@ -239,73 +192,84 @@ export default function IdeaDiscoveryPage() {
                 onChange={(e) => setIdea(e.target.value)}
                 onKeyDown={(e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !loading) {
-                    startDiscovery();
+                    handleStartDiscovery();
                   }
                 }}
                 placeholder="你现在最想解决什么问题？描述你的想法..."
-                className="w-full rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none"
-                rows={5}
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-4 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
+                rows={4}
               />
-              <button
-                onClick={startDiscovery}
-                disabled={loading || !idea.trim()}
-                className="rounded-lg bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-40 transition"
-              >
-                {loading ? '探索中...' : '开始探索'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleStartDiscovery}
+                  disabled={loading || !idea.trim()}
+                  className="rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
+                >
+                  {loading ? '探索中...' : '开始探索'}
+                </button>
+                {['想做习惯追踪 App', '想做笔记工具', '想做 AI 工具站'].map((ex) => (
+                  <button
+                    key={ex}
+                    onClick={() => setIdea(ex)}
+                    className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 transition"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        {/* 错误提示 */}
         {error && (
           <div className="mb-6 rounded-xl border border-red-800 bg-red-950 p-4">
             <p className="text-sm text-red-300">{error}</p>
+            <button
+              onClick={reset}
+              className="mt-2 rounded-lg bg-red-800 px-4 py-1.5 text-xs text-white hover:bg-red-700 transition"
+            >
+              重试
+            </button>
           </div>
         )}
 
-        {/* 阶段卡片 */}
         {session && (
           <div className="space-y-4">
-            {/* 进度指示器 */}
             <div className="flex items-center gap-2 overflow-x-auto pb-2">
               {allPhases.map((phase) => {
                 const status = getPhaseStatus(phase);
                 return (
-                  <React.Fragment key={phase}>
-                    <div
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
-                        status === 'active'
-                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50'
-                          : status === 'completed'
-                          ? 'bg-green-500/20 text-green-300 border border-green-500/50'
-                          : 'bg-slate-800 text-slate-500 border border-slate-700'
-                      }`}
-                    >
-                      {status === 'completed' && '✓'}
-                      {getPhaseName(phase)}
-                    </div>
-                  </React.Fragment>
+                  <div
+                    key={phase}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
+                      status === 'active'
+                        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/50'
+                        : status === 'completed'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                        : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                    }`}
+                  >
+                    {status === 'completed' && '✓'}
+                    {getPhaseName(phase)}
+                  </div>
                 );
               })}
             </div>
 
-            {/* 已完成的阶段 */}
             {phaseHistory.map((entry, index) => (
               <PhaseCard
                 key={index}
                 phase={entry.phase}
                 isActive={false}
                 isCompleted={true}
-                analysis={entry.data.analysis}
+                analysis={entry.analysis}
                 data={entry.data}
               />
             ))}
 
-            {/* 当前阶段的问题 */}
             {session.unresolvedQuestions.length > 0 && (
-              <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-6">
-                <h3 className="text-lg font-semibold text-purple-300 mb-4">
+              <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-6">
+                <h3 className="text-lg font-semibold text-violet-300 mb-4">
                   请回答以下问题
                 </h3>
                 <div className="space-y-6">
@@ -313,7 +277,7 @@ export default function IdeaDiscoveryPage() {
                     <QuestionRenderer
                       key={question.id}
                       question={question}
-                      answer={currentAnswers[question.id]}
+                      answer={(currentAnswers as Record<string, unknown>)[question.id]}
                       onChange={(value) =>
                         setCurrentAnswers((prev) => ({
                           ...prev,
@@ -324,26 +288,31 @@ export default function IdeaDiscoveryPage() {
                   ))}
                 </div>
                 <button
-                  onClick={submitAnswers}
+                  onClick={handleSubmitAnswers}
                   disabled={loading}
-                  className="mt-6 rounded-lg bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-40 transition"
+                  className="mt-6 rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
                 >
                   {loading ? '处理中...' : '继续'}
                 </button>
               </div>
             )}
 
-            {/* 完成状态 */}
             {session.currentPhase === 'complete' &&
               session.collectedFacts.finalReport && (
-                <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-6 text-center">
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
                   <div className="text-4xl mb-4">🎉</div>
-                  <h3 className="text-xl font-semibold text-green-300 mb-2">
+                  <h3 className="text-xl font-semibold text-emerald-300 mb-2">
                     探索完成！
                   </h3>
-                  <p className="text-slate-300">
+                  <p className="text-zinc-300">
                     {session.collectedFacts.finalReport.summary}
                   </p>
+                  <Link
+                    href="/prompt"
+                    className="mt-4 inline-block rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-violet-500 transition"
+                  >
+                    确认方向，开始开发
+                  </Link>
                 </div>
               )}
           </div>

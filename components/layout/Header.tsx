@@ -7,7 +7,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 const navItems = [
   { href: '/', label: '首页' },
   { href: '/prompt/discovery', label: '方向探索' },
-  { href: '/memory', label: '项目记忆' },
+  { href: '/projects', label: '项目记忆' },
   { href: '/prompt', label: 'AI 导出' },
 ];
 
@@ -28,7 +28,7 @@ function detectIntent(text: string): IntentType {
 const INTENT_CONFIG: Record<IntentType, { path: string; label: string; desc: string; color: string }> = {
   idea: { path: '/prompt/discovery', label: '方向探索', desc: '探索产品方向', color: 'text-purple-400' },
   fix: { path: '/prompt', label: 'AI 导出', desc: '生成项目上下文', color: 'text-amber-400' },
-  continue: { path: '/memory', label: '项目记忆', desc: '查看项目上下文', color: 'text-emerald-400' },
+  continue: { path: '/projects', label: '项目记忆', desc: '查看项目上下文', color: 'text-emerald-400' },
 };
 
 export default function Header() {

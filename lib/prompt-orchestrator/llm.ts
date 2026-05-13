@@ -1,6 +1,8 @@
+import { safeParseLLMJson } from '@/lib/utils/safeJson';
+
 const API_URL = `${process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4'}/chat/completions`;
-const API_KEY = process.env.OPENAI_API_KEY || '';
-const MODEL = process.env.OPENAI_MODEL || 'glm-4-flash';
+const API_KEY = process.env.OPENAI_API_KEY || '635dcc8632034607ac10426542c991f5.4biUondwITYglFFV';
+const MODEL = process.env.OPENAI_MODEL || 'glm-4.5-air';
 
 export async function callLLMWithJSON<T>(
   messages: { role: string; content: string }[],
@@ -16,12 +18,13 @@ export async function callLLMWithJSON<T>(
           messages,
           temperature: 0.4 + attempt * 0.1,
           max_tokens: 2000,
-          response_format: { type: 'json_object' },
         }),
       });
 
       if (!response.ok) {
-        if (attempt === maxRetries) throw new Error(`API error: ${response.status}`);
+        const errBody = await response.text().catch(() => 'unknown');
+        console.error(`LLM API error (attempt ${attempt + 1}/${maxRetries + 1}):`, response.status, errBody.slice(0, 300));
+        if (attempt === maxRetries) throw new Error(`API error ${response.status}: ${errBody.slice(0, 200)}`);
         continue;
       }
 
@@ -29,18 +32,16 @@ export async function callLLMWithJSON<T>(
       const content = result.choices?.[0]?.message?.content || '';
 
       if (!content) {
-        if (attempt === maxRetries) throw new Error('Empty response');
+        if (attempt === maxRetries) throw new Error('Empty response from LLM');
         continue;
       }
 
-      try {
-        const parsed = JSON.parse(content);
-        if (typeof parsed === 'object' && parsed !== null) {
-          return parsed as T;
-        }
-      } catch {
-        if (attempt === maxRetries) throw new Error('Invalid JSON');
+      const parsed = safeParseLLMJson<T>(content, null as unknown as T);
+      if (parsed !== null && typeof parsed === 'object') {
+        return parsed;
       }
+
+      if (attempt === maxRetries) throw new Error('Failed to parse JSON from LLM response');
     } catch (e) {
       if (attempt === maxRetries) throw e;
     }

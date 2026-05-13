@@ -1,5 +1,6 @@
 import { getSupabaseServer, isSupabaseConfigured } from '../supabase/client';
 import { CHINESE_OUTPUT_INSTRUCTION_SIMPLE } from './constants';
+import { safeParseLLMJson } from '../utils/safeJson';
 
 // ============================================
 // TYPES
@@ -160,7 +161,6 @@ ${JSON.stringify(executionData, null, 2)}
             { role: 'user', content: userPrompt },
           ],
           temperature: 0.3,
-          response_format: { type: 'json_object' }
         }),
       });
 
@@ -173,7 +173,7 @@ ${JSON.stringify(executionData, null, 2)}
       const content = result.choices[0]?.message?.content;
 
       if (content) {
-        const parsed = JSON.parse(content);
+        const parsed = safeParseLLMJson<{ successes: string[]; failures: string[]; optimizations: string[] }>(content, { successes: [], failures: [], optimizations: [] });
         return {
           successes: parsed.successes || [],
           failures: parsed.failures || [],

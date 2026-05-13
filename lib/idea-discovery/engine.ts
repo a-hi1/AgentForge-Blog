@@ -1,16 +1,15 @@
-// 方向探索核心引擎
 import { callLLMWithJSON } from '@/lib/prompt-orchestrator/llm';
+import { safeParseLLMJson } from '@/lib/utils/safeJson';
 import {
   DiscoverySession,
   CollectedFacts,
   ProductDirection,
   UserProfile,
   DiscoveryQuestion,
-  MarketAssessment,
-  DifferentiationAnalysis,
+  MarketReality,
+  Differentiation,
   MVPShrink,
-  ValidationPath,
-  DirectionRecommendationReport,
+  DirectionReport,
   PhaseOutput,
 } from './types';
 import {
@@ -23,363 +22,219 @@ import {
 } from './stateMachine';
 import { getPhasePrompt } from './prompts';
 
-// 延迟函数
-function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function buildUserProfile(answers: Record<string, string | string[]>): Partial<UserProfile> {
+  const profile: Partial<UserProfile> = {};
+
+  const motivation = answers.q_motivation || answers.motivation;
+  if (motivation) {
+    profile.motivation = Array.isArray(motivation) ? motivation : [motivation];
+  }
+
+  const skill = answers.q_skill || answers.skill_level;
+  if (skill) profile.skillLevel = Array.isArray(skill) ? skill[0] : skill;
+
+  const time = answers.q_time || answers.time_budget;
+  if (time) profile.timeBudget = Array.isArray(time) ? time[0] : time;
+
+  const solo = answers.q_solo;
+  if (solo !== undefined) profile.isSolo = solo === 'yes' || solo === 'true' || String(solo) === 'true';
+
+  const platform = answers.q_platform;
+  if (platform) profile.platform = Array.isArray(platform) ? platform[0] : platform;
+
+  const design = answers.q_design;
+  if (design !== undefined) profile.hasDesignSkills = design === 'yes' || design === 'true' || String(design) === 'true';
+
+  const ops = answers.q_ops;
+  if (ops !== undefined) profile.hasOperationSkills = ops === 'yes' || ops === 'true' || String(ops) === 'true';
+
+  return Object.keys(profile).length > 0 ? profile : ({} as Partial<UserProfile>);
 }
 
-// 带重试的 LLM 调用
-async function callLLMWithJSONWithRetry(
-  messages: any[], 
-  maxRetries = 3, 
-  initialDelay = 2000
-): Promise<any> {
-  let lastError: Error | null = null;
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // 在重试前添加延迟
-      if (attempt > 0) {
-        const delayMs = initialDelay * Math.pow(2, attempt - 1); // 指数退避
-        console.log(`Retry ${attempt}, waiting ${delayMs}ms...`);
-        await delay(delayMs);
+async function handlePhaseResponse(
+  session: DiscoverySession,
+  phase: string,
+  llmResponse: Record<string, unknown>
+): Promise<DiscoverySession> {
+  let updatedSession = { ...session };
+  const analysis = (llmResponse.analysis as string) || '';
+  const phaseOutput: PhaseOutput = { analysis };
+
+  switch (phase) {
+    case 'idea_deconstruction': {
+      const questions = llmResponse.questions as DiscoveryQuestion[] | undefined;
+      if (questions) {
+        updatedSession = setUnresolvedQuestions(updatedSession, questions);
+        phaseOutput.questions = questions;
       }
-      
-      const result = await callLLMWithJSON(messages);
-      return result;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      console.error(`LLM call failed (attempt ${attempt + 1}/${maxRetries}):`, lastError);
-      
-      // 检查是否是速率限制错误
-      const isRateLimitError = lastError.message.includes('429') || 
-                              lastError.message.includes('rate limit') ||
-                              lastError.message.includes('too many requests');
-      
-      // 如果不是速率限制错误，立即抛出
-      if (!isRateLimitError && attempt < maxRetries - 1) {
-        throw lastError;
+      break;
+    }
+    case 'reality_assessment': {
+      const marketReality = llmResponse.marketReality as MarketReality | undefined;
+      if (marketReality) {
+        updatedSession = addCollectedFacts(updatedSession, { marketReality });
+        (phaseOutput as Record<string, unknown>).marketReality = marketReality;
       }
+      break;
+    }
+    case 'differentiation_analysis': {
+      const differentiation = llmResponse.differentiation as Differentiation | undefined;
+      if (differentiation) {
+        updatedSession = addCollectedFacts(updatedSession, { differentiation });
+        (phaseOutput as Record<string, unknown>).differentiation = differentiation;
+      }
+      const question = llmResponse.question as DiscoveryQuestion | undefined;
+      if (question) {
+        updatedSession = setUnresolvedQuestions(updatedSession, [question]);
+        phaseOutput.questions = [question];
+      }
+      break;
+    }
+    case 'mvp_shrink': {
+      const mvp = llmResponse.mvp as MVPShrink | undefined;
+      if (mvp) {
+        updatedSession = addCollectedFacts(updatedSession, { mvp });
+        (phaseOutput as Record<string, unknown>).mvp = mvp;
+      }
+      const question = llmResponse.question as DiscoveryQuestion | undefined;
+      if (question) {
+        updatedSession = setUnresolvedQuestions(updatedSession, [question]);
+        phaseOutput.questions = [question];
+      }
+      break;
+    }
+    case 'validation_path': {
+      const directions = llmResponse.directions as ProductDirection[] | undefined;
+      if (directions) {
+        (updatedSession.collectedFacts as Record<string, unknown>).possibleDirections = directions;
+        (phaseOutput as Record<string, unknown>).directions = directions;
+      }
+      const question = llmResponse.question as DiscoveryQuestion | undefined;
+      if (question && directions) {
+        question.options = directions.map((d) => ({ id: d.id, label: d.name, description: d.whyFits }));
+        updatedSession = setUnresolvedQuestions(updatedSession, [question]);
+        phaseOutput.questions = [question];
+      }
+      break;
+    }
+    case 'final_confirmation': {
+      const report = llmResponse.report as DirectionReport | undefined;
+      if (report) {
+        updatedSession = addCollectedFacts(updatedSession, { finalReport: report });
+        (phaseOutput as Record<string, unknown>).report = report;
+      }
+      updatedSession = advancePhase(updatedSession, phaseOutput);
+      break;
     }
   }
-  
-  throw lastError || new Error('Failed to call LLM after retries');
-}
 
-// 处理第一阶段的响应
-async function handleIdeaDeconstructionResponse(
-  session: DiscoverySession,
-  llmResponse: any
-): Promise<DiscoverySession> {
-  const analysis = llmResponse.analysis || '';
-  const possibleDirections: ProductDirection[] = llmResponse.possibleDirections || [];
-  let questions: DiscoveryQuestion[] = llmResponse.questions || [];
-
-  // 动态填充方向选项
-  questions = questions.map((q) => {
-    if (q.id === 'selected_direction') {
-      return {
-        ...q,
-        options: possibleDirections.map((d) => ({
-          id: d.id,
-          label: d.name,
-          description: d.description,
-        })),
-      };
-    }
-    return q;
-  });
-
-  let updatedSession = addCollectedFacts(session, {
-    possibleDirections,
-  });
-
-  updatedSession = setUnresolvedQuestions(updatedSession, questions);
-
-  const phaseOutput: PhaseOutput = {
-    analysis,
-    questions,
-    possibleDirections,
-  };
+  if (phase !== 'final_confirmation') {
+    updatedSession = advancePhase(updatedSession, phaseOutput);
+  }
 
   return updatedSession;
 }
 
-// 处理第二阶段的响应
-async function handleRealityAssessmentResponse(
-  session: DiscoverySession,
-  llmResponse: any
-): Promise<DiscoverySession> {
-  const analysis = llmResponse.analysis || '';
-  const marketAssessment: MarketAssessment = llmResponse.marketAssessment;
-
-  let updatedSession = addCollectedFacts(session, {
-    marketAssessment,
-  });
-
-  const phaseOutput: PhaseOutput = {
-    analysis,
-    marketAssessment,
-  };
-
-  return advancePhase(updatedSession, phaseOutput);
-}
-
-// 处理第三阶段的响应
-async function handleDifferentiationAnalysisResponse(
-  session: DiscoverySession,
-  llmResponse: any
-): Promise<DiscoverySession> {
-  const analysis = llmResponse.analysis || '';
-  const differentiation: DifferentiationAnalysis = llmResponse.differentiation;
-
-  let updatedSession = addCollectedFacts(session, {
-    differentiation,
-  });
-
-  const phaseOutput: PhaseOutput = {
-    analysis,
-    differentiation,
-  };
-
-  return advancePhase(updatedSession, phaseOutput);
-}
-
-// 处理第四阶段的响应
-async function handleMVPShrinkResponse(
-  session: DiscoverySession,
-  llmResponse: any
-): Promise<DiscoverySession> {
-  const analysis = llmResponse.analysis || '';
-  const mvp: MVPShrink = llmResponse.mvp;
-
-  let updatedSession = addCollectedFacts(session, {
-    mvp,
-  });
-
-  const phaseOutput: PhaseOutput = {
-    analysis,
-    mvp,
-  };
-
-  return advancePhase(updatedSession, phaseOutput);
-}
-
-// 处理第五阶段的响应
-async function handleValidationPathResponse(
-  session: DiscoverySession,
-  llmResponse: any
-): Promise<DiscoverySession> {
-  const analysis = llmResponse.analysis || '';
-  const validationPath: ValidationPath = llmResponse.validationPath;
-
-  let updatedSession = addCollectedFacts(session, {
-    validationPath,
-  });
-
-  const phaseOutput: PhaseOutput = {
-    analysis,
-    validationPath,
-  };
-
-  return advancePhase(updatedSession, phaseOutput);
-}
-
-// 处理第六阶段的响应
-async function handleFinalConfirmationResponse(
-  session: DiscoverySession,
-  llmResponse: any
-): Promise<DiscoverySession> {
-  const analysis = llmResponse.analysis || '';
-  const report: DirectionRecommendationReport = llmResponse.report;
-
-  let updatedSession = addCollectedFacts(session, {
-    finalReport: report,
-  });
-
-  const phaseOutput: PhaseOutput = {
-    analysis,
-    report,
-  };
-
-  return advancePhase(updatedSession, phaseOutput);
-}
-
-// 执行当前阶段
 export async function executePhase(
   session: DiscoverySession,
   onEvent?: (event: {
-    type: 'phase_start' | 'phase_analysis' | 'phase_complete';
+    type: 'phase_start' | 'phase_analysis' | 'phase_complete' | 'phase_fallback';
     phase: string;
-    data?: any;
+    data?: unknown;
   }) => void
 ): Promise<DiscoverySession> {
-  const { system, user } = getPhasePrompt(
-    session.currentPhase,
-    session.collectedFacts
-  );
+  const { system, user } = getPhasePrompt(session.currentPhase, session.collectedFacts);
 
-  onEvent?.({
-    type: 'phase_start',
-    phase: session.currentPhase,
-  });
+  onEvent?.({ type: 'phase_start', phase: session.currentPhase });
 
   try {
-    const llmResponse = await callLLMWithJSONWithRetry([
+    const llmResponse = await callLLMWithJSON<Record<string, unknown>>([
       { role: 'system', content: system },
       { role: 'user', content: user },
     ]);
 
-    onEvent?.({
-      type: 'phase_analysis',
-      phase: session.currentPhase,
-      data: llmResponse,
-    });
+    onEvent?.({ type: 'phase_analysis', phase: session.currentPhase, data: llmResponse });
 
-    let updatedSession: DiscoverySession;
+    const updatedSession = await handlePhaseResponse(session, session.currentPhase, llmResponse);
 
-    switch (session.currentPhase) {
-      case 'idea_deconstruction':
-        updatedSession = await handleIdeaDeconstructionResponse(
-          session,
-          llmResponse
-        );
-        break;
-      case 'reality_assessment':
-        updatedSession = await handleRealityAssessmentResponse(
-          session,
-          llmResponse
-        );
-        break;
-      case 'differentiation_analysis':
-        updatedSession = await handleDifferentiationAnalysisResponse(
-          session,
-          llmResponse
-        );
-        break;
-      case 'mvp_shrink':
-        updatedSession = await handleMVPShrinkResponse(session, llmResponse);
-        break;
-      case 'validation_path':
-        updatedSession = await handleValidationPathResponse(session, llmResponse);
-        break;
-      case 'final_confirmation':
-        updatedSession = await handleFinalConfirmationResponse(
-          session,
-          llmResponse
-        );
-        break;
-      default:
-        updatedSession = session;
-    }
-
-    onEvent?.({
-      type: 'phase_complete',
-      phase: session.currentPhase,
-      data: llmResponse,
-    });
+    onEvent?.({ type: 'phase_complete', phase: session.currentPhase });
 
     return updatedSession;
   } catch (error) {
-    console.error('Phase execution error:', error);
-    throw error;
+    console.error(`Phase ${session.currentPhase} error:`, error);
+
+    onEvent?.({ type: 'phase_fallback', phase: session.currentPhase });
+
+    const fallbackOutput: PhaseOutput = {
+      analysis: '分析过程中遇到问题，请重试或跳过此阶段。',
+    };
+
+    return advancePhase(session, fallbackOutput);
   }
 }
 
-// 处理用户回答
 export function handleUserAnswers(
   session: DiscoverySession,
   answers: Record<string, string | string[]>
 ): DiscoverySession {
   let updatedSession = { ...session };
   const facts: Partial<CollectedFacts> = {};
-  const decisions: Partial<DiscoverySession['confirmedDecisions']> = {};
 
-  // 处理动机
-  if (answers.motivation) {
-    const motivations = Array.isArray(answers.motivation)
-      ? answers.motivation
-      : [answers.motivation];
+  const profileUpdate = buildUserProfile(answers);
+  if (profileUpdate) {
     facts.userProfile = {
       ...session.collectedFacts.userProfile,
-      motivation: motivations,
+      ...profileUpdate,
     } as UserProfile;
   }
 
-  // 处理技术水平
-  if (answers.skill_level) {
-    facts.userProfile = {
-      ...facts.userProfile,
-      ...session.collectedFacts.userProfile,
-      skillLevel: answers.skill_level as UserProfile['skillLevel'],
-    } as UserProfile;
-  }
-
-  // 处理时间预算
-  if (answers.time_budget) {
-    facts.userProfile = {
-      ...facts.userProfile,
-      ...session.collectedFacts.userProfile,
-      timeBudget: answers.time_budget as UserProfile['timeBudget'],
-    } as UserProfile;
-  }
-
-  // 处理方向选择
-  if (answers.selected_direction) {
-    const directionId = answers.selected_direction as string;
-    const selectedDirection = (session.collectedFacts as any)
-      .possibleDirections?.find((d: ProductDirection) => d.id === directionId);
-    
-    if (selectedDirection) {
-      facts.selectedDirection = selectedDirection;
-      decisions.directionId = directionId;
+  const directionAnswer = answers.pick_direction || answers.selected_direction;
+  if (directionAnswer) {
+    const directionId = Array.isArray(directionAnswer) ? directionAnswer[0] : directionAnswer;
+    const possibleDirections = (session.collectedFacts as Record<string, unknown>).possibleDirections as ProductDirection[] | undefined;
+    const selected = possibleDirections?.find((d) => d.id === directionId);
+    if (selected) {
+      facts.selectedDirection = selected;
     }
+  }
+
+  const confirm = answers.confirm_differentiation || answers.confirm_mvp;
+  if (confirm !== undefined) {
+    updatedSession = addConfirmedDecisions(updatedSession, {
+      confirmed: confirm === 'yes' || confirm === 'true' || String(confirm) === 'true',
+    });
   }
 
   if (Object.keys(facts).length > 0) {
     updatedSession = addCollectedFacts(updatedSession, facts);
   }
 
-  if (Object.keys(decisions).length > 0) {
-    updatedSession = addConfirmedDecisions(updatedSession, decisions);
-  }
-
-  // 清除已回答的问题
-  const answeredQuestionIds = Object.keys(answers);
+  const answeredIds = Object.keys(answers);
   updatedSession.unresolvedQuestions = updatedSession.unresolvedQuestions.filter(
-    (q) => !answeredQuestionIds.includes(q.id)
+    (q) => !answeredIds.includes(q.id)
   );
 
   return updatedSession;
 }
 
-// 开始方向探索
 export async function startDiscovery(
   idea: string,
-  onEvent?: (event: any) => void
+  onEvent?: (event: unknown) => void
 ): Promise<DiscoverySession> {
   let session = createSession(idea);
-  session = await executePhase(session, onEvent);
+  session = await executePhase(session, onEvent as never);
   return session;
 }
 
-// 继续探索（用户回答后）
 export async function continueDiscovery(
   session: DiscoverySession,
   answers: Record<string, string | string[]>,
-  onEvent?: (event: any) => void
+  onEvent?: (event: unknown) => void
 ): Promise<DiscoverySession> {
   let updatedSession = handleUserAnswers(session, answers);
 
-  // 如果没有未解决问题，进入下一阶段
-  while (
-    canAdvancePhase(updatedSession) &&
-    updatedSession.currentPhase !== 'complete'
-  ) {
-    if (updatedSession.currentPhase !== 'final_confirmation') {
-      updatedSession = advancePhase(updatedSession);
-    }
-    updatedSession = await executePhase(updatedSession, onEvent);
+  if (canAdvancePhase(updatedSession) && updatedSession.currentPhase !== 'complete') {
+    updatedSession = await executePhase(updatedSession, onEvent as never);
   }
 
   return updatedSession;
