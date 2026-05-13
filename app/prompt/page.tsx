@@ -6,12 +6,11 @@ import { savePrompt } from '@/lib/prompt/history';
 import { IntentResult, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
 
 interface UnifiedIntent extends IntentResult {
-  architecture: {
+  techStack: {
     frontend: string;
     backend: string;
     db: string;
     infra: string[];
-    reasoning: string;
   };
 }
 
@@ -138,7 +137,7 @@ export default function PromptPage() {
                     input: input.trim(),
                     fullPrompt: promptText,
                     qualityScore: 0,
-                    tags: [intentData.architecture.frontend, intentData.architecture.backend, intentData.architecture.db].filter(Boolean) as string[],
+                    tags: [intentData.techStack.frontend, intentData.techStack.backend, intentData.techStack.db].filter(Boolean) as string[],
                   });
                   if (savedRecord?.id) setSaved(true);
                 } catch {
@@ -381,10 +380,10 @@ export default function PromptPage() {
                     <div><span className="text-slate-500">用户类型：</span><span className="text-slate-300">{String(intent.userType || '-')}</span></div>
                     <div><span className="text-slate-500">产品形态：</span><span className="text-slate-300">{String(intent.productShape || '-')}</span></div>
                     <div><span className="text-slate-500">生命周期：</span><span className="text-slate-300">{String(intent.lifecycle || '-')}</span></div>
-                    <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{String(intent.architecture.frontend || '-')}</span></div>
-                    <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{String(intent.architecture.backend || '-')}</span></div>
-                    <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{String(intent.architecture.db || '-')}</span></div>
-                    <div><span className="text-slate-500">基础设施：</span><span className="text-slate-300">{intent.architecture.infra.join('、') || '-'}</span></div>
+                    <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{String(intent.techStack.frontend || '-')}</span></div>
+                    <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{String(intent.techStack.backend || '-')}</span></div>
+                    <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{String(intent.techStack.db || '-')}</span></div>
+                    <div><span className="text-slate-500">基础设施：</span><span className="text-slate-300">{intent.techStack.infra.join('、') || '-'}</span></div>
                   </div>
                 </div>
                 {decompose && Array.isArray(decompose.tasks) && decompose.tasks.length > 0 && (

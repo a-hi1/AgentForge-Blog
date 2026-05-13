@@ -1,5 +1,3 @@
-import type { Complexity } from './reasoner';
-
 export type PromptDepth = 'quick' | 'standard' | 'expert' | 'architect';
 
 export interface CompiledPhase {

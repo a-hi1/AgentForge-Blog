@@ -69,19 +69,7 @@ function scoreTaskSpecificity(prompt: string, pack: CompiledPack): number {
   if (tasks.length >= 8) score += 10;
   if (tasks.length < 3) score -= 25;
 
-  // Check for concrete implementation requirements (function signatures)
-  for (const task of tasks) {
-    for (const req of (task.implementationRequirements || [])) {
-      if (/function|=>|export|interface|type/.test(req)) score += 2;
-    }
-  }
-  score = Math.min(score, 40);
-
-  // Check for forbidden items per task
-  const tasksWithForbidden = tasks.filter(t => t.forbiddenItems && t.forbiddenItems.length > 0).length;
-  score += Math.min(tasksWithForbidden * 3, 15);
-
-  // Check for dependency tracking
+  // Score based on dependency tracking per task
   const tasksWithDeps = tasks.filter(t => t.dependencies && t.dependencies.length > 0).length;
   score += Math.min(tasksWithDeps * 2, 10);
 
@@ -177,30 +165,9 @@ function scoreDependencyClarity(prompt: string, pack: CompiledPack): number {
   return clamp(score);
 }
 
-function scoreArchitectureConsistency(prompt: string, pack: CompiledPack): number {
-  let score = 50; // baseline
+function scoreArchitectureConsistency(prompt: string, _pack: CompiledPack): number {
+  let score = 50;
 
-  const arch = pack.architecture;
-  if (arch) {
-    // Check if frontend is mentioned in tasks
-    if (arch.frontend) {
-      const feKey = arch.frontend.split('—')[0].split('（')[0].trim().toLowerCase();
-      if (prompt.toLowerCase().includes(feKey)) score += 15;
-    }
-
-    // Check if backend is mentioned
-    if (arch.backend) {
-      const beKey = arch.backend.split('—')[0].split('（')[0].trim().toLowerCase();
-      if (prompt.toLowerCase().includes(beKey)) score += 10;
-    }
-
-    // Rejected alternatives mentioned
-    if (arch.rejectedAlternatives && arch.rejectedAlternatives.length > 0) {
-      score += Math.min(arch.rejectedAlternatives.length * 5, 15);
-    }
-  }
-
-  // Consistency: no contradictory tech mentions
   if ((prompt.includes('React') || prompt.includes('Next')) && prompt.includes('Vue') && !prompt.includes('对比')) {
     score -= 20;
   }

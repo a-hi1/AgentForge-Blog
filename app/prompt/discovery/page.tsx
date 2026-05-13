@@ -49,8 +49,6 @@ export default function IdeaDiscoveryPage() {
               ...prev,
               { phase: data.phase, data: data.data || {}, analysis: data.data?.analysis },
             ]);
-          } else if (data.type === 'phase_complete') {
-            // phase completed
           } else if (data.type === 'phase_fallback') {
             setError('部分阶段使用降级方案，结果可能不够精确。');
           } else if (data.type === 'complete') {
