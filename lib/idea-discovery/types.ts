@@ -27,13 +27,13 @@ export interface DiscoveryQuestion {
 }
 
 export interface UserProfile {
-  motivation: string[];
-  skillLevel: string;
-  timeBudget: string;
-  isSolo: boolean;
-  platform: string;
-  hasDesignSkills: boolean;
-  hasOperationSkills: boolean;
+  motivation?: string[];
+  skillLevel?: string;
+  timeBudget?: string;
+  isSolo?: boolean;
+  platform?: string;
+  hasDesignSkills?: boolean;
+  hasOperationSkills?: boolean;
 }
 
 export interface ProductDirection {
