@@ -208,6 +208,13 @@ async function executePhase(
           (phaseOutput as Record<string, unknown>).marketReality = marketReality;
         }
         phaseOutput.analysis = llmResponse.analysis as string || '市场分析完成';
+        if (llmResponse.questions) {
+          const questions = llmResponse.questions as DiscoveryQuestion[];
+          if (questions && questions.length > 0) {
+            updatedSession = setUnresolvedQuestions(updatedSession, questions);
+            phaseOutput.questions = questions;
+          }
+        }
       }
       break;
     }
@@ -234,6 +241,13 @@ async function executePhase(
           (phaseOutput as Record<string, unknown>).differentiation = differentiation;
         }
         phaseOutput.analysis = llmResponse.analysis as string || '差异化分析完成';
+        if (llmResponse.questions) {
+          const questions = llmResponse.questions as DiscoveryQuestion[];
+          if (questions && questions.length > 0) {
+            updatedSession = setUnresolvedQuestions(updatedSession, questions);
+            phaseOutput.questions = questions;
+          }
+        }
       }
       break;
     }
@@ -260,6 +274,13 @@ async function executePhase(
           (phaseOutput as Record<string, unknown>).mvp = mvp;
         }
         phaseOutput.analysis = llmResponse.analysis as string || 'MVP设计完成';
+        if (llmResponse.questions) {
+          const questions = llmResponse.questions as DiscoveryQuestion[];
+          if (questions && questions.length > 0) {
+            updatedSession = setUnresolvedQuestions(updatedSession, questions);
+            phaseOutput.questions = questions;
+          }
+        }
       }
       break;
     }
@@ -363,19 +384,24 @@ function handleUserAnswers(
   answers: Record<string, string | string[]>
 ): DiscoverySession {
   let updatedSession = { ...session };
-  const facts: Partial<CollectedFacts> = {};
+
+  // 将所有回答存入 collectedFacts，key 为 answers_<phase>
+  const phaseAnswerKey = `answers_${session.currentPhase}`;
+  updatedSession = addCollectedFacts(updatedSession, {
+    [phaseAnswerKey]: answers,
+  } as Partial<CollectedFacts>);
+
+  // 特殊处理：validation_path 阶段的方向选择
   const directionAnswer = answers.pick_direction;
   if (directionAnswer) {
     const directionId = Array.isArray(directionAnswer) ? directionAnswer[0] : directionAnswer;
     const possibleDirections = (session.collectedFacts as Record<string, unknown>).possibleDirections as ProductDirection[] | undefined;
     const selected = possibleDirections?.find((d) => d.id === directionId);
     if (selected) {
-      facts.selectedDirection = selected;
+      updatedSession = addCollectedFacts(updatedSession, { selectedDirection: selected });
     }
   }
-  if (Object.keys(facts).length > 0) {
-    updatedSession = addCollectedFacts(updatedSession, facts);
-  }
+
   updatedSession.unresolvedQuestions = [];
   return updatedSession;
 }
