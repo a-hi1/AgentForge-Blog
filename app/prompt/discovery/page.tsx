@@ -124,7 +124,7 @@ export default function IdeaDiscoveryPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: session.id,
+          session: session,
           answers: currentAnswers,
         }),
       });

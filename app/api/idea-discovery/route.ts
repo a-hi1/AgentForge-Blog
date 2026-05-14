@@ -9,9 +9,6 @@ import {
 export const maxDuration = 300;
 export const runtime = 'nodejs';
 
-// 简单的内存存储（生产环境应该用数据库）
-const sessionStore = new Map<string, DiscoverySession>();
-
 function sendSSE(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
@@ -31,7 +28,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const body = await req.json();
-        const { idea, sessionId, answers } = body;
+        const { idea, session: clientSession, answers } = body;
 
         let currentSession: DiscoverySession;
 
@@ -39,18 +36,16 @@ export async function POST(req: NextRequest) {
           sendSSE(controller, encoder, event);
         };
 
-        if (sessionId && sessionStore.has(sessionId)) {
-          const existingSession = sessionStore.get(sessionId)!;
+        // 优先使用客户端传来的完整session，避免服务器内存丢失问题
+        if (clientSession && clientSession.id && answers) {
           currentSession = await continueDiscovery(
-            existingSession,
+            clientSession,
             answers || {},
             eventHandler
           );
         } else {
           currentSession = await startDiscovery(idea || '', eventHandler);
         }
-
-        sessionStore.set(currentSession.id, currentSession);
 
         const finalReport = currentSession.collectedFacts.finalReport;
 
