@@ -46,7 +46,7 @@ function getDefaultIntent(userInput: string): UnifiedIntent {
     ambiguity: "继续推进开发",
     decisionPoints: [userInput],
     techStack: getDefaultTechStack(),
-    coreFeatures: ["核心功能1", "核心功能2", "核心功能3"],
+    coreFeatures: [userInput],
     dataModels: [],
     apiEndpoints: [],
     securityNotes: []
@@ -56,12 +56,18 @@ function getDefaultIntent(userInput: string): UnifiedIntent {
 async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
   const system = `你是产品技术顾问+全栈架构师。分析用户需求，输出具体的开发方案。
 
-## 重要规则
-1. 技术栈必须做出明确选择，不要给"或"的选项
-2. 核心功能要具体到可开发的程度，不要泛泛而谈
-3. 数据模型要列出实体和关键字段
-4. API要列出具体的端点
-5. 如果用户提到了安全/隐私要求，要给出具体方案
+## 约束规则（必须严格遵守）
+1. **只做用户要求的功能**：不要自行添加用户没提到的功能。coreFeatures数量应与用户描述的核心功能数量一致，不要凑数。
+2. **技术栈最简可行**：MVP阶段优先选成熟、简单、免费的技术。
+   - Mobile → Expo + Supabase 或 Firebase（不要React Native裸项目+自建后端）
+   - Web → Next.js + Supabase 或 Vercel
+   - 纯前端SPA → Vite + React + LocalStorage
+   - 不要同时选多个部署平台（如同时用Amplify和Heroku）
+   - infra数组最多2个元素
+3. **技术栈只选一个**：每个维度（前端/后端/数据库）只能选一个具体技术，不要给"或"的选项
+4. **数据模型一致**：同一实体不要既嵌入子文档又独立建collection。如果用关系型DB（Supabase/PostgreSQL），用外键关联；如果用文档型（MongoDB/Firestore），可以嵌入但要合理
+5. **API路径用实际资源名**：不要用 \`{userId}\` 等占位符，用具体路径如 \`/api/transactions\`
+6. **如果有安全/隐私要求**：给出具体方案
 
 ## 输出格式（严格JSON）
 {
@@ -73,32 +79,27 @@ async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
   "decisionPoints": ["关键决策点1", "关键决策点2"],
   "techStack": {
     "frontend": "具体技术（只选一个）",
-    "backend": "具体技术（只选一个）",
+    "backend": "具体技术（只选一个，纯前端填'无'）",
     "db": "具体数据库（只选一个）",
-    "infra": ["具体部署方案"]
+    "infra": ["具体部署方案，最多2个"]
   },
   "coreFeatures": [
-    "功能1：具体描述",
-    "功能2：具体描述",
-    "功能3：具体描述"
+    "功能1：具体描述（只包含用户提到的功能）"
   ],
   "dataModels": [
     {
       "name": "实体名",
-      "fields": ["字段1: 类型", "字段2: 类型", "字段3: 类型"]
+      "fields": ["字段名: 类型", "字段名: 类型"]
     }
   ],
   "apiEndpoints": [
     {
       "method": "GET/POST/PUT/DELETE",
-      "path": "/api/具体路径",
-      "description": "接口功能描述"
+      "path": "/api/具体资源名",
+      "description": "接口功能"
     }
   ],
-  "securityNotes": [
-    "安全/隐私措施1",
-    "安全/隐私措施2"
-  ]
+  "securityNotes": ["具体安全措施"]
 }`;
 
   try {
@@ -152,6 +153,33 @@ function buildContextExport(
     ? intent.securityNotes.map(s => `- ${s}`).join('\n')
     : '无特殊安全要求';
 
+  // 依赖清单：根据技术栈推断需要安装的包
+  const deps: string[] = [];
+  const front = ts.frontend.toLowerCase();
+  const back = ts.backend.toLowerCase();
+  const dbType = ts.db.toLowerCase();
+
+  if (front.includes('next')) deps.push('next', 'react', 'react-dom');
+  else if (front.includes('expo')) deps.push('expo', 'react', 'react-native');
+  else if (front.includes('react')) deps.push('react', 'react-dom');
+  else if (front.includes('vue')) deps.push('vue');
+
+  if (front.includes('tailwind')) deps.push('tailwindcss');
+
+  if (back.includes('express')) deps.push('express');
+  if (back.includes('prisma')) deps.push('prisma', '@prisma/client');
+
+  if (dbType.includes('supabase')) deps.push('@supabase/supabase-js');
+  else if (dbType.includes('firebase')) deps.push('firebase');
+  else if (dbType.includes('prisma') || dbType.includes('postgresql')) deps.push('prisma', '@prisma/client');
+  else if (dbType.includes('mongodb')) deps.push('mongodb');
+
+  if (dbType.includes('zod') || front.includes('zod')) deps.push('zod');
+
+  const depList = deps.length
+    ? Array.from(new Set(deps)).map(d => `- ${d}`).join('\n')
+    : '根据技术栈安装对应依赖';
+
   return `# ${intent.businessGoal}
 
 ## 项目上下文
@@ -183,6 +211,10 @@ ${apis}
 ## 安全与隐私
 
 ${security}
+
+## 依赖清单
+
+${depList}
 
 ## 文件任务
 
@@ -256,14 +288,14 @@ export async function POST(req: NextRequest) {
           send({ type: 'progress', step: 'decompose', status: 'done', result: decompose });
         } catch (err) {
           console.warn('[context-compiler] decompose error, using fallback', err);
-          // 使用reasoner中的降级机制
           const simpleIntent: IntentResult = {
             businessGoal: intent.businessGoal,
             userType: intent.userType,
             productShape: intent.productShape,
             lifecycle: intent.lifecycle,
             ambiguity: intent.ambiguity,
-            decisionPoints: intent.decisionPoints
+            decisionPoints: intent.decisionPoints,
+            techStack: intent.techStack,
           };
           decompose = await decomposeToAtomicTasks(simpleIntent, input);
           send({ type: 'progress', step: 'decompose', status: 'done', result: decompose });
