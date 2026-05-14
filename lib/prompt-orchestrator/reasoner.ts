@@ -154,6 +154,10 @@ export async function decomposeToAtomicTasks(
 ): Promise<DecomposeResult> {
   const system = `你是高级全栈工程师。把需求拆解为具体的开发任务。
 
+## 核心原则
+- 独立设计最优的文件结构和架构，不要参考任何现有项目
+- 使用所选技术栈的最新最佳实践和目录约定
+
 ## 重要规则
 1. 文件名必须具体有意义，不要用 xxx.ts 这种占位符
 2. 每个文件的职责要明确到具体做什么，不要泛泛而谈
