@@ -45,59 +45,91 @@ async function callLLMWithRetry<T>(
 
 function getDefaultIdeaDeconstruction(idea: string): IdeaDeconstruction {
   return {
-    analysis: `让我们一起深入分析你的想法：${idea}。这是一个值得探索的方向。`,
+    analysis: `你想做「${idea}」，核心是解决用户在相关场景下的具体痛点。需要明确：目标用户是谁？他们现在怎么解决这个问题？你的方案相比现有方案有什么不同？先从最小的功能集开始验证核心假设。`,
     coreInsights: [
-      '需要进一步明确核心价值',
-      '建议从最小场景切入',
-      '先验证需求再投入开发'
+      `核心价值：围绕「${idea}」解决一个具体的用户痛点，而不是做大而全的平台`,
+      `切入点：找到一个现有产品做得不好的细分场景，从那里开始`,
+      `验证优先：先用最简单的方式验证用户是否真的需要这个功能，再投入开发`
     ]
   };
 }
 
-function getDefaultMarketReality(): MarketReality {
+function getDefaultMarketReality(idea: string): MarketReality {
   return {
-    whyCrowded: '这个方向有一定市场需求',
-    giants: ['现有成熟产品'],
-    whyWontMigrate: '用户已有使用习惯',
-    nicheOpportunities: ['垂直细分场景'],
-    avoidAreas: ['不要与大公司正面竞争']
+    whyCrowded: `「${idea}」这个方向已经有成熟产品在做，用户有多种选择，新进入者需要找到差异化切入点`,
+    giants: ['主流成熟产品 - 已有大量用户和品牌认知', '新兴竞品 - 在特定细分有优势'],
+    whyWontMigrate: '用户已经在现有产品中积累了数据和使用习惯，迁移成本高',
+    nicheOpportunities: [
+      `专注「${idea}」的某个细分场景，做深做透`,
+      '服务被现有产品忽视的特定用户群体',
+      '在某个功能上做到极致体验'
+    ],
+    avoidAreas: ['不要做大而全的平台', '不要正面与巨头竞争核心功能', '不要在没有验证的情况下大量投入']
   };
 }
 
-function getDefaultDifferentiation(): Differentiation {
+function getDefaultDifferentiation(idea: string): Differentiation {
   return {
-    entryPoint: '从一个具体小场景切入',
-    easiestUserGroup: '有明确痛点的用户',
-    minimalDifferentiation: '专注解决一个核心问题',
-    whyBigPlayersWontDoIt: '这不是他们的核心业务'
+    entryPoint: `专注于「${idea}」中最核心的一个功能场景，把这个做到极致，而不是做很多功能`,
+    easiestUserGroup: '对现有产品不满意、愿意尝试新方案的早期 adopter',
+    minimalDifferentiation: '在一个关键功能上提供明显更好的体验，让用户有理由切换',
+    whyBigPlayersWontDoIt: '大公司关注大市场，细分场景的精细化运营不是他们的优先级'
   };
 }
 
-function getDefaultMVP(): MVPShrink {
+function getDefaultMVP(idea: string): MVPShrink {
   return {
-    mustHave: ['核心功能1', '核心功能2', '核心功能3'],
-    mustNotDo: ['复杂功能', '社交功能', '高级配置'],
-    fastestValidation: '先做一个简单的原型验证',
-    validationSteps: ['验证需求', '验证产品', '验证市场']
+    mustHave: [
+      `「${idea}」最核心的一个功能 - 解决用户最痛的问题`,
+      '基础的数据记录和查看 - 让用户能看到自己的使用轨迹',
+      '简单的设置和引导 - 降低用户的使用门槛'
+    ],
+    mustNotDo: [
+      '社交功能 - 先不做分享、排行等社交特性',
+      '复杂的数据分析 - 先用最简单的统计',
+      '多平台同步 - 先做一个平台'
+    ],
+    fastestValidation: '先做一个简单的原型，让 10 个目标用户试用，观察他们是否真的会持续使用',
+    validationSteps: [
+      '找 10 个目标用户，了解他们现在的解决方案',
+      '做一个最简单的原型，展示核心功能',
+      '让用户试用 1 周，看留存率和反馈'
+    ]
   };
 }
 
-function getDefaultDirections(): ProductDirection[] {
+function getDefaultDirections(idea: string): ProductDirection[] {
   return [
-    { id: 'd1', name: '简洁实用版', whyFits: '专注核心功能', techFeasibility: '技术可行', riskLevel: '低', competition: '中等', estimateCycle: '2-4周' },
-    { id: 'd2', name: '垂直场景版', whyFits: '聚焦特定人群', techFeasibility: '实现不难', riskLevel: '中', competition: '较少', estimateCycle: '3-5周' }
+    {
+      id: 'd1',
+      name: `极简${idea.replace(/想做|做|App|应用|工具/g, '').trim()}工具`,
+      whyFits: `只做「${idea}」最核心的一个功能，快速上线验证`,
+      techFeasibility: '单人 2-3 周可完成，技术栈简单',
+      riskLevel: '低',
+      competition: '中等',
+      estimateCycle: '2-3 周'
+    },
+    {
+      id: 'd2',
+      name: `垂直场景版${idea.replace(/想做|做|App|应用|工具/g, '').trim()}`,
+      whyFits: `针对特定用户群体的「${idea}」，做更贴合他们需求的功能`,
+      techFeasibility: '需要更多定制化开发，3-4 周',
+      riskLevel: '中',
+      competition: '较少',
+      estimateCycle: '3-4 周'
+    }
   ];
 }
 
-function getDefaultReport(): any {
+function getDefaultReport(idea: string): any {
   return {
-    title: '方向建议报告',
+    title: `「${idea}」方向建议报告`,
     worthDoing: '值得小规模验证',
-    reason: '这个方向有实际需求',
-    whereToStart: '从最小可行验证开始',
-    minimalValidation: '先做简单的原型',
-    summary: '建议从小开始验证',
-    risks: '注意用户获取成本'
+    reason: `「${idea}」有真实的用户需求，但竞争也存在。建议先验证核心假设，再决定是否深入投入。`,
+    whereToStart: `从「${idea}」最核心的功能开始，做一个最简单的原型，找 10 个目标用户试用`,
+    minimalValidation: '用 2-3 周做一个最小原型，观察用户是否真的会持续使用',
+    summary: `建议从小规模验证开始，先确认用户真的需要「${idea}」的核心功能`,
+    risks: '主要风险是用户留存 - 很多工具类产品初期新鲜感过后就不用了，需要在产品设计上解决这个问题'
   };
 }
 
@@ -164,7 +196,7 @@ async function executePhase(
       } catch (error) {
         llmFailed = true;
         console.error('市场评估阶段LLM调用失败:', error);
-        const defaultMarket = getDefaultMarketReality();
+        const defaultMarket = getDefaultMarketReality(session.collectedFacts.originalIdea);
         updatedSession = addCollectedFacts(updatedSession, { marketReality: defaultMarket });
         (phaseOutput as Record<string, unknown>).marketReality = defaultMarket;
         phaseOutput.analysis = '市场评估完成（使用默认分析）';
@@ -190,7 +222,7 @@ async function executePhase(
       } catch (error) {
         llmFailed = true;
         console.error('差异化分析阶段LLM调用失败:', error);
-        const defaultDiff = getDefaultDifferentiation();
+        const defaultDiff = getDefaultDifferentiation(session.collectedFacts.originalIdea);
         updatedSession = addCollectedFacts(updatedSession, { differentiation: defaultDiff });
         (phaseOutput as Record<string, unknown>).differentiation = defaultDiff;
         phaseOutput.analysis = '差异化分析完成（使用默认分析）';
@@ -216,7 +248,7 @@ async function executePhase(
       } catch (error) {
         llmFailed = true;
         console.error('MVP设计阶段LLM调用失败:', error);
-        const defaultMVP = getDefaultMVP();
+        const defaultMVP = getDefaultMVP(session.collectedFacts.originalIdea);
         updatedSession = addCollectedFacts(updatedSession, { mvp: defaultMVP });
         (phaseOutput as Record<string, unknown>).mvp = defaultMVP;
         phaseOutput.analysis = 'MVP设计完成（使用默认分析）';
@@ -242,7 +274,7 @@ async function executePhase(
       } catch (error) {
         llmFailed = true;
         console.error('方向分析阶段LLM调用失败:', error);
-        const defaultDirs = getDefaultDirections();
+        const defaultDirs = getDefaultDirections(session.collectedFacts.originalIdea);
         (updatedSession.collectedFacts as Record<string, unknown>).possibleDirections = defaultDirs;
         (phaseOutput as Record<string, unknown>).directions = defaultDirs;
         const dirQuestion: DiscoveryQuestion = {
@@ -259,7 +291,7 @@ async function executePhase(
       if (llmResponse) {
         directions = llmResponse.directions as ProductDirection[];
         if (!directions || !Array.isArray(directions) || directions.length === 0) {
-          directions = getDefaultDirections();
+          directions = getDefaultDirections(session.collectedFacts.originalIdea);
         }
         (updatedSession.collectedFacts as Record<string, unknown>).possibleDirections = directions;
         (phaseOutput as Record<string, unknown>).directions = directions;
@@ -292,7 +324,7 @@ async function executePhase(
       } catch (error) {
         llmFailed = true;
         console.error('最终确认阶段LLM调用失败:', error);
-        const defaultReport = getDefaultReport();
+        const defaultReport = getDefaultReport(session.collectedFacts.originalIdea);
         updatedSession = addCollectedFacts(updatedSession, { finalReport: defaultReport });
         (phaseOutput as Record<string, unknown>).report = defaultReport;
         phaseOutput.analysis = '最终建议完成（使用默认分析）';

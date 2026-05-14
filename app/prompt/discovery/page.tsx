@@ -185,6 +185,16 @@ export default function IdeaDiscoveryPage() {
     return 'pending';
   };
 
+  // phase snake_case -> collectedFacts camelCase 映射
+  const phaseToFactKey: Record<string, string> = {
+    idea_deconstruction: 'ideaDeconstruction',
+    reality_assessment: 'marketReality',
+    differentiation_analysis: 'differentiation',
+    mvp_shrink: 'mvp',
+    validation_path: 'possibleDirections',
+    final_confirmation: 'finalReport',
+  };
+
   const renderPhaseContent = () => {
     if (!session) return null;
 
@@ -192,7 +202,10 @@ export default function IdeaDiscoveryPage() {
 
     for (const phase of allPhases) {
       const status = getPhaseStatus(phase);
-      const phaseData = session.collectedFacts[phase as keyof typeof session.collectedFacts];
+      const factKey = phaseToFactKey[phase];
+      const phaseData = factKey
+        ? (session.collectedFacts as Record<string, unknown>)[factKey]
+        : undefined;
 
       if (phaseData && status !== 'pending') {
         elements.push(
@@ -202,7 +215,7 @@ export default function IdeaDiscoveryPage() {
             isActive={status === 'active'}
             isCompleted={status === 'completed'}
             analysis={(phaseData as any)?.analysis}
-            data={phaseData as Record<string, unknown>}
+            collectedFacts={session.collectedFacts}
           />
         );
       }

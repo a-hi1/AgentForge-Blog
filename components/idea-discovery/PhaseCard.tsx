@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { DiscoveryPhase } from '@/lib/idea-discovery';
+import { DiscoveryPhase, CollectedFacts } from '@/lib/idea-discovery';
 import { getPhaseName } from '@/lib/idea-discovery/stateMachine';
 
 interface PhaseCardProps {
@@ -9,10 +9,10 @@ interface PhaseCardProps {
   isActive: boolean;
   isCompleted: boolean;
   analysis?: string;
-  data?: Record<string, unknown>;
+  collectedFacts?: CollectedFacts;
 }
 
-export function PhaseCard({ phase, isActive, isCompleted, analysis, data }: PhaseCardProps) {
+export function PhaseCard({ phase, isActive, isCompleted, analysis, collectedFacts }: PhaseCardProps) {
   const phaseName = getPhaseName(phase);
 
   return (
@@ -44,23 +44,23 @@ export function PhaseCard({ phase, isActive, isCompleted, analysis, data }: Phas
 
       {analysis && <p className="text-zinc-300 mb-4 leading-relaxed">{analysis}</p>}
 
-      {data && renderPhaseContent(phase, data)}
+      {collectedFacts && renderPhaseDetails(phase, collectedFacts)}
     </div>
   );
 }
 
-function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>) {
+function renderPhaseDetails(phase: DiscoveryPhase, facts: CollectedFacts) {
   switch (phase) {
     case 'idea_deconstruction': {
-      const deconstruction = data.ideaDeconstruction as Record<string, unknown> | undefined;
+      const deconstruction = facts.ideaDeconstruction;
       if (!deconstruction) return null;
       return (
         <div className="space-y-3 text-sm">
-          {Array.isArray(deconstruction.coreInsights) && (deconstruction.coreInsights as string[]).length > 0 && (
+          {Array.isArray(deconstruction.coreInsights) && deconstruction.coreInsights.length > 0 && (
             <div className="rounded-lg bg-violet-900/20 p-4 border border-violet-500/30">
               <div className="text-violet-300 font-medium mb-2">核心洞察：</div>
               <ul className="space-y-2">
-                {(deconstruction.coreInsights as string[]).map((insight, i) => (
+                {deconstruction.coreInsights.map((insight, i) => (
                   <li key={i} className="text-violet-100 flex items-start gap-2">
                     <span className="text-violet-400 mt-0.5">💡</span>
                     {insight}
@@ -74,24 +74,24 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
     }
 
     case 'reality_assessment': {
-      const mr = data as Record<string, unknown> | undefined;
+      const mr = facts.marketReality;
       if (!mr) return null;
       return (
         <div className="space-y-3 text-sm">
           <div>
             <span className="text-zinc-400">为什么拥挤：</span>
-            <span className="text-zinc-200 ml-2">{String(mr.whyCrowded || '-')}</span>
+            <span className="text-zinc-200 ml-2">{mr.whyCrowded || '-'}</span>
           </div>
           <div>
             <span className="text-zinc-400">巨头：</span>
-            {Array.isArray(mr.giants) && (mr.giants as string[]).map((g, i) => (
+            {Array.isArray(mr.giants) && mr.giants.map((g, i) => (
               <span key={i} className="text-zinc-200 ml-2">{g}</span>
             ))}
           </div>
           <div>
             <span className="text-zinc-400">机会方向：</span>
             <ul className="mt-1 ml-4 space-y-1">
-              {Array.isArray(mr.nicheOpportunities) && (mr.nicheOpportunities as string[]).map((o, i) => (
+              {Array.isArray(mr.nicheOpportunities) && mr.nicheOpportunities.map((o, i) => (
                 <li key={i} className="text-emerald-400">✓ {o}</li>
               ))}
             </ul>
@@ -99,7 +99,7 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
           <div>
             <span className="text-zinc-400">千万别碰：</span>
             <ul className="mt-1 ml-4 space-y-1">
-              {Array.isArray(mr.avoidAreas) && (mr.avoidAreas as string[]).map((a, i) => (
+              {Array.isArray(mr.avoidAreas) && mr.avoidAreas.map((a, i) => (
                 <li key={i} className="text-red-400">✗ {a}</li>
               ))}
             </ul>
@@ -109,28 +109,28 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
     }
 
     case 'differentiation_analysis': {
-      const diff = data as Record<string, unknown> | undefined;
+      const diff = facts.differentiation;
       if (!diff) return null;
       return (
         <div className="space-y-2 text-sm">
           <div className="rounded-lg bg-zinc-800 p-3">
             <div className="text-zinc-400 mb-1">具体切入点：</div>
-            <div className="text-zinc-200">{String(diff.entryPoint || '-')}</div>
+            <div className="text-zinc-200">{diff.entryPoint || '-'}</div>
           </div>
           <div className="rounded-lg bg-zinc-800 p-3">
             <div className="text-zinc-400 mb-1">最容易成功的用户群：</div>
-            <div className="text-zinc-200">{String(diff.easiestUserGroup || '-')}</div>
+            <div className="text-zinc-200">{diff.easiestUserGroup || '-'}</div>
           </div>
           <div className="rounded-lg bg-violet-900/30 p-3 border border-violet-500/30">
             <div className="text-violet-300 mb-1">最小差异化：</div>
-            <div className="text-violet-100">{String(diff.minimalDifferentiation || '-')}</div>
+            <div className="text-violet-100">{diff.minimalDifferentiation || '-'}</div>
           </div>
         </div>
       );
     }
 
     case 'mvp_shrink': {
-      const mvp = data as Record<string, unknown> | undefined;
+      const mvp = facts.mvp;
       if (!mvp) return null;
       return (
         <div className="space-y-3 text-sm">
@@ -138,7 +138,7 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
             <div className="rounded-lg bg-emerald-900/20 p-3 border border-emerald-500/30">
               <div className="text-emerald-400 mb-2 font-medium">必须做：</div>
               <ul className="space-y-1">
-                {Array.isArray(mvp.mustHave) && (mvp.mustHave as string[]).map((m, i) => (
+                {Array.isArray(mvp.mustHave) && mvp.mustHave.map((m, i) => (
                   <li key={i} className="text-emerald-300">• {m}</li>
                 ))}
               </ul>
@@ -146,21 +146,21 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
             <div className="rounded-lg bg-red-900/20 p-3 border border-red-500/30">
               <div className="text-red-400 mb-2 font-medium">暂时不做：</div>
               <ul className="space-y-1">
-                {Array.isArray(mvp.mustNotDo) && (mvp.mustNotDo as string[]).map((m, i) => (
+                {Array.isArray(mvp.mustNotDo) && mvp.mustNotDo.map((m, i) => (
                   <li key={i} className="text-red-300">• {m}</li>
                 ))}
               </ul>
             </div>
           </div>
           <div className="rounded-lg bg-amber-900/20 p-3 border border-amber-500/30">
-            <div className="text-amber-400 mb-1 font-medium">最快验证：{String(mvp.fastestValidation || '-')}</div>
+            <div className="text-amber-400 mb-1 font-medium">最快验证：{mvp.fastestValidation || '-'}</div>
           </div>
         </div>
       );
     }
 
     case 'validation_path': {
-      const dirs = data.directions as Array<Record<string, unknown>> | undefined;
+      const dirs = (facts as Record<string, unknown>).possibleDirections as Array<Record<string, unknown>> | undefined;
       if (!dirs) return null;
       return (
         <div className="space-y-2">
@@ -180,9 +180,9 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
     }
 
     case 'final_confirmation': {
-      const report = data as Record<string, unknown> | undefined;
+      const report = facts.finalReport;
       if (!report) return null;
-      const worth = String(report.worthDoing || '');
+      const worth = report.worthDoing || '';
       return (
         <div className="space-y-3">
           <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
@@ -190,10 +190,10 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
             : worth.includes('验证') ? 'bg-amber-500/20 text-amber-300'
             : 'bg-red-500/20 text-red-300'
           }`}>{worth}</div>
-          <p className="text-zinc-300">{String(report.reason || '')}</p>
+          <p className="text-zinc-300">{report.reason || ''}</p>
           <div className="rounded-lg bg-zinc-800 p-3">
             <div className="text-zinc-400 text-sm mb-1">从哪里开始：</div>
-            <div className="text-zinc-200">{String(report.whereToStart || '')}</div>
+            <div className="text-zinc-200">{report.whereToStart || ''}</div>
           </div>
         </div>
       );
