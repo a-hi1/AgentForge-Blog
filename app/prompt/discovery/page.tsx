@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   DiscoverySession,
   DiscoveryPhase,
-  DirectionRecommendationReport,
+  DirectionReport,
 } from '@/lib/idea-discovery';
 import { getPhaseName } from '@/lib/idea-discovery/stateMachine';
 import { PhaseCard } from '@/components/idea-discovery/PhaseCard';
@@ -26,7 +26,7 @@ export default function IdeaDiscoveryPage() {
     Array<{ phase: DiscoveryPhase; data: Record<string, unknown>; analysis?: string }>
   >([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [finalReport, setFinalReport] = useState<DirectionRecommendationReport | undefined>();
+  const [finalReport, setFinalReport] = useState<DirectionReport | undefined>();
 
   const abortRef = useRef<AbortController | null>(null);
 
