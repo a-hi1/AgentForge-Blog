@@ -57,17 +57,41 @@ async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
   const system = `你是产品技术顾问+全栈架构师。分析用户需求，输出具体的开发方案。
 
 ## 约束规则（必须严格遵守）
+
+### 功能约束
 1. **只做用户要求的功能**：不要自行添加用户没提到的功能。coreFeatures数量应与用户描述的核心功能数量一致，不要凑数。
-2. **技术栈最简可行**：MVP阶段优先选成熟、简单、免费的技术。
+2. **功能描述要具体可开发**：不要写"个性化算法"这种模糊描述，要拆解成具体的数据操作（如"按分类汇总支出"、"计算月度消费趋势"、"对比预算与实际支出"）。
+
+### 技术栈约束
+3. **技术栈最简可行**：MVP阶段优先选成熟、简单、免费的技术。
    - Mobile → Expo + Supabase 或 Firebase（不要React Native裸项目+自建后端）
    - Web → Next.js + Supabase 或 Vercel
    - 纯前端SPA → Vite + React + LocalStorage
-   - 不要同时选多个部署平台（如同时用Amplify和Heroku）
+   - 不要同时选多个部署平台
    - infra数组最多2个元素
-3. **技术栈只选一个**：每个维度（前端/后端/数据库）只能选一个具体技术，不要给"或"的选项
-4. **数据模型一致**：同一实体不要既嵌入子文档又独立建collection。如果用关系型DB（Supabase/PostgreSQL），用外键关联；如果用文档型（MongoDB/Firestore），可以嵌入但要合理
-5. **API路径用实际资源名**：不要用 \`{userId}\` 等占位符，用具体路径如 \`/api/transactions\`
-6. **如果有安全/隐私要求**：给出具体方案
+4. **技术栈只选一个**：每个维度（前端/后端/数据库）只能选一个具体技术。
+5. **infra必须与技术栈一致**：
+   - 如果用了Supabase → infra只填 ["Supabase"]，不要加Heroku/AWS等
+   - 如果用了Firebase → infra只填 ["Firebase"]
+   - 如果后端是"无" → infra不能包含自建服务器平台
+
+### BaaS模式约束（Supabase/Firebase）
+6. **如果数据库是Supabase或Firebase**（即BaaS模式）：
+   - backend字段填"无"
+   - apiEndpoints数组留空 [] — BaaS通过客户端SDK直接操作数据库，不需要自建API
+   - 安全措施必须提到该BaaS的安全机制（Supabase用RLS策略，Firebase用Security Rules）
+   - 不要提到HTTPS/密码哈希 — 这些BaaS平台默认提供
+   - dataModels的字段类型要匹配该平台（Supabase用PostgreSQL类型，Firebase用Firestore类型）
+
+### 自建后端模式约束
+7. **如果backend不是"无"**（如Express/FastAPI等）：
+   - apiEndpoints必须列出具体接口
+   - 安全措施要具体（JWT、bcrypt哈希、CORS等）
+
+### 数据模型约束
+8. **数据模型一致**：同一实体不要既嵌入子文档又独立建collection。
+   - 关系型DB（Supabase/PostgreSQL）→ 用外键关联，列出字段类型如 "amount: decimal(10,2)"
+   - 文档型（MongoDB/Firestore）→ 可以嵌入但要合理
 
 ## 输出格式（严格JSON）
 {
@@ -79,17 +103,17 @@ async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
   "decisionPoints": ["关键决策点1", "关键决策点2"],
   "techStack": {
     "frontend": "具体技术（只选一个）",
-    "backend": "具体技术（只选一个，纯前端填'无'）",
+    "backend": "具体技术（BaaS模式填'无'）",
     "db": "具体数据库（只选一个）",
-    "infra": ["具体部署方案，最多2个"]
+    "infra": ["具体部署方案，最多2个，必须与技术栈一致"]
   },
   "coreFeatures": [
-    "功能1：具体描述（只包含用户提到的功能）"
+    "功能1：具体描述（只包含用户提到的功能，必须可开发，不要模糊描述）"
   ],
   "dataModels": [
     {
       "name": "实体名",
-      "fields": ["字段名: 类型", "字段名: 类型"]
+      "fields": ["字段名: 具体类型"]
     }
   ],
   "apiEndpoints": [
@@ -99,7 +123,7 @@ async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
       "description": "接口功能"
     }
   ],
-  "securityNotes": ["具体安全措施"]
+  "securityNotes": ["针对所选技术栈的具体安全措施"]
 }`;
 
   try {
@@ -142,10 +166,13 @@ function buildContextExport(
     : '无特定数据模型';
 
   // API接口
+  const isBaaS = ts.backend === '无' || ts.backend.toLowerCase() === 'none';
   const apis = intent.apiEndpoints?.length
     ? intent.apiEndpoints.map(a =>
       `- \`${a.method} ${a.path}\` — ${a.description}`
     ).join('\n')
+    : isBaaS
+    ? '无自建API — 使用客户端SDK直接操作数据库'
     : '无API接口（纯前端应用）';
 
   // 安全/隐私

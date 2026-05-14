@@ -167,6 +167,12 @@ export async function decomposeToAtomicTasks(
 6. MVP阶段最小化文件数量，不要过度拆分
 7. 必须包含导航/路由/入口结构文件
 8. 不要创建用户需求中未提到的功能对应的文件
+9. BaaS模式（Supabase/Firebase）特殊规则：
+   - 不要创建 src/api/ 或 app/api/ 下的路由文件 — BaaS通过客户端SDK直接操作
+   - 必须包含BaaS客户端初始化文件（如 services/supabase.ts）
+   - 如果需要认证，包含auth相关hooks或services
+   - 数据库schema通过migration文件或SQL文件定义，不是代码文件
+10. 自建后端模式：必须包含API路由文件和中间件
 
 ## 输出格式（严格JSON）
 {
