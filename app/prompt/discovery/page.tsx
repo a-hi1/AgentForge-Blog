@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   DiscoverySession,
@@ -23,9 +23,6 @@ export default function IdeaDiscoveryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentAnswers, setCurrentAnswers] = useState<Record<string, unknown>>({});
-  const [phaseHistory, setPhaseHistory] = useState<
-    Array<{ phase: DiscoveryPhase; data: Record<string, unknown>; analysis?: string }>
-  >([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [finalReport, setFinalReport] = useState<DirectionReport | undefined>();
 
@@ -53,24 +50,19 @@ export default function IdeaDiscoveryPage() {
         try {
           const data = JSON.parse(payload);
 
-        if (data.type === 'phase_analysis') {
-          setPhaseHistory((prev) => [
-            ...prev,
-            { phase: data.phase, data: data.data || {}, analysis: data.data?.analysis },
-          ]);
-        } else if (data.type === 'session_update') {
-          setSession(data.session);
-          if (data.report) {
-            setFinalReport(data.report);
+          if (data.type === 'session_update') {
+            setSession(data.session);
+            if (data.report) {
+              setFinalReport(data.report);
+            }
+          } else if (data.type === 'complete') {
+            setSession(data.session);
+            if (data.report) {
+              setFinalReport(data.report);
+            }
+          } else if (data.type === 'error') {
+            throw new Error(data.error || '未知错误');
           }
-        } else if (data.type === 'complete') {
-          setSession(data.session);
-          if (data.report) {
-            setFinalReport(data.report);
-          }
-        } else if (data.type === 'error') {
-          throw new Error(data.error || '未知错误');
-        }
         } catch (parseError) {
           console.error('SSE parse error:', parseError);
         }
@@ -85,7 +77,6 @@ export default function IdeaDiscoveryPage() {
     setError('');
     setSession(null);
     setCurrentAnswers({});
-    setPhaseHistory([]);
     setFinalReport(undefined);
 
     abortRef.current = new AbortController();
@@ -144,29 +135,6 @@ export default function IdeaDiscoveryPage() {
     setFinalReport(record.report);
     setIdea(record.originalIdea);
     setError('');
-    
-    const phaseData: Array<{ phase: DiscoveryPhase; data: any; analysis?: string }> = [];
-    const phaseSequence: DiscoveryPhase[] = [
-      'idea_deconstruction',
-      'reality_assessment',
-      'differentiation_analysis',
-      'mvp_shrink',
-      'validation_path',
-      'final_confirmation',
-    ];
-    
-    phaseSequence.forEach((phase) => {
-      const phaseDataKey = phase as keyof typeof record.session.collectedFacts;
-      if (record.session.collectedFacts[phaseDataKey]) {
-        phaseData.push({
-          phase,
-          data: record.session.collectedFacts[phaseDataKey],
-          analysis: (record.session.collectedFacts[phaseDataKey] as any)?.analysis,
-        });
-      }
-    });
-    
-    setPhaseHistory(phaseData);
   }, []);
 
   const reset = useCallback(() => {
@@ -175,13 +143,12 @@ export default function IdeaDiscoveryPage() {
     setLoading(false);
     setError('');
     setCurrentAnswers({});
-    setPhaseHistory([]);
     setFinalReport(undefined);
     abortRef.current?.abort();
   }, []);
 
   const handleClearHistory = () => {
-    if (confirm('确定要清除所有历史记录并重置吗？这将重新开始一个干净的探索。')) {
+    if (confirm('确定要清除所有历史记录并重置吗？')) {
       clearAllDiscoveryHistory();
       reset();
     }
@@ -206,11 +173,31 @@ export default function IdeaDiscoveryPage() {
     return 'pending';
   };
 
-  useEffect(() => {
-    if (session && !loading) {
-      saveDiscoveryToHistory(session, finalReport);
+  const renderPhaseContent = () => {
+    if (!session) return null;
+
+    const elements: React.ReactNode[] = [];
+
+    for (const phase of allPhases) {
+      const status = getPhaseStatus(phase);
+      const phaseData = session.collectedFacts[phase as keyof typeof session.collectedFacts];
+
+      if (phaseData && status !== 'pending') {
+        elements.push(
+          <PhaseCard
+            key={phase}
+            phase={phase}
+            isActive={status === 'active'}
+            isCompleted={status === 'completed'}
+            analysis={(phaseData as any)?.analysis}
+            data={phaseData as Record<string, unknown>}
+          />
+        );
+      }
     }
-  }, [session, finalReport, loading]);
+
+    return elements;
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 flex">
@@ -223,9 +210,9 @@ export default function IdeaDiscoveryPage() {
       />
       
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="max-w-3xl mx-auto px-6 py-8">
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <div>
                 <h1 className="text-2xl font-bold text-white">方向探索</h1>
                 <p className="mt-1 text-sm text-zinc-400">
@@ -272,7 +259,7 @@ export default function IdeaDiscoveryPage() {
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-4 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
                   rows={4}
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={handleStartDiscovery}
                     disabled={loading || !idea.trim()}
@@ -329,19 +316,12 @@ export default function IdeaDiscoveryPage() {
                 })}
               </div>
 
-              {phaseHistory.map((entry, index) => (
-                <PhaseCard
-                  key={index}
-                  phase={entry.phase}
-                  isActive={false}
-                  isCompleted={true}
-                  analysis={entry.analysis}
-                  data={entry.data}
-                />
-              ))}
+              <div className="space-y-4">
+                {renderPhaseContent()}
+              </div>
 
               {session.unresolvedQuestions.length > 0 && (
-                <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-violet-500/5 p-8">
+                <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-violet-500/5 p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-xl font-semibold text-violet-300">
@@ -353,12 +333,9 @@ export default function IdeaDiscoveryPage() {
                           : '最后一个问题了！'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/20 text-violet-300 text-sm">
-                      <span>第 {Math.min(session.unresolvedQuestions.length, 6)} 阶段</span>
-                    </div>
                   </div>
                   
-                  <div className="space-y-8">
+                  <div className="space-y-6">
                     {session.unresolvedQuestions.map((question, idx) => (
                       <div key={question.id}>
                         <QuestionRenderer
@@ -435,7 +412,6 @@ export default function IdeaDiscoveryPage() {
                       <p className="text-zinc-400">{finalReport.risks}</p>
                     </div>
 
-                    {/* 生成项目描述，可直接复制到AI导出 */}
                     <div className="rounded-lg bg-violet-500/10 border border-violet-500/30 p-4">
                       <h4 className="text-sm font-medium text-violet-300 mb-3">📋 项目描述（可直接复制到AI导出）</h4>
                       <textarea

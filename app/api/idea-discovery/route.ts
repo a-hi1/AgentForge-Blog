@@ -33,30 +33,36 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { idea, sessionId, answers } = body;
 
-        let session: DiscoverySession;
+        let currentSession: DiscoverySession;
+
+        const eventHandler = (event: any) => {
+          sendSSE(controller, encoder, event);
+        };
 
         if (sessionId && sessionStore.has(sessionId)) {
           const existingSession = sessionStore.get(sessionId)!;
-          session = await continueDiscovery(
+          currentSession = await continueDiscovery(
             existingSession,
             answers || {},
-            (event: any) => {
-              sendSSE(controller, encoder, event);
-            }
+            eventHandler
           );
         } else {
-          session = await startDiscovery(idea || '', (event: any) => {
-            sendSSE(controller, encoder, event);
-          });
+          currentSession = await startDiscovery(idea || '', eventHandler);
         }
 
-        sessionStore.set(session.id, session);
+        sessionStore.set(currentSession.id, currentSession);
 
-        const finalReport = session.collectedFacts.finalReport;
+        const finalReport = currentSession.collectedFacts.finalReport;
+
+        sendSSE(controller, encoder, {
+          type: 'session_update',
+          session: currentSession,
+          report: finalReport,
+        });
 
         sendSSE(controller, encoder, {
           type: 'complete',
-          session,
+          session: currentSession,
           report: finalReport,
         });
 
