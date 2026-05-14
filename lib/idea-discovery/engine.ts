@@ -25,9 +25,18 @@ async function callLLMWithRetry<T>(
   let lastError: Error | null = null;
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await callLLMWithJSON<T>(messages);
+      const result = await callLLMWithJSON<T>(messages);
+      // 验证返回结果不是空对象或null
+      if (result && typeof result === 'object' && Object.keys(result).length > 0) {
+        return result;
+      }
+      console.warn(`LLM返回空结果，重试 ${i + 1}/${maxRetries}`);
+      lastError = new Error('LLM返回空结果');
     } catch (error) {
       lastError = error as Error;
+      console.error(`LLM调用失败 (${i + 1}/${maxRetries}):`, error);
+    }
+    if (i < maxRetries - 1) {
       await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
     }
   }
@@ -92,6 +101,13 @@ function getDefaultReport(): any {
   };
 }
 
+// 验证LLM返回的分析是否有意义（不是空话）
+function isAnalysisMeaningful(analysis: string | undefined): boolean {
+  if (!analysis || typeof analysis !== 'string') return false;
+  const genericPhrases = ['分析完成', '正在分析', '值得探索', '需要进一步', '建议从'];
+  return analysis.length > 20 && !genericPhrases.some(p => analysis === p);
+}
+
 async function executePhase(
   session: DiscoverySession,
   onEvent?: (event: any) => void
@@ -100,6 +116,7 @@ async function executePhase(
 
   let updatedSession = { ...session };
   const phaseOutput: PhaseOutput = { analysis: '分析完成' };
+  let llmFailed = false;
 
   switch (session.currentPhase) {
     case 'idea_deconstruction': {
@@ -111,10 +128,12 @@ async function executePhase(
           { role: 'user', content: user },
         ]);
       } catch (error) {
-        phaseOutput.analysis = '正在分析你的想法...';
+        llmFailed = true;
+        console.error('想法拆解阶段LLM调用失败:', error);
         const defaultDeconstruction = getDefaultIdeaDeconstruction(session.collectedFacts.originalIdea);
         updatedSession = addCollectedFacts(updatedSession, { ideaDeconstruction: defaultDeconstruction });
         (phaseOutput as Record<string, unknown>).ideaDeconstruction = defaultDeconstruction;
+        phaseOutput.analysis = '想法拆解完成（使用默认分析）';
       }
       if (llmResponse) {
         const ideaDeconstruction = llmResponse.ideaDeconstruction as IdeaDeconstruction || {
@@ -143,10 +162,12 @@ async function executePhase(
           { role: 'user', content: user },
         ]);
       } catch (error) {
-        phaseOutput.analysis = '正在分析市场情况...';
+        llmFailed = true;
+        console.error('市场评估阶段LLM调用失败:', error);
         const defaultMarket = getDefaultMarketReality();
         updatedSession = addCollectedFacts(updatedSession, { marketReality: defaultMarket });
         (phaseOutput as Record<string, unknown>).marketReality = defaultMarket;
+        phaseOutput.analysis = '市场评估完成（使用默认分析）';
       }
       if (llmResponse) {
         const marketReality = llmResponse.marketReality as MarketReality;
@@ -167,10 +188,12 @@ async function executePhase(
           { role: 'user', content: user },
         ]);
       } catch (error) {
-        phaseOutput.analysis = '正在寻找差异化机会...';
+        llmFailed = true;
+        console.error('差异化分析阶段LLM调用失败:', error);
         const defaultDiff = getDefaultDifferentiation();
         updatedSession = addCollectedFacts(updatedSession, { differentiation: defaultDiff });
         (phaseOutput as Record<string, unknown>).differentiation = defaultDiff;
+        phaseOutput.analysis = '差异化分析完成（使用默认分析）';
       }
       if (llmResponse) {
         const differentiation = llmResponse.differentiation as Differentiation;
@@ -191,10 +214,12 @@ async function executePhase(
           { role: 'user', content: user },
         ]);
       } catch (error) {
-        phaseOutput.analysis = '正在设计MVP...';
+        llmFailed = true;
+        console.error('MVP设计阶段LLM调用失败:', error);
         const defaultMVP = getDefaultMVP();
         updatedSession = addCollectedFacts(updatedSession, { mvp: defaultMVP });
         (phaseOutput as Record<string, unknown>).mvp = defaultMVP;
+        phaseOutput.analysis = 'MVP设计完成（使用默认分析）';
       }
       if (llmResponse) {
         const mvp = llmResponse.mvp as MVPShrink;
@@ -215,7 +240,8 @@ async function executePhase(
           { role: 'user', content: user },
         ]);
       } catch (error) {
-        phaseOutput.analysis = '正在生成方向建议...';
+        llmFailed = true;
+        console.error('方向分析阶段LLM调用失败:', error);
         const defaultDirs = getDefaultDirections();
         (updatedSession.collectedFacts as Record<string, unknown>).possibleDirections = defaultDirs;
         (phaseOutput as Record<string, unknown>).directions = defaultDirs;
@@ -227,6 +253,7 @@ async function executePhase(
         };
         updatedSession = setUnresolvedQuestions(updatedSession, [dirQuestion]);
         phaseOutput.questions = [dirQuestion];
+        phaseOutput.analysis = '方向分析完成（使用默认分析）';
       }
       let directions: ProductDirection[] = [];
       if (llmResponse) {
@@ -263,10 +290,12 @@ async function executePhase(
           { role: 'user', content: user },
         ]);
       } catch (error) {
-        phaseOutput.analysis = '正在生成最终建议...';
+        llmFailed = true;
+        console.error('最终确认阶段LLM调用失败:', error);
         const defaultReport = getDefaultReport();
         updatedSession = addCollectedFacts(updatedSession, { finalReport: defaultReport });
         (phaseOutput as Record<string, unknown>).report = defaultReport;
+        phaseOutput.analysis = '最终建议完成（使用默认分析）';
       }
       if (llmResponse) {
         const report = llmResponse.report as any;
@@ -278,6 +307,11 @@ async function executePhase(
       }
       break;
     }
+  }
+
+  // 通知前端是否有LLM失败
+  if (llmFailed) {
+    onEvent?.({ type: 'phase_warning', phase: session.currentPhase, message: 'AI分析暂时不可用，使用了默认分析。你可以稍后重试获得更好的分析。' });
   }
 
   onEvent?.({ type: 'phase_analysis', phase: session.currentPhase, data: { ...phaseOutput } });

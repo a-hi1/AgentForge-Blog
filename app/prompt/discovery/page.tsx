@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   DiscoverySession,
@@ -25,8 +25,16 @@ export default function IdeaDiscoveryPage() {
   const [currentAnswers, setCurrentAnswers] = useState<Record<string, unknown>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [finalReport, setFinalReport] = useState<DirectionReport | undefined>();
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
+
+  // 自动保存探索记录到 localStorage
+  useEffect(() => {
+    if (session) {
+      saveDiscoveryToHistory(session, finalReport);
+    }
+  }, [session, finalReport]);
 
   const processSSEStream = useCallback(async (response: Response) => {
     if (!response.body) throw new Error('No response body');
@@ -60,6 +68,8 @@ export default function IdeaDiscoveryPage() {
             if (data.report) {
               setFinalReport(data.report);
             }
+          } else if (data.type === 'phase_warning') {
+            setWarnings(prev => [...prev, data.message]);
           } else if (data.type === 'error') {
             throw new Error(data.error || '未知错误');
           }
@@ -78,6 +88,7 @@ export default function IdeaDiscoveryPage() {
     setSession(null);
     setCurrentAnswers({});
     setFinalReport(undefined);
+    setWarnings([]);
 
     abortRef.current = new AbortController();
 
@@ -144,6 +155,7 @@ export default function IdeaDiscoveryPage() {
     setError('');
     setCurrentAnswers({});
     setFinalReport(undefined);
+    setWarnings([]);
     abortRef.current?.abort();
   }, []);
 
@@ -290,6 +302,18 @@ export default function IdeaDiscoveryPage() {
               >
                 重试
               </button>
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div className="mb-6 rounded-xl border border-amber-800/50 bg-amber-950/30 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-amber-400">⚠</span>
+                <p className="text-sm text-amber-300 font-medium">AI 分析提示</p>
+              </div>
+              {warnings.map((warning, idx) => (
+                <p key={idx} className="text-xs text-amber-400/80 mb-1">{warning}</p>
+              ))}
             </div>
           )}
 

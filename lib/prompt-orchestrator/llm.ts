@@ -17,8 +17,8 @@ export async function callLLMWithJSON<T>(
         body: JSON.stringify({
           model: MODEL,
           messages,
-          temperature: temperature + attempt * 0.15,
-          max_tokens: 3500,
+          temperature: temperature + attempt * 0.1,
+          max_tokens: 4000,
           top_p: 0.9,
         }),
       });
@@ -35,17 +35,17 @@ export async function callLLMWithJSON<T>(
 
       if (!content) {
         console.warn(`Empty response from LLM, attempt ${attempt + 1}/${maxRetries + 1}`);
-        if (attempt === maxRetries) throw new Error('Empty response from LLM');
+        if (attempt === maxRetries) throw new Error('AI 返回了空响应');
         continue;
       }
 
       const parsed = safeParseLLMJson<T>(content, null as unknown as T);
-      if (parsed !== null && typeof parsed === 'object') {
+      if (parsed !== null && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
         return parsed;
       }
 
       console.warn(`Failed to parse JSON, attempt ${attempt + 1}/${maxRetries + 1}`, content.slice(0, 200));
-      if (attempt === maxRetries) throw new Error('Failed to parse JSON from LLM response');
+      if (attempt === maxRetries) throw new Error('AI 返回的内容无法解析为有效的 JSON');
     } catch (e) {
       console.error(`Error in LLM call, attempt ${attempt + 1}/${maxRetries + 1}:`, e);
       if (attempt === maxRetries) throw e;
