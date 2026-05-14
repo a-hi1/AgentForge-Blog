@@ -18,7 +18,7 @@ export default function Dashboard() {
           </p>
           <div className="flex items-center justify-center gap-3">
             <Link
-              href="/vault"
+              href="/projects"
               className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] hover:from-[#7C3AED] hover:to-[#2563EB] text-sm font-medium text-white transition-all"
             >
               导入 GitHub 仓库

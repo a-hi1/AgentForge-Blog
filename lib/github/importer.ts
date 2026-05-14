@@ -38,25 +38,26 @@ export function parseRepoUrl(url: string): { owner: string; repo: string } {
   return { owner: match[1], repo: match[2].replace(/\.git$/, '') };
 }
 
+async function proxyFetch(action: string, params: Record<string, string>) {
+  const res = await fetch('/api/github-proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `请求失败: ${res.status}`);
+  }
+
+  return res;
+}
+
 export async function fetchRepoMeta(
   owner: string,
   repo: string,
-  token?: string
 ): Promise<RepoMeta> {
-  const headers: HeadersInit = {
-    'Accept': 'application/vnd.github.v3+json'
-  };
-  if (token) {
-    headers['Authorization'] = `token ${token}`;
-  }
-
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
-  if (!res.ok) {
-    if (res.status === 404) throw new Error('仓库不存在或为私有仓库');
-    if (res.status === 403) throw new Error('GitHub API 请求限流，请稍后重试或配置 GITHUB_TOKEN');
-    throw new Error(`获取仓库信息失败: ${res.status}`);
-  }
-
+  const res = await proxyFetch('meta', { owner, repo });
   const data = await res.json();
   return {
     name: data.name,
@@ -76,20 +77,8 @@ export async function fetchRepoTree(
   owner: string,
   repo: string,
   branch: string,
-  token?: string
 ): Promise<RepoTree> {
-  const headers: HeadersInit = {
-    'Accept': 'application/vnd.github.v3+json'
-  };
-  if (token) {
-    headers['Authorization'] = `token ${token}`;
-  }
-
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, { headers });
-  if (!res.ok) {
-    throw new Error(`获取文件树失败: ${res.status}`);
-  }
-
+  const res = await proxyFetch('tree', { owner, repo, branch });
   const data = await res.json();
   const items: RepoTreeItem[] = (data.tree || []).map((item: any) => ({
     path: item.path,
@@ -98,7 +87,7 @@ export async function fetchRepoTree(
     sha: item.sha
   }));
 
-  const keyFiles = await fetchKeyFiles(owner, repo, items, token);
+  const keyFiles = await fetchKeyFiles(owner, repo, items);
 
   return { items, keyFiles };
 }
@@ -107,24 +96,16 @@ async function fetchKeyFiles(
   owner: string,
   repo: string,
   items: RepoTreeItem[],
-  token?: string
 ): Promise<RepoTree['keyFiles']> {
   const keyFiles: RepoTree['keyFiles'] = {};
-  const headers: HeadersInit = {
-    'Accept': 'application/vnd.github.v3.raw'
-  };
-  if (token) {
-    headers['Authorization'] = `token ${token}`;
-  }
 
   const fetchFile = async (path: string) => {
     try {
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, { headers });
-      if (res.ok) {
-        return await res.text();
-      }
-    } catch {}
-    return undefined;
+      const res = await proxyFetch('file', { owner, repo, path });
+      return await res.text();
+    } catch {
+      return undefined;
+    }
   };
 
   const packageJsonPath = items.find(i => i.path === 'package.json');

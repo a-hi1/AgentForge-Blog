@@ -17,6 +17,7 @@ import {
   PromptPhase,
 } from '@/lib/prompt/history';
 import { refinePrompt, RefinementResult } from '@/lib/prompt/refiner';
+import { calculatePromptScore } from '@/lib/prompt/scorer';
 import { loadSkills, removeSkill, type Skill } from '@/lib/session/skillStore';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -207,7 +208,24 @@ export default function PromptHistoryPage() {
         originalPrompt: selectedRecord.fullPrompt,
         score: selectedRecord.score,
       });
-      setRefinementResult(result);
+
+      // Compute before/after scores
+      const originalScore = calculatePromptScore({
+        prompt: selectedRecord.fullPrompt,
+        executionSuccess: selectedRecord.executionSuccess,
+        userFeedback: selectedRecord.feedback,
+      });
+      const improvedScore = calculatePromptScore({
+        prompt: result.improvedPrompt,
+        executionSuccess: selectedRecord.executionSuccess,
+        userFeedback: selectedRecord.feedback,
+      });
+
+      setRefinementResult({
+        ...result,
+        originalScore,
+        improvedScore,
+      });
       setShowRefinement(true);
     } catch (e) {
       console.error('[PromptRefine] Failed:', e);
@@ -1064,6 +1082,49 @@ export default function PromptHistoryPage() {
                   <h3 className="text-sm font-medium text-[#FAFAFA] mb-2">改进点</h3>
                   <ul className="space-y-1">{refinementResult.improvements.map((imp, idx) => <li key={idx} className="text-sm text-[#10B981]">✓ {imp}</li>)}</ul>
                 </div>
+
+                {refinementResult.originalScore && refinementResult.improvedScore && (
+                  <div className="p-4 rounded-lg bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)]">
+                    <h3 className="text-sm font-medium text-[#FAFAFA] mb-3">评分对比</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <p className="text-xs text-[#71717A] mb-1">优化前</p>
+                        <p className={`text-2xl font-bold ${getScoreColor(refinementResult.originalScore.overall)}`}>
+                          {refinementResult.originalScore.overall}
+                        </p>
+                        <div className="grid grid-cols-2 gap-1 text-[10px] mt-2 text-[#71717A]">
+                          <div>结构: <span className={getScoreColor(refinementResult.originalScore.dimensions.structure)}>{refinementResult.originalScore.dimensions.structure}</span></div>
+                          <div>专业: <span className={getScoreColor(refinementResult.originalScore.dimensions.professionalism)}>{refinementResult.originalScore.dimensions.professionalism}</span></div>
+                          <div>可执行: <span className={getScoreColor(refinementResult.originalScore.dimensions.executability)}>{refinementResult.originalScore.dimensions.executability}</span></div>
+                          <div>执行率: <span className={getScoreColor(refinementResult.originalScore.dimensions.executionSuccess)}>{refinementResult.originalScore.dimensions.executionSuccess}</span></div>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-[#71717A] mb-1">优化后</p>
+                        <p className={`text-2xl font-bold ${getScoreColor(refinementResult.improvedScore.overall)}`}>
+                          {refinementResult.improvedScore.overall}
+                        </p>
+                        <div className="grid grid-cols-2 gap-1 text-[10px] mt-2 text-[#71717A]">
+                          <div>结构: <span className={getScoreColor(refinementResult.improvedScore.dimensions.structure)}>{refinementResult.improvedScore.dimensions.structure}</span></div>
+                          <div>专业: <span className={getScoreColor(refinementResult.improvedScore.dimensions.professionalism)}>{refinementResult.improvedScore.dimensions.professionalism}</span></div>
+                          <div>可执行: <span className={getScoreColor(refinementResult.improvedScore.dimensions.executability)}>{refinementResult.improvedScore.dimensions.executability}</span></div>
+                          <div>执行率: <span className={getScoreColor(refinementResult.improvedScore.dimensions.executionSuccess)}>{refinementResult.improvedScore.dimensions.executionSuccess}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                    {refinementResult.improvedScore.overall > refinementResult.originalScore.overall && (
+                      <p className="text-center text-xs text-[#10B981] mt-3 font-medium">
+                        +{refinementResult.improvedScore.overall - refinementResult.originalScore.overall} 分提升
+                      </p>
+                    )}
+                    {refinementResult.improvedScore.overall <= refinementResult.originalScore.overall && (
+                      <p className="text-center text-xs text-[#71717A] mt-3">
+                        结构已优化，执行效果取决于实际使用
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <h3 className="text-sm font-medium text-[#FAFAFA] mb-2">优化后的 Prompt</h3>
                   <pre className="text-xs text-[#A1A1AA] whitespace-pre-wrap bg-[#070707] border border-[rgba(255,255,255,0.1)] rounded-lg p-4 max-h-60 overflow-y-auto">{refinementResult.improvedPrompt}</pre>

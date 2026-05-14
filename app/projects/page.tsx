@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { parseRepoUrl, fetchRepoMeta, fetchRepoTree, RepoMeta } from '@/lib/github/importer';
 import { analyzeCodebase, CodeAnalysis } from '@/lib/github/codeAnalyzer';
+import { analyzeMaturity, generateRecommendationPrompts, MaturityResult } from '@/lib/projects/maturityAnalyzer';
 import { buildContextPack, ExportTarget } from '@/lib/export/contextPack';
+import RepoInsights from '@/components/projects/RepoInsights';
+
+const STORAGE_KEY = 'agentforge_imported_repo';
 
 export default function ProjectsPage() {
   const [importUrl, setImportUrl] = useState('');
@@ -11,7 +15,26 @@ export default function ProjectsPage() {
   const [importError, setImportError] = useState('');
   const [meta, setMeta] = useState<RepoMeta | null>(null);
   const [analysis, setAnalysis] = useState<CodeAnalysis | null>(null);
+  const [maturity, setMaturity] = useState<MaturityResult | null>(null);
+  const [recommendations, setRecommendations] = useState<{ title: string; prompt: string }[]>([]);
   const [copiedLabel, setCopiedLabel] = useState('');
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.meta && data.analysis) {
+          setMeta(data.meta);
+          setAnalysis(data.analysis);
+          setMaturity(data.maturity || null);
+          setRecommendations(data.recommendations || []);
+          setImportUrl(data.importUrl || '');
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const handleImport = useCallback(async () => {
     try {
@@ -21,8 +44,22 @@ export default function ProjectsPage() {
       const m = await fetchRepoMeta(owner, repo);
       const tree = await fetchRepoTree(owner, repo, m.defaultBranch);
       const a = analyzeCodebase(tree);
+      const mat = analyzeMaturity(m, tree, a);
+      const recs = generateRecommendationPrompts(a, mat);
+
       setMeta(m);
       setAnalysis(a);
+      setMaturity(mat);
+      setRecommendations(recs);
+
+      // Persist to localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        meta: m,
+        analysis: a,
+        maturity: mat,
+        recommendations: recs,
+        importUrl,
+      }));
     } catch (err: unknown) {
       setImportError(err instanceof Error ? err.message : '导入失败');
     } finally {
@@ -33,7 +70,18 @@ export default function ProjectsPage() {
   const handleCopy = async (target: ExportTarget) => {
     if (!meta || !analysis) return;
     const text = buildContextPack(target, meta, analysis);
-    await navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
     const labels: Record<ExportTarget, string> = { claude: 'Claude', cursor: 'Cursor', gpt: 'GPT' };
     setCopiedLabel(`${labels[target]} 已复制`);
     setTimeout(() => setCopiedLabel(''), 2000);
@@ -42,7 +90,10 @@ export default function ProjectsPage() {
   const reset = () => {
     setMeta(null);
     setAnalysis(null);
+    setMaturity(null);
+    setRecommendations([]);
     setImportUrl('');
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
@@ -78,94 +129,15 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {meta && analysis && (
+        {meta && analysis && maturity && (
           <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">
-                  <a href={`https://github.com/${meta.owner}/${meta.repo}`} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300">
-                    {meta.owner}/{meta.name}
-                  </a>
-                </h2>
-                <p className="text-sm text-zinc-400 mt-1">{meta.description || '无描述'}</p>
-              </div>
-              <button onClick={reset} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition">重新导入</button>
-            </div>
-
-            {/* Stats Row */}
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { label: 'Stars', value: meta.stars.toLocaleString() },
-                { label: '语言', value: meta.language || '-' },
-                { label: '架构', value: { monolith: '单体', fullstack: '全栈', frontend: '前端', 'api-first': 'API' }[analysis.architecture] },
-                { label: '技术栈数', value: String(analysis.techStack.length) },
-              ].map(s => (
-                <div key={s.label} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-                  <p className="text-xs text-zinc-500">{s.label}</p>
-                  <p className="text-lg font-bold text-white mt-1">{s.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Tech Stack */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-              <h3 className="text-sm font-semibold text-white mb-3">技术栈</h3>
-              <div className="flex flex-wrap gap-2">
-                {analysis.techStack.map(t => (
-                  <span key={t} className="px-3 py-1 bg-violet-500/20 text-violet-300 rounded-full text-sm">{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Tech Decisions */}
-            {analysis.techDecisions.length > 0 && (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                <h3 className="text-sm font-semibold text-white mb-3">技术决策</h3>
-                <div className="space-y-2">
-                  {analysis.techDecisions.map((d, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm">
-                      <span className="text-violet-400 shrink-0 mt-0.5">•</span>
-                      <span className="text-zinc-200 font-medium">{d.decision}</span>
-                      <span className="text-zinc-500">— {d.why}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* File Structure + Features */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                <h3 className="text-sm font-semibold text-white mb-3">文件结构</h3>
-                <p className="font-mono text-sm text-zinc-400">{analysis.directorySummary}</p>
-                {analysis.todos.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-zinc-800">
-                    <p className="text-xs text-zinc-500 mb-2">待处理文件 ({analysis.todos.length})</p>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
-                      {analysis.todos.slice(0, 20).map((t, i) => (
-                        <p key={i} className="text-xs text-zinc-500 font-mono">{t}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                <h3 className="text-sm font-semibold text-white mb-3">功能模块</h3>
-                <div className="space-y-2">
-                  {analysis.features.map(f => (
-                    <div key={f} className="flex items-center gap-2 text-sm text-zinc-300">
-                      <span className="text-emerald-400">✓</span> {f}
-                    </div>
-                  ))}
-                  {analysis.missingModules.map(m => (
-                    <div key={m} className="flex items-center gap-2 text-sm text-amber-400">
-                      <span>⚠</span> {m}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <RepoInsights
+              repoMeta={meta}
+              codeAnalysis={analysis}
+              maturity={maturity}
+              recommendations={recommendations}
+              onRefresh={handleImport}
+            />
 
             {/* Export Section */}
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -195,6 +167,10 @@ export default function ProjectsPage() {
               <p className="text-sm text-zinc-500 mb-4">粘贴 Cursor / Claude / GPT 的对话记录，AI 自动提取技术决策和约束</p>
               <SessionMemoryInput onSave={() => {}} />
             </div>
+
+            <button onClick={reset} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition">
+              重新导入
+            </button>
           </div>
         )}
 

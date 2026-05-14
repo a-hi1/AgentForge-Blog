@@ -195,6 +195,8 @@ export interface RefinementResult {
   strategy: string;
   improvements: string[];
   improvedPrompt: string;
+  originalScore?: { overall: number; dimensions: { structure: number; professionalism: number; executability: number; executionSuccess: number } };
+  improvedScore?: { overall: number; dimensions: { structure: number; professionalism: number; executability: number; executionSuccess: number } };
 }
 
 function detectIssues(prompt: string): string[] {
@@ -210,6 +212,20 @@ function detectIssues(prompt: string): string[] {
 
   const sectionCount = (prompt.match(/##/g) || []).length;
   if (sectionCount < 3) issues.push(`仅 ${sectionCount} 个章节，结构不足`);
+
+  // 新增检测规则
+  if (!/实现|创建|修改|删除|添加|配置|部署|测试|优化/.test(prompt)) {
+    issues.push('缺少具体动作指令');
+  }
+  if (!/(输出|格式|Format|Output|返回)/i.test(prompt)) {
+    issues.push('缺少输出格式定义');
+  }
+  if (!/优先|Phase\s*\d|第[一二三四五]|步骤\s*\d|先后/.test(prompt)) {
+    issues.push('缺少优先级排序');
+  }
+  if (!/例如|比如|e\.g\.|example|示例/.test(prompt) && prompt.length > 1000) {
+    issues.push('缺少具体示例');
+  }
 
   return issues;
 }
@@ -237,6 +253,19 @@ export function refinePrompt(input: RefinementInput): RefinementResult {
   if (issues.includes('缺少验证清单')) {
     improved += '\n\n## VALIDATION\n- [ ] npm run dev 无报错\n- [ ] TS 0 errors\n- [ ] 功能可用';
     suggestions.push('添加了验证清单');
+  }
+  if (issues.includes('缺少输出格式定义')) {
+    improved += '\n\n## 输出格式\n请按以下结构输出结果：\n1. 修改的文件列表\n2. 每个文件的完整代码\n3. 验证方式';
+    suggestions.push('添加了输出格式定义');
+  }
+  if (issues.includes('缺少具体动作指令')) {
+    suggestions.push('建议添加具体动作指令（实现、创建、修改等动词）');
+  }
+  if (issues.includes('缺少优先级排序')) {
+    suggestions.push('建议为任务添加优先级排序');
+  }
+  if (issues.includes('缺少具体示例')) {
+    suggestions.push('建议添加具体示例以提高可执行性');
   }
 
   if (humanFeedback) {

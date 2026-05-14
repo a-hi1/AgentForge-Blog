@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, Component, ReactNode } from '
 import { useRouter } from 'next/navigation';
 import { savePrompt } from '@/lib/prompt/history';
 import { IntentResult, DecomposeResult } from '@/lib/prompt-orchestrator/reasoner';
+import CopyPromptButton from '@/components/prompt/CopyPromptButton';
 
 interface UnifiedIntent extends IntentResult {
   techStack: {
@@ -194,10 +195,6 @@ export default function PromptPage() {
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(result);
-  };
-
   const getStepState = (stepKey: string) => {
     if (fallbackSteps.has(stepKey)) return 'fallback';
     if (completedSteps.has(stepKey)) return 'done';
@@ -348,11 +345,23 @@ export default function PromptPage() {
                     已保存
                   </span>
                 )}
+                <CopyPromptButton text={result} label="复制" variant="compact" />
                 <button
-                  onClick={handleCopy}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 transition"
+                  onClick={() => {
+                    const blob = new Blob([result], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `context-pack-${Date.now()}.md`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-all border border-slate-700 text-slate-300 hover:bg-slate-800"
                 >
-                  复制
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  下载
                 </button>
               </div>
             </div>
