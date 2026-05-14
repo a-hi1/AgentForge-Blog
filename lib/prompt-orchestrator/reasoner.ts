@@ -154,23 +154,29 @@ export async function decomposeToAtomicTasks(
   intent: IntentResult,
   userInput: string
 ): Promise<DecomposeResult> {
-  const system = `你是高级全栈工程师。把需求拆解为开发任务。
+  const system = `你是高级全栈工程师。把需求拆解为具体的开发任务。
 
-输出JSON：
+## 重要规则
+1. 文件名必须具体有意义，不要用 xxx.ts 这种占位符
+2. 每个文件的职责要明确到具体做什么
+3. 依赖关系要准确，指向实际的文件路径
+4. 阶段划分要合理：先基础设施 → 核心逻辑 → UI → 测试
+
+## 输出格式（严格JSON）
 {
   "tasks": [{
     "phase": 1,
     "phaseLabel": "阶段名称",
-    "file": "src/xxx.ts",
-    "responsibility": "核心职责",
-    "input": "输入",
-    "output": "输出",
-    "dependencies": ["依赖文件"]
+    "file": "src/具体文件名.ts",
+    "responsibility": "具体做什么（不要泛泛而谈）",
+    "input": "输入什么",
+    "output": "输出什么",
+    "dependencies": ["具体的依赖文件路径"]
   }],
   "phases": [{
     "phase": 1,
     "label": "阶段名称",
-    "files": ["文件1", "文件2"]
+    "files": ["具体文件1", "具体文件2"]
   }]
 }`;
 

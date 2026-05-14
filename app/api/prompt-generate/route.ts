@@ -20,6 +20,10 @@ interface UnifiedIntent extends IntentResult {
     db: string;
     infra: string[];
   };
+  coreFeatures: string[];
+  dataModels: { name: string; fields: string[] }[];
+  apiEndpoints: { method: string; path: string; description: string }[];
+  securityNotes: string[];
 }
 
 // 降级默认技术栈
@@ -41,26 +45,60 @@ function getDefaultIntent(userInput: string): UnifiedIntent {
     lifecycle: "验证期",
     ambiguity: "继续推进开发",
     decisionPoints: [userInput],
-    techStack: getDefaultTechStack()
+    techStack: getDefaultTechStack(),
+    coreFeatures: ["核心功能1", "核心功能2", "核心功能3"],
+    dataModels: [],
+    apiEndpoints: [],
+    securityNotes: []
   };
 }
 
 async function inferUnifiedIntent(userInput: string): Promise<UnifiedIntent> {
-  const system = `你是产品技术顾问。输出JSON：
+  const system = `你是产品技术顾问+全栈架构师。分析用户需求，输出具体的开发方案。
 
+## 重要规则
+1. 技术栈必须做出明确选择，不要给"或"的选项
+2. 核心功能要具体到可开发的程度，不要泛泛而谈
+3. 数据模型要列出实体和关键字段
+4. API要列出具体的端点
+5. 如果用户提到了安全/隐私要求，要给出具体方案
+
+## 输出格式（严格JSON）
 {
-  "businessGoal": "核心目标",
+  "businessGoal": "一句话核心目标",
   "userType": "个人/小团队/公众产品",
   "productShape": "Web/Mobile/API/CLI",
   "lifecycle": "验证期/MVP/增长期",
-  "ambiguity": "缺失信息",
-  "decisionPoints": ["线索1", "线索2"],
+  "ambiguity": "缺失的关键信息",
+  "decisionPoints": ["关键决策点1", "关键决策点2"],
   "techStack": {
-    "frontend": "技术",
-    "backend": "技术",
-    "db": "数据库",
-    "infra": ["部署"]
-  }
+    "frontend": "具体技术（只选一个）",
+    "backend": "具体技术（只选一个）",
+    "db": "具体数据库（只选一个）",
+    "infra": ["具体部署方案"]
+  },
+  "coreFeatures": [
+    "功能1：具体描述",
+    "功能2：具体描述",
+    "功能3：具体描述"
+  ],
+  "dataModels": [
+    {
+      "name": "实体名",
+      "fields": ["字段1: 类型", "字段2: 类型", "字段3: 类型"]
+    }
+  ],
+  "apiEndpoints": [
+    {
+      "method": "GET/POST/PUT/DELETE",
+      "path": "/api/具体路径",
+      "description": "接口功能描述"
+    }
+  ],
+  "securityNotes": [
+    "安全/隐私措施1",
+    "安全/隐私措施2"
+  ]
 }`;
 
   try {
@@ -90,15 +128,42 @@ function buildContextExport(
 
   const ts = intent.techStack;
 
+  // 核心功能
+  const features = intent.coreFeatures?.length
+    ? intent.coreFeatures.map((f, i) => `${i + 1}. ${f}`).join('\n')
+    : '待定义';
+
+  // 数据模型
+  const models = intent.dataModels?.length
+    ? intent.dataModels.map(m =>
+      `**${m.name}**\n${m.fields.map(f => `- ${f}`).join('\n')}`
+    ).join('\n\n')
+    : '无特定数据模型';
+
+  // API接口
+  const apis = intent.apiEndpoints?.length
+    ? intent.apiEndpoints.map(a =>
+      `- \`${a.method} ${a.path}\` — ${a.description}`
+    ).join('\n')
+    : '无API接口（纯前端应用）';
+
+  // 安全/隐私
+  const security = intent.securityNotes?.length
+    ? intent.securityNotes.map(s => `- ${s}`).join('\n')
+    : '无特殊安全要求';
+
   return `# ${intent.businessGoal}
 
 ## 项目上下文
 
-- **目标**：${intent.businessGoal}
 - **用户**：${intent.userType}
 - **形态**：${intent.productShape}
 - **阶段**：${intent.lifecycle}
-- **注意**：${intent.ambiguity || '无特别模糊点'}
+${intent.ambiguity ? `- **待确认**：${intent.ambiguity}` : ''}
+
+## 核心功能
+
+${features}
 
 ## 技术栈
 
@@ -106,6 +171,18 @@ function buildContextExport(
 - 后端：${ts.backend}
 - 数据库：${ts.db}
 - 基础设施：${ts.infra.join('、')}
+
+## 数据模型
+
+${models}
+
+## API 接口
+
+${apis}
+
+## 安全与隐私
+
+${security}
 
 ## 文件任务
 
@@ -120,7 +197,8 @@ ${phases}
 - 每个阶段完成后暂停，确认后再继续
 - 不修改未列出的文件
 - 不引入未列出的依赖
-- 遇到歧义先确认再实现`;
+- 遇到歧义先确认再实现
+- 严格遵循上述数据模型和API定义`;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
