@@ -97,6 +97,7 @@ export interface DirectionReport {
   whereToStart: string;
   minimalValidation: string;
   summary: string;
+  risks?: string;
 }
 
 export interface DiscoverySession {
