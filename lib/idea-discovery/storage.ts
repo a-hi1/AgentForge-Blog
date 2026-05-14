@@ -84,3 +84,11 @@ export function toggleDiscoveryFavorite(id: string): void {
 export function getDiscoveryRecord(id: string): DiscoveryRecord | undefined {
   return getDiscoveryHistory().find(r => r.id === id);
 }
+
+export function clearAllDiscoveryHistory(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    console.warn('Failed to clear discovery history');
+  }
+}

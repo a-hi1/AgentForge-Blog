@@ -14,6 +14,7 @@ import { Sidebar } from '@/components/idea-discovery/Sidebar';
 import {
   DiscoveryRecord,
   saveDiscoveryToHistory,
+  clearAllDiscoveryHistory,
 } from '@/lib/idea-discovery/storage';
 
 export default function IdeaDiscoveryPage() {
@@ -179,6 +180,13 @@ export default function IdeaDiscoveryPage() {
     abortRef.current?.abort();
   }, []);
 
+  const handleClearHistory = () => {
+    if (confirm('确定要清除所有历史记录并重置吗？这将重新开始一个干净的探索。')) {
+      clearAllDiscoveryHistory();
+      reset();
+    }
+  };
+
   const allPhases: DiscoveryPhase[] = [
     'idea_deconstruction',
     'reality_assessment',
@@ -225,6 +233,12 @@ export default function IdeaDiscoveryPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClearHistory}
+                  className="rounded-lg border border-red-800/50 px-3 py-2 text-xs text-red-400 hover:bg-red-950/50 transition"
+                >
+                  清除历史
+                </button>
                 {loading && (
                   <button
                     onClick={() => abortRef.current?.abort()}
