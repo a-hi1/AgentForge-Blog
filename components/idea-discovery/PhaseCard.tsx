@@ -51,11 +51,30 @@ export function PhaseCard({ phase, isActive, isCompleted, analysis, data }: Phas
 
 function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>) {
   switch (phase) {
-    case 'idea_deconstruction':
-      return null;
+    case 'idea_deconstruction': {
+      const deconstruction = data.ideaDeconstruction as Record<string, unknown> | undefined;
+      if (!deconstruction) return null;
+      return (
+        <div className="space-y-3 text-sm">
+          {Array.isArray(deconstruction.coreInsights) && (deconstruction.coreInsights as string[]).length > 0 && (
+            <div className="rounded-lg bg-violet-900/20 p-4 border border-violet-500/30">
+              <div className="text-violet-300 font-medium mb-2">核心洞察：</div>
+              <ul className="space-y-2">
+                {(deconstruction.coreInsights as string[]).map((insight, i) => (
+                  <li key={i} className="text-violet-100 flex items-start gap-2">
+                    <span className="text-violet-400 mt-0.5">💡</span>
+                    {insight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
 
     case 'reality_assessment': {
-      const mr = data.marketReality as Record<string, unknown> | undefined;
+      const mr = data as Record<string, unknown> | undefined;
       if (!mr) return null;
       return (
         <div className="space-y-3 text-sm">
@@ -90,7 +109,7 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
     }
 
     case 'differentiation_analysis': {
-      const diff = data.differentiation as Record<string, unknown> | undefined;
+      const diff = data as Record<string, unknown> | undefined;
       if (!diff) return null;
       return (
         <div className="space-y-2 text-sm">
@@ -111,7 +130,7 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
     }
 
     case 'mvp_shrink': {
-      const mvp = data.mvp as Record<string, unknown> | undefined;
+      const mvp = data as Record<string, unknown> | undefined;
       if (!mvp) return null;
       return (
         <div className="space-y-3 text-sm">
@@ -161,7 +180,7 @@ function renderPhaseContent(phase: DiscoveryPhase, data: Record<string, unknown>
     }
 
     case 'final_confirmation': {
-      const report = data.report as Record<string, unknown> | undefined;
+      const report = data as Record<string, unknown> | undefined;
       if (!report) return null;
       const worth = String(report.worthDoing || '');
       return (

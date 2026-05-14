@@ -156,7 +156,7 @@ export default function IdeaDiscoveryPage() {
     ];
     
     phaseSequence.forEach((phase) => {
-      const phaseDataKey = `${phase}_data` as keyof typeof record.session.collectedFacts;
+      const phaseDataKey = phase as keyof typeof record.session.collectedFacts;
       if (record.session.collectedFacts[phaseDataKey]) {
         phaseData.push({
           phase,

@@ -26,14 +26,10 @@ export interface DiscoveryQuestion {
   context?: string;
 }
 
-export interface UserProfile {
-  motivation?: string[];
-  skillLevel?: string;
-  timeBudget?: string;
-  isSolo?: boolean;
-  platform?: string;
-  hasDesignSkills?: boolean;
-  hasOperationSkills?: boolean;
+export interface IdeaDeconstruction {
+  analysis: string;
+  coreInsights: string[];
+  questions?: DiscoveryQuestion[];
 }
 
 export interface ProductDirection {
@@ -70,7 +66,7 @@ export interface MVPShrink {
 
 export interface CollectedFacts {
   originalIdea: string;
-  userProfile?: UserProfile;
+  ideaDeconstruction?: IdeaDeconstruction;
   selectedDirection?: ProductDirection;
   marketReality?: MarketReality;
   differentiation?: Differentiation;
