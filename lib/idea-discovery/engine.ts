@@ -319,7 +319,12 @@ export async function startDiscovery(
   onEvent?: (event: any) => void
 ): Promise<DiscoverySession> {
   let session = createSession(idea);
-  session = await executePhase(session, onEvent);
+  
+  // 自动执行阶段，直到完成或需要用户输入
+  while (session.currentPhase !== 'complete' && session.unresolvedQuestions.length === 0) {
+    session = await executePhase(session, onEvent);
+  }
+  
   return session;
 }
 
@@ -329,8 +334,11 @@ export async function continueDiscovery(
   onEvent?: (event: any) => void
 ): Promise<DiscoverySession> {
   let updatedSession = handleUserAnswers(session, answers);
-  if (updatedSession.unresolvedQuestions.length === 0 && updatedSession.currentPhase !== 'complete') {
+  
+  // 自动执行阶段，直到完成或需要用户输入
+  while (updatedSession.currentPhase !== 'complete' && updatedSession.unresolvedQuestions.length === 0) {
     updatedSession = await executePhase(updatedSession, onEvent);
   }
+  
   return updatedSession;
 }
