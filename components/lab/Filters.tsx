@@ -32,7 +32,8 @@ const DATE_OPTIONS = [
   { value: '30d', label: '近 30 天' },
 ];
 
-const selectClass = "px-3 py-2 bg-[#111113] border border-[rgba(255,255,255,0.06)] rounded-lg text-sm text-[#FAFAFA] focus:outline-none focus:border-[#3B82F6] transition-all appearance-none cursor-pointer";
+const selectClass =
+  'px-3 py-2 bg-[rgba(255,255,255,0.03)] border border-[var(--border-light)] rounded-xl text-sm text-[var(--text)] focus:outline-none focus:border-[rgba(139,92,246,0.5)] focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)] transition-all appearance-none cursor-pointer';
 
 export default function Filters({
   statusFilter, agentFilter, dateFilter,
@@ -44,6 +45,7 @@ export default function Filters({
         value={statusFilter}
         onChange={(e) => onStatusFilterChange(e.target.value)}
         className={selectClass}
+        aria-label="按状态筛选"
       >
         {STATUS_OPTIONS.map(option => (
           <option key={option.value} value={option.value}>
@@ -56,6 +58,7 @@ export default function Filters({
         value={agentFilter}
         onChange={(e) => onAgentFilterChange(e.target.value)}
         className={selectClass}
+        aria-label="按代理筛选"
       >
         {AGENT_OPTIONS.map(option => (
           <option key={option.value} value={option.value}>
@@ -68,6 +71,7 @@ export default function Filters({
         value={dateFilter}
         onChange={(e) => onDateFilterChange(e.target.value)}
         className={selectClass}
+        aria-label="按时间筛选"
       >
         {DATE_OPTIONS.map(option => (
           <option key={option.value} value={option.value}>

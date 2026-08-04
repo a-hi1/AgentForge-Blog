@@ -16,26 +16,31 @@ const downloadMarkdown = (content: string, filename: string) => {
 
 function StrategySummary({ pack }: { pack: CompiledPack }) {
   if (!pack) return null;
-  const { intent, decompose, markdown } = pack;
+  const { intent, markdown } = pack;
 
   return (
     <div className="space-y-5">
-      <div className="p-5 rounded-xl bg-[#0a0a0c] border border-[rgba(255,255,255,0.06)]">
-        <h3 className="text-sm font-semibold text-[#FAFAFA] mb-3">意图分析</h3>
+      <div className="p-5 glass-card rounded-xl">
+        <h3 className="text-sm font-semibold text-[var(--text)] mb-3">意图分析</h3>
         <div className="space-y-2 text-sm">
-          <div><span className="text-[#71717A]">目标：</span><span className="text-[#A1A1AA]">{String(intent.businessGoal || '-')}</span></div>
-          <div><span className="text-[#71717A]">用户：</span><span className="text-[#A1A1AA]">{String(intent.userType || '-')}</span></div>
-          <div><span className="text-[#71717A]">形态：</span><span className="text-[#A1A1AA]">{String(intent.productShape || '-')}</span></div>
-          <div><span className="text-[#71717A]">阶段：</span><span className="text-[#A1A1AA]">{String(intent.lifecycle || '-')}</span></div>
+          <div><span className="text-[var(--text-tertiary)]">目标：</span><span className="text-[var(--text-secondary)]">{String(intent.businessGoal || '-')}</span></div>
+          <div><span className="text-[var(--text-tertiary)]">用户：</span><span className="text-[var(--text-secondary)]">{String(intent.userType || '-')}</span></div>
+          <div><span className="text-[var(--text-tertiary)]">形态：</span><span className="text-[var(--text-secondary)]">{String(intent.productShape || '-')}</span></div>
+          <div><span className="text-[var(--text-tertiary)]">阶段：</span><span className="text-[var(--text-secondary)]">{String(intent.lifecycle || '-')}</span></div>
         </div>
       </div>
 
       {intent.decisionPoints.length > 0 && (
-        <div className="p-5 rounded-xl bg-[#0a0a0c] border border-[rgba(255,255,255,0.06)]">
-          <h3 className="text-sm font-semibold text-[#FAFAFA] mb-3">决策依据</h3>
+        <div className="p-5 glass-card rounded-xl">
+          <h3 className="text-sm font-semibold text-[var(--text)] mb-3">决策依据</h3>
           <div className="space-y-1.5">
             {intent.decisionPoints.map((point: string, i: number) => (
-              <p key={i} className="text-xs text-[#A1A1AA]">🔍 {point}</p>
+              <p key={i} className="text-xs text-[var(--text-secondary)] flex items-start gap-2">
+                <svg className="w-3.5 h-3.5 text-[#60A5FA] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {point}
+              </p>
             ))}
           </div>
         </div>
@@ -43,10 +48,11 @@ function StrategySummary({ pack }: { pack: CompiledPack }) {
 
       <div className="flex gap-3">
         <button
+          type="button"
           onClick={() => downloadMarkdown(markdown, 'prompt.md')}
-          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[rgba(24,24,27,0.72)] text-[#FAFAFA] border border-[rgba(255,255,255,0.1)] hover:border-[#3B82F6] hover:bg-[rgba(63,63,70,0.6)] transition-all"
+          className="btn-secondary flex-1"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           导出 Markdown

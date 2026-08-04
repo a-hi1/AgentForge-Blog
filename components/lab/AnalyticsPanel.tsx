@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -21,6 +21,54 @@ interface Execution {
 
 interface AnalyticsPanelProps {
   executions: Execution[];
+}
+
+function ChartIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function BrainIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  );
+}
+
+function BotIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
 }
 
 function AnalyticsPanel({ executions }: AnalyticsPanelProps) {
@@ -73,42 +121,42 @@ function AnalyticsPanel({ executions }: AnalyticsPanelProps) {
     };
   }, [executions]);
 
-  const statCards = [
+  const statCards: { label: string; value: string | number; icon: ReactNode; color: string }[] = [
     {
       label: '总执行次数',
       value: stats.totalExecutions,
-      icon: '📊',
-      color: 'from-[#3B82F6]/20 to-[#8B5CF6]/20',
+      icon: <ChartIcon />,
+      color: 'from-[#3B82F6]/20 to-[#8B5CF6]/20 text-[#60A5FA]',
     },
     {
       label: '成功率',
       value: `${stats.successRate}%`,
-      icon: '✅',
-      color: 'from-[#10B981]/20 to-[#34D399]/20',
+      icon: <CheckIcon />,
+      color: 'from-[#10B981]/20 to-[#34D399]/20 text-[#34D399]',
     },
     {
       label: '步均耗时',
       value: stats.avgDurationSec > 0 ? `${stats.avgDurationSec}s` : '—',
-      icon: '⏱️',
-      color: 'from-[#F59E0B]/20 to-[#FBBF24]/20',
+      icon: <ClockIcon />,
+      color: 'from-[#F59E0B]/20 to-[#FBBF24]/20 text-[#FBBF24]',
     },
     {
       label: 'Memory 命中率',
       value: `${stats.memoryHitRate}%`,
-      icon: '🧠',
-      color: 'from-[#8B5CF6]/20 to-[#A78BFA]/20',
+      icon: <BrainIcon />,
+      color: 'from-[#8B5CF6]/20 to-[#A78BFA]/20 text-[#A78BFA]',
     },
     {
       label: '最活跃 Agent',
       value: stats.mostUsedAgent,
-      icon: '🤖',
-      color: 'from-[#ec4899]/20 to-[#f472b6]/20',
+      icon: <BotIcon />,
+      color: 'from-[#ec4899]/20 to-[#f472b6]/20 text-[#f472b6]',
     },
     {
       label: '近30天有数据天',
       value: stats.trendData.filter((d) => d.executions > 0).length,
-      icon: '📅',
-      color: 'from-[#3B82F6]/20 to-[#60A5FA]/20',
+      icon: <CalendarIcon />,
+      color: 'from-[#3B82F6]/20 to-[#60A5FA]/20 text-[#60A5FA]',
     },
   ];
 
@@ -118,18 +166,18 @@ function AnalyticsPanel({ executions }: AnalyticsPanelProps) {
         {statCards.map((stat, index) => (
           <div key={index} className="p-4 glass-card rounded-xl">
             <div
-              className={`w-8 h-8 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center text-sm mb-2`}
+              className={`w-8 h-8 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center mb-2`}
             >
               {stat.icon}
             </div>
-            <div className="text-xl font-bold text-[#FAFAFA] mb-0.5">{stat.value}</div>
-            <div className="text-[11px] text-[#71717A]">{stat.label}</div>
+            <div className="text-xl font-bold text-[var(--text)] mb-0.5">{stat.value}</div>
+            <div className="text-[11px] text-[var(--text-tertiary)]">{stat.label}</div>
           </div>
         ))}
       </div>
 
       <div className="p-5 glass-card rounded-xl">
-        <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4">执行趋势 (近 30 天)</h3>
+        <h3 className="text-sm font-semibold text-[var(--text)] mb-4">执行趋势 (近 30 天)</h3>
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={stats.trendData}>
@@ -167,7 +215,7 @@ function AnalyticsPanel({ executions }: AnalyticsPanelProps) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <p className="mt-2 text-[11px] text-[#52525B]">
+        <p className="mt-2 text-[11px] text-[var(--text-muted)]">
           指标均来自当前加载的执行记录，不使用随机数模拟。
         </p>
       </div>

@@ -54,7 +54,7 @@ export default function ProjectCard({ project }: { project: Project }) {
         {project.agentContributions && project.agentContributions.length > 0 && (
           <div className="mb-6">
             <h4 className="text-sm font-medium text-[#64748b] mb-3">
-              🤖 Agent Contributions
+              Agent Contributions
             </h4>
             <div className="space-y-2">
               {project.agentContributions.map((contribution, index) => (

@@ -25,86 +25,102 @@ export default function ExecutionFeedback({ isOpen, onClose, onSubmit }: Executi
     onClose();
   };
 
+  const idleBtn =
+    'border-[var(--border-light)] bg-[rgba(255,255,255,0.03)] text-[var(--text-tertiary)] hover:border-[var(--border-strong)]';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl">
+      <div className="w-full max-w-lg glass-card rounded-2xl p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">执行反馈</h2>
+          <h2 className="text-xl font-bold text-[var(--text)]">执行反馈</h2>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-slate-800 transition-colors"
+            aria-label="关闭"
+            className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text)] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 执行状态 */}
           <div>
-          <label className="block text-sm font-medium text-gray-300 mb-3">执行结果</label>
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => setStatus('success')}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                status === 'success'
-                  ? 'border-green-500 bg-green-500/20 text-green-400'
-                  : 'border-slate-700 bg-slate-800 text-gray-400 hover:border-slate-600'
-              }`}
-            >
-              <div className="text-2xl mb-1">✅</div>
-              <div className="text-sm font-medium">成功</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatus('partial')}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                status === 'partial'
-                  ? 'border-yellow-500 bg-yellow-500/20 text-yellow-400'
-                  : 'border-slate-700 bg-slate-800 text-gray-400 hover:border-slate-600'
-              }`}
-            >
-              <div className="text-2xl mb-1">⚠️</div>
-              <div className="text-sm font-medium">部分成功</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatus('failed')}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                status === 'failed'
-                  ? 'border-red-500 bg-red-500/20 text-red-400'
-                  : 'border-slate-700 bg-slate-800 text-gray-400 hover:border-slate-600'
-              }`}
-            >
-              <div className="text-2xl mb-1">❌</div>
-              <div className="text-sm font-medium">失败</div>
-            </button>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">执行结果</label>
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setStatus('success')}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  status === 'success'
+                    ? 'border-green-500 bg-green-500/20 text-green-400'
+                    : idleBtn
+                }`}
+              >
+                <div className="mb-1 flex justify-center">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium">成功</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus('partial')}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  status === 'partial'
+                    ? 'border-yellow-500 bg-yellow-500/20 text-yellow-400'
+                    : idleBtn
+                }`}
+              >
+                <div className="mb-1 flex justify-center">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium">部分成功</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus('failed')}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  status === 'failed'
+                    ? 'border-red-500 bg-red-500/20 text-red-400'
+                    : idleBtn
+                }`}
+              >
+                <div className="mb-1 flex justify-center">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium">失败</div>
+              </button>
+            </div>
           </div>
-        </div>
 
-          {/* 评分 */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">满意度评分</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">满意度评分</label>
             <div className="flex items-center gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
                   type="button"
                   onClick={() => setRating(star)}
+                  aria-label={`${star} 星`}
                   className={`p-2 rounded-lg transition-all ${
                     star <= rating
                       ? 'text-yellow-400'
-                      : 'text-gray-600 hover:text-gray-400'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-tertiary)]'
                   }`}
                 >
-                  <svg className="w-8 h-8" fill={star <= rating ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8" fill={star <= rating ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                   </svg>
                 </button>
               ))}
-              <span className="ml-2 text-gray-400 text-sm">
+              <span className="ml-2 text-[var(--text-tertiary)] text-sm">
                 {rating === 1 ? '非常不满意' :
                  rating === 2 ? '不满意' :
                  rating === 3 ? '一般' :
@@ -113,29 +129,27 @@ export default function ExecutionFeedback({ isOpen, onClose, onSubmit }: Executi
             </div>
           </div>
 
-          {/* 评论 */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">改进建议（可选）</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">改进建议（可选）</label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Agent 哪些地方做得不够好？或者有什么可以改进的？"
-              className="w-full h-24 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+              className="input-field h-24 resize-none"
             />
           </div>
 
-          {/* 按钮 */}
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 rounded-xl bg-slate-800 text-gray-300 hover:bg-slate-700 transition-colors font-medium"
+              className="btn-secondary flex-1"
             >
               稍后
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium transition-all"
+              className="btn-primary flex-1"
             >
               提交反馈
             </button>

@@ -24,7 +24,7 @@
 
 **A**
 1. 设计 **契约化 Agent Runtime**（`lib/agent-runtime/`）：Planner 规划 → 多角色顺序执行 → `outputValidator` 质量校验 → 不达标重试。
-2. 实现 **记忆增强检索**：执行完成后抽取 lessons，写入 `agent_memory`；新任务用 embedding + `match_memories` RPC 语义召回，失败时回退关键词/标签匹配（`memoryManager.ts` + `embeddings.ts` + `004_vector_search.sql`）。
+2. 实现 **记忆增强检索**：执行完成后抽取 lessons，写入 `agent_memory`；新任务用 embedding + `match_memories` RPC 语义召回，支持 MaxKB 内置 `text2vec-base-chinese`，服务不可用时回退 OpenAI 兼容接口 / 本地哈希 / 关键词匹配（`memoryManager.ts` + `embeddings.ts` + `004_vector_search.sql`）。
 3. 用 **SSE 流式 API**（`/api/agent`）推送 step_start / chunk / quality_score / memory_influence 事件；接入 IP 级限流。
 4. 补齐工程化：密钥不落库、CI（typecheck/test/eval/build）、离线质量评测集。
 

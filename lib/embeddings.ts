@@ -1,8 +1,17 @@
 /**
  * Embedding 工具
- * - 优先调用 OpenAI 兼容 /embeddings 接口（若 provider 支持）
- * - DeepSeek 对话 API 通常无 embedding：自动走本地哈希回退，保证记忆链路可演示
- * - 智谱可用 embedding-2；也可通过 EMBEDDING_MODEL 覆盖
+ * 优先级：
+ * 1. MaxKB 内置本地向量服务（text2vec-base-chinese，默认 768 维）
+ * 2. OpenAI 兼容 /embeddings（智谱 embedding-2、OpenAI text-embedding-3-small 等）
+ * 3. 本地哈希回退（可相对排序，非语义模型）
+ *
+ * MaxKB local_model 服务：
+ *   python main.py dev local_model  # 默认 127.0.0.1:11636
+ *   POST {MAXKB_EMBEDDING_URL}/model/{model_id}/embed_query
+ *     Content-Type: application/x-www-form-urlencoded
+ *     body: text=<query>
+ *   POST .../embed_documents  body: texts=...&texts=...
+ *   响应：{ code: 200, data: number[] | number[][] }
  */
 
 export interface EmbeddingOptions {
@@ -12,40 +21,109 @@ export interface EmbeddingOptions {
 
 export const DEFAULT_EMBEDDING_DIM = 768;
 
-function resolveEmbeddingModel(baseUrl: string, explicit?: string): string | null {
+export type EmbeddingProvider = 'maxkb' | 'openai-compatible' | 'local-hash';
+
+export interface EmbeddingMeta {
+  provider: EmbeddingProvider;
+  model?: string | null;
+  dimensions: number;
+}
+
+function resolveOpenAICompatibleModel(baseUrl: string, explicit?: string): string | null {
   if (explicit) return explicit;
   if (process.env.EMBEDDING_MODEL) return process.env.EMBEDDING_MODEL;
   if (baseUrl.includes('bigmodel.cn')) return 'embedding-2';
   if (baseUrl.includes('api.openai.com')) return 'text-embedding-3-small';
-  // DeepSeek 等：无稳定 embedding 端点 → 返回 null 触发本地回退
+  // DeepSeek 对话 API 无稳定 embedding 端点
   if (baseUrl.includes('deepseek.com')) return null;
   return 'text-embedding-3-small';
 }
 
+function getMaxKBConfig(): { baseUrl: string; modelId: string } | null {
+  const modelId = process.env.MAXKB_MODEL_ID?.trim();
+  if (!modelId) return null;
+
+  const raw =
+    process.env.MAXKB_EMBEDDING_URL?.trim() ||
+    'http://127.0.0.1:11636/admin/api';
+  const baseUrl = raw.replace(/\/$/, '');
+  return { baseUrl, modelId };
+}
+
 /**
- * 生成文本向量。
- * 远程失败 / 无 embedding 模型时返回本地哈希向量（可相对排序，非语义模型）。
+ * 调用 MaxKB local_model 的 embed_query 接口。
+ * 内置默认模型 shibing624/text2vec-base-chinese → 768 维，与 pgvector schema 对齐。
  */
-export async function generateEmbedding(
+async function embedViaMaxKB(
   text: string,
-  options?: EmbeddingOptions
+  dimensions: number
+): Promise<number[] | null> {
+  const cfg = getMaxKBConfig();
+  if (!cfg) return null;
+
+  const url = `${cfg.baseUrl}/model/${cfg.modelId}/embed_query`;
+  const input = text.slice(0, 8000);
+
+  try {
+    const form = new URLSearchParams({ text: input });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form,
+      // 本地服务，给足冷启动时间
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      console.warn(`[Embedding/MaxKB] ${url} -> ${response.status} ${errBody.slice(0, 120)}`);
+      return null;
+    }
+
+    const result = await response.json();
+    // MaxKB 标准响应：{ code: 200, data: number[] }
+    // 兼容直接返回数组 / OpenAI 风格
+    let embedding: unknown =
+      result?.data ?? result?.embedding ?? result?.data?.[0]?.embedding;
+
+    if (result?.code !== undefined && result.code !== 200) {
+      console.warn(`[Embedding/MaxKB] code=${result.code} msg=${result?.message || ''}`);
+      return null;
+    }
+
+    // data 可能是向量本身
+    if (Array.isArray(embedding) && typeof embedding[0] === 'number') {
+      return normalizeDimensions(embedding.map(Number), dimensions);
+    }
+    // data 可能是 { embedding: [...] }
+    if (embedding && typeof embedding === 'object' && Array.isArray((embedding as { embedding?: number[] }).embedding)) {
+      return normalizeDimensions(
+        (embedding as { embedding: number[] }).embedding.map(Number),
+        dimensions
+      );
+    }
+
+    console.warn('[Embedding/MaxKB] 响应中未找到向量数组');
+    return null;
+  } catch (e) {
+    console.warn('[Embedding/MaxKB] 请求失败:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function embedViaOpenAICompatible(
+  text: string,
+  dimensions: number,
+  modelOverride?: string
 ): Promise<number[] | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1').replace(
     /\/$/,
     ''
   );
-  const dimensions = options?.dimensions || DEFAULT_EMBEDDING_DIM;
-  const model = resolveEmbeddingModel(baseUrl, options?.model);
+  const model = resolveOpenAICompatibleModel(baseUrl, modelOverride);
 
-  if (!apiKey || !model) {
-    if (!model) {
-      console.warn('[Embedding] 当前 provider 无 embedding 模型配置，使用本地哈希回退向量');
-    } else {
-      console.warn('[Embedding] OPENAI_API_KEY 缺失，使用本地哈希回退向量');
-    }
-    return fallbackEmbedding(text, dimensions);
-  }
+  if (!apiKey || !model) return null;
 
   const input = text.slice(0, 8000);
   const url = `${baseUrl}/embeddings`;
@@ -62,12 +140,13 @@ export async function generateEmbedding(
         input,
         dimensions,
       }),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
       console.warn(`[Embedding] ${url} -> ${response.status} ${errBody.slice(0, 120)}`);
-      return fallbackEmbedding(text, dimensions);
+      return null;
     }
 
     const result = await response.json();
@@ -76,10 +155,61 @@ export async function generateEmbedding(
       return normalizeDimensions(embedding.map(Number), dimensions);
     }
   } catch (e) {
-    console.warn('[Embedding] 请求失败:', e);
+    console.warn('[Embedding] OpenAI 兼容请求失败:', e instanceof Error ? e.message : e);
   }
+  return null;
+}
 
-  console.warn('[Embedding] 远程向量失败，使用本地哈希回退');
+/** 当前生效的 embedding 提供方（诊断用，不发网络请求） */
+export function resolveEmbeddingProvider(): EmbeddingMeta {
+  const dimensions = DEFAULT_EMBEDDING_DIM;
+  if (getMaxKBConfig()) {
+    return {
+      provider: 'maxkb',
+      model: process.env.MAXKB_MODEL_ID,
+      dimensions,
+    };
+  }
+  const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1').replace(
+    /\/$/,
+    ''
+  );
+  const model = resolveOpenAICompatibleModel(baseUrl);
+  if (process.env.OPENAI_API_KEY && model) {
+    return { provider: 'openai-compatible', model, dimensions };
+  }
+  return { provider: 'local-hash', model: null, dimensions };
+}
+
+/**
+ * 生成文本向量。
+ * MaxKB → OpenAI 兼容 → 本地哈希回退。
+ */
+export async function generateEmbedding(
+  text: string,
+  options?: EmbeddingOptions
+): Promise<number[] | null> {
+  const dimensions = options?.dimensions || DEFAULT_EMBEDDING_DIM;
+
+  // 1) MaxKB 内置向量（text2vec-base-chinese）
+  const maxkbVec = await embedViaMaxKB(text, dimensions);
+  if (maxkbVec) return maxkbVec;
+
+  // 2) OpenAI 兼容远程 embedding
+  const remoteVec = await embedViaOpenAICompatible(text, dimensions, options?.model);
+  if (remoteVec) return remoteVec;
+
+  // 3) 本地哈希回退
+  if (getMaxKBConfig()) {
+    console.warn('[Embedding] MaxKB 不可用且远程 embedding 失败，使用本地哈希回退');
+  } else {
+    const baseUrl = (process.env.OPENAI_BASE_URL || '').toLowerCase();
+    if (baseUrl.includes('deepseek.com') || !process.env.EMBEDDING_MODEL) {
+      console.warn('[Embedding] 未配置 MaxKB / 远程 embedding，使用本地哈希回退向量');
+    } else {
+      console.warn('[Embedding] 远程向量失败，使用本地哈希回退');
+    }
+  }
   return fallbackEmbedding(text, dimensions);
 }
 
@@ -87,6 +217,38 @@ export async function generateEmbeddings(
   texts: string[],
   options?: EmbeddingOptions
 ): Promise<(number[] | null)[]> {
+  // MaxKB 支持 batch embed_documents，优先走批量
+  const cfg = getMaxKBConfig();
+  const dimensions = options?.dimensions || DEFAULT_EMBEDDING_DIM;
+
+  if (cfg && texts.length > 1) {
+    try {
+      const url = `${cfg.baseUrl}/model/${cfg.modelId}/embed_documents`;
+      const form = new URLSearchParams();
+      texts.map((t) => t.slice(0, 8000)).forEach((text) => form.append('texts', text));
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form,
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const data = result?.data;
+        if (Array.isArray(data) && data.length === texts.length) {
+          return data.map((row: unknown) => {
+            if (Array.isArray(row) && typeof row[0] === 'number') {
+              return normalizeDimensions(row.map(Number), dimensions);
+            }
+            return null;
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Embedding/MaxKB] batch 失败，回退逐条:', e instanceof Error ? e.message : e);
+    }
+  }
+
   const results = await Promise.allSettled(texts.map((t) => generateEmbedding(t, options)));
   return results.map((r) => (r.status === 'fulfilled' ? r.value : null));
 }

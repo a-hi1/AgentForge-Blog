@@ -204,109 +204,73 @@ export default function PromptPage() {
 
   return (
     <ErrorBoundary fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-white mb-2">渲染出错</p>
-          <p className="text-sm text-slate-400 mb-4">请刷新页面重试</p>
-          <button onClick={() => window.location.reload()} className="rounded-lg bg-cyan-600 px-6 py-2 text-sm text-white">刷新页面</button>
+      <div className="page-shell min-h-[60vh] flex items-center justify-center">
+        <div className="glass-card p-8 text-center max-w-sm">
+          <p className="text-lg font-semibold text-white mb-2">渲染出错</p>
+          <p className="text-sm text-[var(--text-secondary)] mb-5">请刷新页面重试</p>
+          <button onClick={() => window.location.reload()} className="btn-primary mx-auto">刷新页面</button>
         </div>
       </div>
     }>
-    <div className="min-h-screen bg-slate-950">
-      <div className="mx-auto max-w-4xl px-6 py-12">
-        <div className="mb-8 flex items-center justify-between">
+    <div className="page-shell py-12 sm:py-16">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 animate-fade-up">
           <div>
-            <h1 className="text-2xl font-bold text-white">AI 导出</h1>
-            <p className="mt-1 text-sm text-slate-400">输入需求，生成 AI 可消费的项目上下文</p>
+            <span className="badge badge-violet mb-4">Context Compiler</span>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">AI 导出</h1>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">输入需求，生成 AI 可消费的项目上下文。</p>
           </div>
-          <button
-            onClick={() => router.push('/prompt/history')}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 transition"
-          >
-            历史记录
-          </button>
+          <button onClick={() => router.push('/prompt/history')} className="btn-secondary shrink-0">历史记录</button>
         </div>
 
-        <div className="mb-6">
+        <div className="glass-card mesh-panel p-5 sm:p-6 mb-6 animate-fade-up animate-delay-1">
+          <label htmlFor="prompt-input" className="block text-sm font-medium text-white mb-3">开发需求</label>
           <textarea
+            id="prompt-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="描述你的开发需求..."
-            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-5 py-4 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none resize-none"
+            placeholder="例如：做一个支持邮箱登录、文章发布和评论的博客系统..."
+            className="input-field min-h-[132px] resize-y"
             rows={4}
           />
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              onClick={handleGenerate}
-              disabled={loading || !input.trim()}
-              className="rounded-lg bg-cyan-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-40 transition"
-            >
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button onClick={handleGenerate} disabled={loading || !input.trim()} className="btn-primary">
               {loading ? '编译中...' : '生成上下文'}
+              {!loading && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>}
             </button>
-            <button
-              onClick={() => router.push('/prompt/discovery')}
-              disabled={loading}
-              className="rounded-lg border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.08)] px-4 py-2.5 text-sm font-medium text-[#A78BFA] hover:bg-[rgba(139,92,246,0.15)] disabled:opacity-40 transition"
-            >
-              方向探索
-            </button>
-            {loading && (
-              <button
-                onClick={() => abortRef.current?.abort()}
-                className="rounded-lg border border-red-600 px-4 py-2.5 text-sm text-red-400 hover:bg-red-950 transition"
-              >
-                取消
-              </button>
-            )}
-            {result && (
-              <button
-                onClick={() => {
-                  setResult('');
-                  setSaved(false);
-                  setIntent(null);
-                  setDecompose(null);
-                  setFallbackSteps(new Set());
-                }}
-                className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 transition"
-              >
-                重新生成
-              </button>
-            )}
-            <div className="ml-auto flex items-center gap-2">
-              {['做一个 habit tracker', 'AI 写作助手', 'Chrome 书签插件'].map((ex) => (
-                <button
-                  key={ex}
-                  onClick={() => setInput(ex)}
-                  className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400 hover:bg-slate-800 transition"
-                >
-                  {ex}
-                </button>
+            <button onClick={() => router.push('/prompt/discovery')} disabled={loading} className="btn-secondary">先做方向探索</button>
+            {loading && <button onClick={() => abortRef.current?.abort()} className="btn-ghost text-red-300 hover:bg-red-500/10">取消</button>}
+            {result && <button onClick={() => { setResult(''); setSaved(false); setIntent(null); setDecompose(null); setFallbackSteps(new Set()); }} className="btn-ghost">重新生成</button>}
+            <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-2">
+              {['习惯追踪 App', 'AI 写作助手', 'Chrome 书签插件'].map((ex) => (
+                <button key={ex} onClick={() => setInput(ex)} className="px-2.5 py-1 rounded-lg border border-[var(--border)] text-xs text-[var(--text-tertiary)] hover:text-white hover:border-[var(--border-strong)] transition-colors cursor-pointer">{ex}</button>
               ))}
             </div>
           </div>
+          <p className="text-[11px] text-[var(--text-muted)] mt-3">快捷键：Ctrl / ⌘ + Enter 生成</p>
         </div>
 
         {loading && (
-          <div className="mb-6 flex items-center gap-3">
+          <div className="mb-6 flex flex-wrap items-center gap-2.5">
             {CHAIN.map((step, i) => {
               const state = getStepState(step.key);
               return (
                 <div key={step.key} className="flex items-center gap-2">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium ${
-                    state === 'done' ? 'bg-emerald-600 text-white' :
-                    state === 'fallback' ? 'bg-amber-600 text-white' :
-                    state === 'active' ? 'bg-cyan-600 text-white animate-pulse' :
-                    'bg-slate-700 text-slate-400'
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium border ${
+                    state === 'done' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' :
+                    state === 'fallback' ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' :
+                    state === 'active' ? 'bg-violet-500/20 border-violet-500/40 text-violet-200 animate-pulse' :
+                    'bg-white/[0.04] border-[var(--border)] text-[var(--text-muted)]'
                   }`}>
                     {state === 'done' ? '✓' : state === 'fallback' ? '!' : i + 1}
                   </div>
-                  <span className={`text-sm ${state === 'active' ? 'text-cyan-400' : state === 'done' ? 'text-emerald-400' : state === 'fallback' ? 'text-amber-400' : 'text-slate-500'}`}>
+                  <span className={`text-sm ${state === 'active' ? 'text-violet-300' : state === 'done' ? 'text-emerald-300' : state === 'fallback' ? 'text-amber-300' : 'text-[var(--text-muted)]'}`}>
                     {step.label}
                     {state === 'fallback' && <span className="text-[10px] ml-1">(降级)</span>}
                   </span>
                   {i < CHAIN.length - 1 && (
-                    <div className={`w-8 h-px ${state === 'done' || state === 'fallback' ? 'bg-emerald-600' : 'bg-slate-700'}`} />
+                    <div className={`w-8 h-px ${state === 'done' || state === 'fallback' ? 'bg-emerald-500/60' : 'bg-[var(--border)]'}`} />
                   )}
                 </div>
               );
@@ -315,8 +279,8 @@ export default function PromptPage() {
         )}
 
         {fallbackSteps.size > 0 && result && (
-          <div className="mb-6 rounded-xl border border-amber-800 bg-amber-950/50 p-4">
-            <p className="text-sm text-amber-300">
+          <div className="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4" role="status">
+            <p className="text-sm text-amber-200/80">
               部分阶段使用了降级方案（{Array.from(fallbackSteps).map(s => CHAIN.find(c => c.key === s)?.label || s).join('、')}），
               结果仍可用但精度可能降低。
             </p>
@@ -324,14 +288,9 @@ export default function PromptPage() {
         )}
 
         {error && (
-          <div className="mb-6 rounded-xl border border-red-800 bg-red-950 p-4">
-            <p className="text-sm text-red-300">{error}</p>
-            <button
-              onClick={handleGenerate}
-              className="mt-2 rounded-lg bg-red-800 px-4 py-1.5 text-xs text-white hover:bg-red-700 transition"
-            >
-              重试
-            </button>
+          <div className="mb-6 rounded-xl border border-red-500/25 bg-red-500/10 p-4" role="alert">
+            <p className="text-sm text-red-200">{error}</p>
+            <button onClick={handleGenerate} className="btn-ghost mt-2 text-red-300">重试</button>
           </div>
         )}
 
@@ -340,11 +299,7 @@ export default function PromptPage() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-white">Context Pack</h2>
               <div className="flex items-center gap-2">
-                {saved && (
-                  <span className="rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-[11px] text-emerald-400">
-                    已保存
-                  </span>
-                )}
+                {saved && <span className="badge badge-green">已保存</span>}
                 <CopyPromptButton text={result} label="复制" variant="compact" />
                 <button
                   onClick={() => {
@@ -356,7 +311,7 @@ export default function PromptPage() {
                     a.click();
                     URL.revokeObjectURL(url);
                   }}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-all border border-slate-700 text-slate-300 hover:bg-slate-800"
+                  className="btn-secondary"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -365,46 +320,43 @@ export default function PromptPage() {
                 </button>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 max-h-[500px] overflow-y-auto">
-              <pre className="whitespace-pre-wrap font-mono text-sm text-slate-200 leading-relaxed">{result}</pre>
+            <div className="rounded-xl border border-[var(--border)] bg-[#09090D] p-5 max-h-[500px] overflow-y-auto">
+              <pre className="whitespace-pre-wrap font-mono text-sm text-[var(--text-secondary)] leading-relaxed">{result}</pre>
             </div>
           </div>
         )}
 
         {result && intent && (
           <div className="mb-6">
-            <button
-              onClick={() => setShowReasoning(!showReasoning)}
-              className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition"
-            >
+            <button onClick={() => setShowReasoning(!showReasoning)} className="btn-ghost px-0">
               <span>{showReasoning ? '▾' : '▸'}</span>
               推理详情
             </button>
             {showReasoning && (
               <div className="mt-3 space-y-3">
-                <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                <div className="glass-card p-4">
                   <h3 className="mb-2 text-xs font-semibold text-cyan-400">意图 + 架构</h3>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="text-slate-500">业务目标：</span><span className="text-slate-300">{String(intent.businessGoal || '-')}</span></div>
-                    <div><span className="text-slate-500">用户类型：</span><span className="text-slate-300">{String(intent.userType || '-')}</span></div>
-                    <div><span className="text-slate-500">产品形态：</span><span className="text-slate-300">{String(intent.productShape || '-')}</span></div>
-                    <div><span className="text-slate-500">生命周期：</span><span className="text-slate-300">{String(intent.lifecycle || '-')}</span></div>
-                    <div><span className="text-slate-500">前端：</span><span className="text-slate-300">{String(intent.techStack.frontend || '-')}</span></div>
-                    <div><span className="text-slate-500">后端：</span><span className="text-slate-300">{String(intent.techStack.backend || '-')}</span></div>
-                    <div><span className="text-slate-500">数据库：</span><span className="text-slate-300">{String(intent.techStack.db || '-')}</span></div>
-                    <div><span className="text-slate-500">基础设施：</span><span className="text-slate-300">{intent.techStack.infra.join('、') || '-'}</span></div>
+                    <div><span className="text-[var(--text-muted)]">业务目标：</span><span className="text-[var(--text-secondary)]">{String(intent.businessGoal || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">用户类型：</span><span className="text-[var(--text-secondary)]">{String(intent.userType || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">产品形态：</span><span className="text-[var(--text-secondary)]">{String(intent.productShape || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">生命周期：</span><span className="text-[var(--text-secondary)]">{String(intent.lifecycle || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">前端：</span><span className="text-[var(--text-secondary)]">{String(intent.techStack.frontend || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">后端：</span><span className="text-[var(--text-secondary)]">{String(intent.techStack.backend || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">数据库：</span><span className="text-[var(--text-secondary)]">{String(intent.techStack.db || '-')}</span></div>
+                    <div><span className="text-[var(--text-muted)]">基础设施：</span><span className="text-[var(--text-secondary)]">{intent.techStack.infra.join('、') || '-'}</span></div>
                   </div>
                 </div>
                 {decompose && Array.isArray(decompose.tasks) && decompose.tasks.length > 0 && (
-                  <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                  <div className="glass-card p-4">
                     <h3 className="mb-2 text-xs font-semibold text-amber-400">任务拆解</h3>
                     <div className="space-y-1 text-xs">
                       {decompose.tasks.map((task, i) => (
                         <div key={i} className="flex items-start gap-2">
-                          <span className="text-slate-500 shrink-0">P{task.phase}</span>
-                          <span className="text-slate-400 font-mono">{task.file}</span>
-                          <span className="text-slate-500">—</span>
-                          <span className="text-slate-300">{task.responsibility}</span>
+                          <span className="text-[var(--text-muted)] shrink-0">P{task.phase}</span>
+                          <span className="text-[var(--text-tertiary)] font-mono">{task.file}</span>
+                          <span className="text-[var(--text-muted)]">—</span>
+                          <span className="text-[var(--text-secondary)]">{task.responsibility}</span>
                         </div>
                       ))}
                     </div>
@@ -416,8 +368,10 @@ export default function PromptPage() {
         )}
 
         {!result && !loading && !error && (
-          <div className="mt-16 text-center text-slate-600">
-            <div className="text-4xl mb-3">⚡</div>
+          <div className="mt-16 text-center text-[var(--text-muted)]">
+            <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4 text-violet-300">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </div>
             <p>输入需求，生成 AI 可消费的项目上下文</p>
             <p className="text-sm mt-1">3 步流程：理解需求 → 任务拆解 → 编译输出</p>
           </div>

@@ -145,314 +145,253 @@ export default function ComparePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen py-8 px-4">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div className="h-6 w-32 bg-[#1e293b] rounded animate-pulse" />
-          <div className="h-8 w-64 bg-[#1e293b] rounded animate-pulse" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-32 bg-[#1e293b] rounded-xl animate-pulse" />
-            <div className="h-32 bg-[#1e293b] rounded-xl animate-pulse" />
+      <main className="min-h-[calc(100vh-144px)] py-10 sm:py-14">
+        <div className="page-shell max-w-6xl space-y-6">
+          <div className="h-4 w-24 animate-pulse rounded bg-white/[0.05]" />
+          <div className="space-y-3 border-b border-white/[0.06] pb-8">
+            <div className="h-9 w-72 animate-pulse rounded bg-white/[0.06]" />
+            <div className="h-4 w-[28rem] max-w-full animate-pulse rounded bg-white/[0.04]" />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="h-32 animate-pulse rounded-lg border border-white/[0.05] bg-white/[0.025]" />
+            <div className="h-32 animate-pulse rounded-lg border border-white/[0.05] bg-white/[0.025]" />
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen py-16 px-4 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-[#FAFAFA] mb-3">加载失败</h2>
-          <p className="text-[#71717A] text-sm mb-4">{error}</p>
-          <div className="p-4 bg-[#1e293b] rounded-lg text-left mb-6">
-            <p className="text-[#71717A] text-xs mb-2">可能原因：</p>
-            <ul className="text-[#52525B] text-xs space-y-1">
-              <li>• 模型服务限流</li>
-              <li>• Supabase 未连接</li>
-            </ul>
-            <p className="text-[#71717A] text-xs mt-3">建议：重新执行 或 检查环境变量</p>
-          </div>
-          <button
-            onClick={loadExecutions}
-            className="px-4 py-2 bg-[#3B82F6] text-white rounded-lg hover:bg-[#60A5FA] transition-colors text-sm"
-          >
-            重新加载
-          </button>
+      <main className="flex min-h-[calc(100vh-144px)] items-center py-12">
+        <div className="page-shell max-w-lg">
+          <section className="glass-card p-8 text-center sm:p-10">
+            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-[#F87171]/20 bg-[#F87171]/10 text-[#F87171]">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.949 3.374H4.646c-1.732 0-2.815-1.874-1.949-3.374L10.05 3.374c.866-1.5 3.032-1.5 3.898 0l7.354 12.752zM12 16.5h.008v.008H12V16.5z" />
+              </svg>
+            </div>
+            <p className="section-label mb-3">COMPARISON DATA</p>
+            <h2 className="mb-3 text-xl font-semibold text-[#FAFAFA]">加载失败</h2>
+            <p className="mb-6 text-sm leading-6 text-[#A1A1AA]">{error}</p>
+            <div className="mb-7 rounded-lg border border-white/[0.06] bg-black/20 p-4 text-left">
+              <p className="mb-3 text-xs font-medium text-[#A1A1AA]">检查以下服务状态</p>
+              <ul className="space-y-2 text-xs text-[#71717A]">
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#FBBF24]" />模型服务请求配额</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#FBBF24]" />Supabase 数据连接</li>
+              </ul>
+            </div>
+            <button onClick={loadExecutions} className="btn-primary">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16.023 9.348h4.992V4.356m-.997 4.993a8.25 8.25 0 10.683 8.301" />
+              </svg>
+              重新加载
+            </button>
+          </section>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <Link href="/lab" className="text-[#60A5FA] hover:text-[#3B82F6] flex items-center gap-2 mb-4 text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    <main className="min-h-[calc(100vh-144px)] py-10 sm:py-14">
+      <div className="page-shell max-w-6xl">
+        <header className="mb-8 border-b border-white/[0.06] pb-8">
+          <Link href="/lab" className="btn-ghost mb-6 text-[#60A5FA]">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 19l-7-7 7-7" />
             </svg>
             返回实验室
           </Link>
-          <h1 className="text-3xl font-bold text-[#FAFAFA] mb-2">执行对比分析</h1>
-          <p className="text-[#71717A]">选择两次执行进行深度对比，包括策略差异、记忆影响和质量评分</p>
-        </div>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="badge badge-violet mb-4">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6.75 3v18M17.25 3v18M3.75 6h6m4.5 0h6m-16.5 6h6m4.5 0h6m-16.5 6h6m4.5 0h6" />
+                </svg>
+                分析工具
+              </span>
+              <h1 className="mb-3 text-3xl font-bold text-[#FAFAFA]">执行对比分析</h1>
+              <p className="max-w-2xl text-sm leading-6 text-[#A1A1AA]">选择两次执行，比较策略差异、记忆影响和输出质量。</p>
+            </div>
+            <div className="font-mono text-xs text-[#52525B]">{executions.length} AVAILABLE RUNS</div>
+          </div>
+        </header>
 
         {executions.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-lg font-medium text-[#FAFAFA] mb-2">暂无执行记录</h3>
-            <p className="text-[#71717A] text-sm mb-6">请先在 Playground 中执行任务，然后返回此处进行对比分析。</p>
-            <Link href="/playground" className="px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white rounded-lg text-sm font-medium hover:-translate-y-0.5 transition-all">
+          <section className="glass-card mb-8 p-10 text-center">
+            <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-[#71717A]">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.75 3v18M17.25 3v18M3.75 6h6m4.5 0h6m-10.5 6h6m4.5 0h6" />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-lg font-semibold text-[#FAFAFA]">暂无执行记录</h2>
+            <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-[#71717A]">请先在 Playground 中执行任务，然后返回此处进行对比分析。</p>
+            <Link href="/playground" className="btn-primary">
               前往 Playground
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
             </Link>
-          </div>
+          </section>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="p-5 glass-card rounded-xl">
-            <label className="block text-sm font-medium text-[#FAFAFA] mb-3">执行 A</label>
-            <select
-              value={selectedA || ''}
-              onChange={(e) => setSelectedA(e.target.value)}
-              className="w-full px-4 py-3 bg-[#111113] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#E4E4E7] focus:outline-none focus:border-[#3B82F6] text-sm"
-            >
-              <option value="">选择执行记录...</option>
-              {executions.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.prompt.slice(0, 50)}... — {new Date(e.timestamp).toLocaleString('zh-CN')}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="p-5 glass-card rounded-xl">
-            <label className="block text-sm font-medium text-[#FAFAFA] mb-3">执行 B</label>
-            <select
-              value={selectedB || ''}
-              onChange={(e) => setSelectedB(e.target.value)}
-              className="w-full px-4 py-3 bg-[#111113] border border-[rgba(255,255,255,0.08)] rounded-lg text-[#E4E4E7] focus:outline-none focus:border-[#8B5CF6] text-sm"
-            >
-              <option value="">选择执行记录...</option>
-              {executions.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.prompt.slice(0, 50)}... — {new Date(e.timestamp).toLocaleString('zh-CN')}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <section className="mb-8 grid gap-4 lg:grid-cols-2">
+          {[
+            { key: 'A', value: selectedA, onChange: setSelectedA, accent: 'badge-blue', border: 'focus:border-[#3B82F6]/60' },
+            { key: 'B', value: selectedB, onChange: setSelectedB, accent: 'badge-violet', border: 'focus:border-[#8B5CF6]/60' },
+          ].map((selection) => (
+            <div key={selection.key} className="glass-card p-5 sm:p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="section-label mb-1">SELECT RUN</p>
+                  <label htmlFor={`execution-${selection.key}`} className="text-sm font-semibold text-[#FAFAFA]">执行 {selection.key}</label>
+                </div>
+                <span className={`badge ${selection.accent}`}>{selection.key}</span>
+              </div>
+              <select
+                id={`execution-${selection.key}`}
+                value={selection.value || ''}
+                onChange={(e) => selection.onChange(e.target.value)}
+                className={`input-field cursor-pointer appearance-none ${selection.border}`}
+              >
+                <option value="">选择执行记录...</option>
+                {executions.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.prompt.slice(0, 50)}... — {new Date(e.timestamp).toLocaleString('zh-CN')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </section>
 
         {!execA && !execB && executions.length > 0 && (
-          <div className="text-center py-12">
-            <div className="text-3xl mb-3">👆</div>
-            <p className="text-[#71717A] text-sm">请从上方选择两条执行记录进行对比分析</p>
-          </div>
+          <section className="mb-8 border-y border-white/[0.06] py-10 text-center">
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-[#71717A]">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 5v14m0-14l-4 4m4-4l4 4" />
+              </svg>
+            </div>
+            <p className="text-sm text-[#71717A]">从上方选择两条执行记录开始对比。</p>
+          </section>
         )}
 
         {execA && execB && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-5 glass-card rounded-xl">
-                <h3 className="text-sm font-semibold text-[#FAFAFA] mb-3">执行 A</h3>
-                {execA.status && <AgentStatus status={execA.status as any} className="mb-2" />}
-                <p className="text-xs text-[#71717A] mb-2">{new Date(execA.timestamp).toLocaleString('zh-CN')}</p>
-                <div className="p-3 bg-[#111113] rounded-lg">
-                  <p className="text-[#A1A1AA] text-sm">{execA.prompt}</p>
-                </div>
-              </div>
-              <div className="p-5 glass-card rounded-xl">
-                <h3 className="text-sm font-semibold text-[#FAFAFA] mb-3">执行 B</h3>
-                {execB.status && <AgentStatus status={execB.status as any} className="mb-2" />}
-                <p className="text-xs text-[#71717A] mb-2">{new Date(execB.timestamp).toLocaleString('zh-CN')}</p>
-                <div className="p-3 bg-[#111113] rounded-lg">
-                  <p className="text-[#A1A1AA] text-sm">{execB.prompt}</p>
-                </div>
-              </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {[{ exec: execA, label: '执行 A', tone: 'text-[#93C5FD]', border: 'border-[#3B82F6]/20' }, { exec: execB, label: '执行 B', tone: 'text-[#C4B5FD]', border: 'border-[#8B5CF6]/20' }].map(({ exec, label, tone, border }) => (
+                <section key={label} className="glass-card p-5 sm:p-6">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h2 className={`text-sm font-semibold ${tone}`}>{label}</h2>
+                    {exec.status && <AgentStatus status={exec.status as any} />}
+                  </div>
+                  <p className="mb-3 text-[11px] text-[#71717A]">{new Date(exec.timestamp).toLocaleString('zh-CN')}</p>
+                  <div className={`rounded-lg border ${border} bg-black/20 p-4`}>
+                    <p className="text-sm leading-6 text-[#A1A1AA]">{exec.prompt}</p>
+                  </div>
+                </section>
+              ))}
             </div>
 
-            <div className="p-5 glass-card rounded-xl">
-              <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4">策略差异分析</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-[#111113] border border-[rgba(99,102,241,0.2)]">
-                  <h4 className="text-xs text-[#6366F1] font-medium mb-3">执行 A 策略</h4>
-                  <div className="space-y-1.5">
-                    {execA.steps.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="text-[#52525B] w-4">{i + 1}.</span>
-                        <AgentBadge agent={s.agent} size="sm" />
-                        <span className="text-[#A1A1AA] truncate">{s.task.slice(0, 40)}</span>
-                      </div>
-                    ))}
+            <section className="glass-card overflow-hidden">
+              <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6">
+                <p className="section-label mb-1">STRATEGY</p>
+                <h2 className="text-base font-semibold text-[#FAFAFA]">策略差异分析</h2>
+              </div>
+              <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-2">
+                {[{ exec: execA, title: '执行 A 策略', tone: 'text-[#93C5FD]', border: 'border-[#3B82F6]/20' }, { exec: execB, title: '执行 B 策略', tone: 'text-[#C4B5FD]', border: 'border-[#8B5CF6]/20' }].map(({ exec, title, tone, border }) => (
+                  <div key={title} className={`rounded-lg border ${border} bg-black/20 p-4`}>
+                    <h3 className={`mb-4 text-xs font-medium ${tone}`}>{title}</h3>
+                    <div className="space-y-2.5">
+                      {exec.steps.map((s, i) => (
+                        <div key={i} className="flex min-w-0 items-center gap-2 text-xs">
+                          <span className="w-4 shrink-0 font-mono text-[#52525B]">{String(i + 1).padStart(2, '0')}</span>
+                          <AgentBadge agent={s.agent} size="sm" />
+                          <span className="truncate text-[#A1A1AA]">{s.task.slice(0, 40)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="p-4 rounded-lg bg-[#111113] border border-[rgba(139,92,246,0.2)]">
-                  <h4 className="text-xs text-[#8B5CF6] font-medium mb-3">执行 B 策略</h4>
-                  <div className="space-y-1.5">
-                    {execB.steps.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="text-[#52525B] w-4">{i + 1}.</span>
-                        <AgentBadge agent={s.agent} size="sm" />
-                        <span className="text-[#A1A1AA] truncate">{s.task.slice(0, 40)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
               {execA.steps.length !== execB.steps.length && (
-                <div className="mt-3 p-2.5 rounded-lg bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.15)]">
-                  <p className="text-[11px] text-[#F59E0B]">
-                    步骤差异: A 使用 {execA.steps.length} 步，B 使用 {execB.steps.length} 步
-                    {execA.steps.length > execB.steps.length ? '（B 更精简）' : '（A 更精简）'}
-                  </p>
+                <div className="mx-5 mb-5 rounded-lg border border-[#F59E0B]/20 bg-[#F59E0B]/[0.05] p-3 sm:mx-6 sm:mb-6">
+                  <p className="text-xs text-[#FBBF24]">步骤差异：A 使用 {execA.steps.length} 步，B 使用 {execB.steps.length} 步 {execA.steps.length > execB.steps.length ? '（B 更精简）' : '（A 更精简）'}</p>
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="p-5 glass-card rounded-xl">
-              <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4">记忆影响对比</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-[#111113]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{execA.memory_influenced ? '🧠' : '💭'}</span>
-                    <span className="text-xs text-[#E4E4E7] font-medium">
-                      {execA.memory_influenced ? '已使用记忆' : '未使用记忆'}
-                    </span>
-                  </div>
-                  {execA.adaptation_reason && execA.adaptation_reason.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {execA.adaptation_reason.map((r, i) => (
-                        <p key={i} className="text-[11px] text-[#A1A1AA]">• {r}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 rounded-lg bg-[#111113]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{execB.memory_influenced ? '🧠' : '💭'}</span>
-                    <span className="text-xs text-[#E4E4E7] font-medium">
-                      {execB.memory_influenced ? '已使用记忆' : '未使用记忆'}
-                    </span>
-                  </div>
-                  {execB.adaptation_reason && execB.adaptation_reason.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {execB.adaptation_reason.map((r, i) => (
-                        <p key={i} className="text-[11px] text-[#A1A1AA]">• {r}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            <section className="glass-card overflow-hidden">
+              <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6">
+                <p className="section-label mb-1">MEMORY SIGNAL</p>
+                <h2 className="text-base font-semibold text-[#FAFAFA]">记忆影响对比</h2>
               </div>
-            </div>
+              <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-2">
+                {[{ exec: execA, label: '执行 A', tone: 'text-[#93C5FD]' }, { exec: execB, label: '执行 B', tone: 'text-[#C4B5FD]' }].map(({ exec, label, tone }) => (
+                  <div key={label} className="rounded-lg border border-white/[0.06] bg-black/20 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${exec.memory_influenced ? 'bg-[#34D399] shadow-[0_0_10px_rgba(52,211,153,0.7)]' : 'bg-[#52525B]'}`} />
+                      <span className={`text-xs font-medium ${tone}`}>{label} · {exec.memory_influenced ? '已使用记忆' : '未使用记忆'}</span>
+                    </div>
+                    {exec.adaptation_reason && exec.adaptation_reason.length > 0 && (
+                      <div className="space-y-2 border-t border-white/[0.05] pt-3">
+                        {exec.adaptation_reason.map((r, i) => <p key={i} className="text-xs leading-5 text-[#A1A1AA]">{r}</p>)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
 
-            <div className="p-5 glass-card rounded-xl">
-              <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4">质量雷达图</h3>
-              <div className="flex flex-col md:flex-row items-center gap-8">
-                <RadarChart
-                  dataA={[qualityA.relevance, qualityA.structure, qualityA.chinese, qualityA.code]}
-                  dataB={[qualityB.relevance, qualityB.structure, qualityB.chinese, qualityB.code]}
-                  labels={radarLabels}
-                />
-                <div className="space-y-3 flex-1">
+            <section className="glass-card overflow-hidden">
+              <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6">
+                <p className="section-label mb-1">QUALITY PROFILE</p>
+                <h2 className="text-base font-semibold text-[#FAFAFA]">质量雷达图</h2>
+              </div>
+              <div className="flex flex-col items-center gap-8 p-5 sm:p-6 md:flex-row">
+                <RadarChart dataA={[qualityA.relevance, qualityA.structure, qualityA.chinese, qualityA.code]} dataB={[qualityB.relevance, qualityB.structure, qualityB.chinese, qualityB.code]} labels={radarLabels} />
+                <div className="w-full flex-1 space-y-3">
+                  <div className="mb-4 flex gap-4 text-[10px] text-[#71717A]"><span className="flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-full bg-[#6366F1]" />执行 A</span><span className="flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-full bg-[#8B5CF6]" />执行 B</span></div>
                   {radarLabels.map((label, i) => {
                     const valuesA = [qualityA.relevance, qualityA.structure, qualityA.chinese, qualityA.code];
                     const valuesB = [qualityB.relevance, qualityB.structure, qualityB.chinese, qualityB.code];
                     return (
                       <div key={label} className="flex items-center gap-3">
-                        <span className="text-[11px] text-[#71717A] w-16 shrink-0">{label}</span>
-                        <div className="flex-1 flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#6366F1] rounded-full" style={{ width: `${valuesA[i]}%` }} />
-                          </div>
-                          <span className="text-[10px] text-[#6366F1] font-mono w-8">{valuesA[i]}</span>
-                        </div>
-                        <div className="flex-1 flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#8B5CF6] rounded-full" style={{ width: `${valuesB[i]}%` }} />
-                          </div>
-                          <span className="text-[10px] text-[#8B5CF6] font-mono w-8">{valuesB[i]}</span>
-                        </div>
+                        <span className="w-16 shrink-0 text-[11px] text-[#71717A]">{label}</span>
+                        <div className="flex min-w-0 flex-1 items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.05]"><div className="h-full rounded-full bg-[#6366F1]" style={{ width: `${valuesA[i]}%` }} /></div><span className="w-7 font-mono text-[10px] text-[#6366F1]">{valuesA[i]}</span></div>
+                        <div className="flex min-w-0 flex-1 items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.05]"><div className="h-full rounded-full bg-[#8B5CF6]" style={{ width: `${valuesB[i]}%` }} /></div><span className="w-7 font-mono text-[10px] text-[#8B5CF6]">{valuesB[i]}</span></div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="p-5 glass-card rounded-xl">
-              <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4">Agent 贡献对比</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-xs text-[#6366F1] mb-3 font-medium">执行 A</h4>
-                  {Object.entries(statsA).map(([agent, count]) => (
-                    <div key={agent} className="mb-2.5">
-                      <div className="flex items-center gap-2 mb-1">
-                        <AgentBadge agent={agent} size="sm" />
-                        <span className="text-[#A1A1AA] text-xs">{count} 步</span>
-                      </div>
-                      <div className="h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#6366F1]" style={{ width: `${(count / Object.values(statsA).reduce((a, b) => a + b, 0)) * 100}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <h4 className="text-xs text-[#8B5CF6] mb-3 font-medium">执行 B</h4>
-                  {Object.entries(statsB).map(([agent, count]) => (
-                    <div key={agent} className="mb-2.5">
-                      <div className="flex items-center gap-2 mb-1">
-                        <AgentBadge agent={agent} size="sm" />
-                        <span className="text-[#A1A1AA] text-xs">{count} 步</span>
-                      </div>
-                      <div className="h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#8B5CF6]" style={{ width: `${(count / Object.values(statsB).reduce((a, b) => a + b, 0)) * 100}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <section className="glass-card overflow-hidden">
+              <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6"><p className="section-label mb-1">AGENT DISTRIBUTION</p><h2 className="text-base font-semibold text-[#FAFAFA]">Agent 贡献对比</h2></div>
+              <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-2">
+                {[{ stats: statsA, title: '执行 A', color: '#6366F1', tone: 'text-[#93C5FD]' }, { stats: statsB, title: '执行 B', color: '#8B5CF6', tone: 'text-[#C4B5FD]' }].map(({ stats, title, color, tone }) => {
+                  const total = Object.values(stats).reduce((a, b) => a + b, 0);
+                  return <div key={title}><h3 className={`mb-4 text-xs font-medium ${tone}`}>{title}</h3>{Object.entries(stats).map(([agent, count]) => <div key={agent} className="mb-3"><div className="mb-1.5 flex items-center gap-2"><AgentBadge agent={agent} size="sm" /><span className="text-xs text-[#A1A1AA]">{count} 步</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/[0.05]"><div className="h-full" style={{ width: `${total ? (count / total) * 100 : 0}%`, backgroundColor: color }} /></div></div>)}</div>;
+                })}
               </div>
-            </div>
+            </section>
 
-            <div className="p-5 glass-card rounded-xl">
-              <h3 className="text-sm font-semibold text-[#FAFAFA] mb-4">逐步骤对比</h3>
-              <div className="space-y-4">
+            <section className="glass-card overflow-hidden">
+              <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6"><p className="section-label mb-1">STEP DELTA</p><h2 className="text-base font-semibold text-[#FAFAFA]">逐步骤对比</h2></div>
+              <div className="space-y-4 p-5 sm:p-6">
                 {Array.from({ length: Math.max(execA.steps.length, execB.steps.length) }).map((_, index) => (
-                  <div key={index} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <div className={`p-3 rounded-lg border ${execA.steps[index] ? 'border-[rgba(99,102,241,0.2)] bg-[rgba(99,102,241,0.03)]' : 'border-[rgba(255,255,255,0.04)] opacity-40'}`}>
-                      {execA.steps[index] && (
-                        <>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-[10px] text-[#52525B]">步骤 {index + 1}</span>
-                            <AgentBadge agent={execA.steps[index].agent} size="sm" />
-                          </div>
-                          <p className="text-xs text-[#A1A1AA] mb-1.5">{execA.steps[index].task}</p>
-                          <div className="p-2 bg-[#111113] rounded text-[11px] font-mono text-[#71717A] max-h-24 overflow-y-auto">
-                            {execA.steps[index].output.slice(0, 200)}...
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <div className={`p-3 rounded-lg border ${execB.steps[index] ? 'border-[rgba(139,92,246,0.2)] bg-[rgba(139,92,246,0.03)]' : 'border-[rgba(255,255,255,0.04)] opacity-40'}`}>
-                      {execB.steps[index] && (
-                        <>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-[10px] text-[#52525B]">步骤 {index + 1}</span>
-                            <AgentBadge agent={execB.steps[index].agent} size="sm" />
-                          </div>
-                          <p className="text-xs text-[#A1A1AA] mb-1.5">{execB.steps[index].task}</p>
-                          <div className="p-2 bg-[#111113] rounded text-[11px] font-mono text-[#71717A] max-h-24 overflow-y-auto">
-                            {execB.steps[index].output.slice(0, 200)}...
-                          </div>
-                        </>
-                      )}
-                    </div>
+                  <div key={index} className="grid gap-3 lg:grid-cols-2">
+                    {[{ step: execA.steps[index], color: 'border-[#6366F1]/20 bg-[#6366F1]/[0.03]' }, { step: execB.steps[index], color: 'border-[#8B5CF6]/20 bg-[#8B5CF6]/[0.03]' }].map(({ step, color }, side) => <div key={side} className={`rounded-lg border p-3 ${step ? color : 'border-white/[0.04] bg-white/[0.01] opacity-40'}`}>{step ? <><div className="mb-2 flex items-center gap-2"><span className="font-mono text-[10px] text-[#52525B]">步骤 {index + 1}</span><AgentBadge agent={step.agent} size="sm" /></div><p className="mb-2 text-xs leading-5 text-[#A1A1AA]">{step.task}</p><div className="max-h-24 overflow-y-auto rounded border border-white/[0.04] bg-black/25 p-2 font-mono text-[11px] leading-5 text-[#71717A]">{step.output.slice(0, 200)}...</div></> : <span className="text-xs text-[#52525B]">该执行没有对应步骤</span>}</div>)}
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 

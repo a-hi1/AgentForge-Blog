@@ -92,7 +92,7 @@ export function generateDailyTask(
       actionHref: `/prompt/history?id=${best.id}`,
       priority: 'high',
       source: 'real-verified-boost',
-      realityBadge: '🟢 Real Verified',
+      realityBadge: 'Real Verified',
     };
   }
 

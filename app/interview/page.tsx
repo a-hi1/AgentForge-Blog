@@ -9,109 +9,109 @@ export default function InterviewPage() {
   const chapters = [
     {
       title: '系统概览',
-      content: 'AgentForge 智能工程系统是一个基于 Next.js 构建的、具有记忆增强功能的自适应工程系统。',
-      keyPoints: ['优先深色模式', '玻璃态 UI', '实时指标'],
+      content:
+        'AgentForge 是一个基于 Next.js 的记忆增强多 Agent 工程工作台。DeepSeek 负责对话规划，MaxKB 本地向量负责语义检索，pgvector 负责持久化记忆。',
+      keyPoints: ['OLED 深色工作台', '语义设计系统', 'SSE 可观测执行'],
     },
     {
       title: '运行时执行',
-      content: '基于流式的智能代理执行，提供逐步记录和回放功能。',
-      keyPoints: ['实时流式', '逐步回放', '性能监控'],
+      content: '基于流式的多角色 Agent 执行，支持逐步记录、质量评分与回放。',
+      keyPoints: ['Planner → Architect → Coding → Debug → Deploy', '规则校验重试', '进度事件流'],
     },
     {
       title: '云端持久化',
-      content: '基于 Supabase 的存储层，使用 PostgreSQL 存储执行和记忆数据。',
-      keyPoints: ['PostgreSQL', 'Supabase', '本地回退'],
+      content: '基于 Supabase PostgreSQL 存储执行记录与记忆；本地也可回退运行。',
+      keyPoints: ['PostgreSQL + pgvector', 'Supabase', '本地降级'],
     },
     {
       title: '记忆系统',
-      content: '基于关键词重叠和时效性的相关性检索。',
-      keyPoints: ['LLM 提取', '相关性评分', '记忆链接'],
+      content:
+        'Embedding 优先走 MaxKB text2vec-base-chinese，失败后回退 OpenAI 兼容接口或本地哈希，再结合关键词检索。',
+      keyPoints: ['MaxKB 768 维向量', 'match_memories RPC', '标签/关键词回退'],
     },
     {
       title: '自适应规划',
-      content: '基于历史经验和当前任务的动态计划生成。',
-      keyPoints: ['智能代理插入', '任务精简', '优先级调整'],
+      content: '根据历史经验与当前任务动态调整计划，可插入诊断 Agent 或精简步骤。',
+      keyPoints: ['记忆影响计划', '角色插入', '优先级调整'],
     },
     {
       title: '工程决策',
-      content: '为可维护性和性能精心选择的权衡方案。',
-      keyPoints: ['类型安全', '渐进式增强', '回退系统'],
+      content: '为可维护性与面试可解释性做的明确权衡：类型安全、渐进增强、可演示降级。',
+      keyPoints: ['TypeScript strict', '渐进增强', '可防御的简历亮点'],
     },
   ];
 
+  const progress = ((currentChapter + 1) / chapters.length) * 100;
+
   return (
-    <div className="min-h-[calc(100vh-144px)] py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-extrabold text-[#f8fafc] mb-4">
-            系统介绍
-          </h1>
-          <p className="text-[#94a3b8]">
-            引导式浏览工程架构
+    <div className="page-shell py-12 sm:py-16">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10 animate-fade-up">
+          <span className="badge badge-violet mb-4">Interview Walkthrough</span>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">系统介绍</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            引导式浏览工程架构，适合面试讲解
           </p>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-[#64748b] mb-2">
-            <span>第 {currentChapter + 1} 章，共 {chapters.length} 章</span>
-            <span>{Math.round(((currentChapter + 1) / chapters.length) * 100)}%</span>
+        <div className="mb-8 animate-fade-up animate-delay-1">
+          <div className="flex justify-between text-xs text-[var(--text-muted)] mb-2">
+            <span>
+              第 {currentChapter + 1} 章，共 {chapters.length} 章
+            </span>
+            <span>{Math.round(progress)}%</span>
           </div>
-          <div className="h-2 bg-[#1e293b] rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] transition-all duration-500"
-              style={{ width: `${((currentChapter + 1) / chapters.length) * 100}%` }}
+          <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-blue-500 transition-all duration-500"
+              style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
-        {/* Chapter Content */}
-        <div className="glass-card rounded-xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-[#818cf8] mb-4">
+        <div className="glass-card mesh-panel p-6 sm:p-8 mb-8 animate-fade-up animate-delay-2">
+          <p className="section-label mb-3">Chapter {String(currentChapter + 1).padStart(2, '0')}</p>
+          <h2 className="text-2xl font-bold text-white mb-4">
             {chapters[currentChapter].title}
           </h2>
-          <p className="text-[#94a3b8] text-lg mb-6">
+          <p className="text-[var(--text-secondary)] text-base leading-relaxed mb-6">
             {chapters[currentChapter].content}
           </p>
           <div className="space-y-2">
-            <h3 className="text-[#f8fafc] font-semibold">关键要点：</h3>
+            <h3 className="text-sm font-semibold text-white">关键要点</h3>
             {chapters[currentChapter].keyPoints.map((point, i) => (
-              <div key={i} className="flex items-start gap-3 text-[#94a3b8]">
-                <span className="text-[#6366f1]">•</span>
+              <div key={i} className="flex items-start gap-3 text-sm text-[var(--text-tertiary)]">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
                 <span>{point}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
           <button
+            type="button"
             onClick={() => setCurrentChapter(Math.max(0, currentChapter - 1))}
             disabled={currentChapter === 0}
-            className="px-6 py-3 rounded-lg bg-[#1e293b] text-[#f8fafc] border border-[rgba(255,255,255,0.15)] hover:bg-[#334155] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="btn-secondary"
           >
-            ← 上一章
+            上一章
           </button>
-          
+
           {currentChapter < chapters.length - 1 ? (
             <button
+              type="button"
               onClick={() => setCurrentChapter(currentChapter + 1)}
-              className="px-6 py-3 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white font-semibold hover:shadow-lg transition-all"
+              className="btn-primary"
             >
-              下一章 →
+              下一章
             </button>
           ) : (
-            <Link
-              href="/showcase"
-              className="px-6 py-3 rounded-lg bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white font-semibold hover:shadow-lg transition-all"
-            >
-              🚀 前往能力展示
+            <Link href="/showcase" className="btn-primary text-center">
+              前往能力展示
             </Link>
           )}
         </div>
-
       </div>
     </div>
   );

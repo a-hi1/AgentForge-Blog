@@ -18,12 +18,12 @@ interface TimelineNode {
   failureReason?: string;
 }
 
-const NODE_CONFIG: Record<TimelineNode['type'], { icon: string; color: string; bgColor: string }> = {
-  idea: { icon: '💡', color: 'text-yellow-400', bgColor: 'bg-yellow-500/10 border-yellow-500/30' },
-  generated: { icon: '✨', color: 'text-indigo-400', bgColor: 'bg-indigo-500/10 border-indigo-500/30' },
-  executed: { icon: '▶️', color: 'text-blue-400', bgColor: 'bg-blue-500/10 border-blue-500/30' },
-  feedback: { icon: '📝', color: 'text-purple-400', bgColor: 'bg-purple-500/10 border-purple-500/30' },
-  optimized: { icon: '🔄', color: 'text-green-400', bgColor: 'bg-green-500/10 border-green-500/30' },
+const NODE_CONFIG: Record<TimelineNode['type'], { label: string; color: string; bgColor: string }> = {
+  idea: { label: 'Idea', color: 'text-amber-300', bgColor: 'bg-amber-500/10 border-amber-500/25' },
+  generated: { label: 'Gen', color: 'text-violet-300', bgColor: 'bg-violet-500/10 border-violet-500/25' },
+  executed: { label: 'Run', color: 'text-blue-300', bgColor: 'bg-blue-500/10 border-blue-500/25' },
+  feedback: { label: 'FB', color: 'text-violet-300', bgColor: 'bg-violet-500/10 border-violet-500/25' },
+  optimized: { label: 'Opt', color: 'text-emerald-300', bgColor: 'bg-emerald-500/10 border-emerald-500/25' },
 };
 
 function buildTimeline(history: PromptAsset[]): TimelineNode[] {
@@ -108,14 +108,14 @@ export default function ProjectTimeline({ limit = 20 }: ProjectTimelineProps) {
 
   if (loading) {
     return (
-      <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
+      <div className="glass-card p-6">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-800" />
+              <div className="w-8 h-8 rounded-full bg-white/[0.06]" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-slate-800 rounded w-1/3" />
-                <div className="h-3 bg-slate-800 rounded w-2/3" />
+                <div className="h-4 bg-white/[0.06] rounded w-1/3" />
+                <div className="h-3 bg-white/[0.06] rounded w-2/3" />
               </div>
             </div>
           ))}
@@ -126,9 +126,9 @@ export default function ProjectTimeline({ limit = 20 }: ProjectTimelineProps) {
 
   if (nodes.length === 0) {
     return (
-      <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50 text-center">
-        <p className="text-sm text-gray-500">暂无项目时间线数据</p>
-        <Link href="/prompt" className="text-sm text-indigo-400 hover:text-indigo-300 mt-2 inline-block">
+      <div className="glass-card p-6 text-center">
+        <p className="text-sm text-[var(--text-muted)]">暂无项目时间线数据</p>
+        <Link href="/prompt" className="text-sm text-violet-300 hover:text-violet-200 mt-2 inline-block transition-colors">
           生成第一个 Prompt →
         </Link>
       </div>
@@ -136,64 +136,64 @@ export default function ProjectTimeline({ limit = 20 }: ProjectTimelineProps) {
   }
 
   return (
-    <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
+    <div className="glass-card p-6">
       <h3 className="text-lg font-bold text-white mb-5">项目时间线</h3>
       <div className="relative">
-        <div className="absolute left-4 top-0 bottom-0 w-px bg-slate-700/50" />
+        <div className="absolute left-4 top-0 bottom-0 w-px bg-[var(--border)]" />
         <div className="space-y-4">
-          {nodes.map((node, i) => {
+          {nodes.map((node) => {
             const cfg = NODE_CONFIG[node.type];
             return (
               <div key={node.id} className="relative flex items-start gap-4 pl-2">
-                <div className={`relative z-10 w-8 h-8 rounded-full border flex items-center justify-center shrink-0 text-sm ${cfg.bgColor}`}>
-                  {cfg.icon}
+                <div className={`relative z-10 w-8 h-8 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-semibold ${cfg.bgColor} ${cfg.color}`}>
+                  {cfg.label}
                 </div>
                 <div className="flex-1 min-w-0 pb-2">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`text-sm font-medium ${cfg.color}`}>{node.label}</span>
                     {node.version && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-gray-400">v{node.version}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.05] text-[var(--text-muted)]">v{node.version}</span>
                     )}
                     {node.score !== undefined && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                        node.score >= 80 ? 'bg-green-500/20 text-green-400' :
-                        node.score >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                        node.score >= 80 ? 'bg-emerald-500/15 text-emerald-300' :
+                        node.score >= 60 ? 'bg-amber-500/15 text-amber-300' :
+                        'bg-red-500/15 text-red-300'
                       }`}>
                         {node.score}分
                       </span>
                     )}
                     {node.feedback && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                        node.feedback === 'excellent' ? 'bg-green-500/20 text-green-400' :
-                        node.feedback === 'average' ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                        node.feedback === 'excellent' ? 'bg-emerald-500/15 text-emerald-300' :
+                        node.feedback === 'average' ? 'bg-amber-500/15 text-amber-300' :
+                        'bg-red-500/15 text-red-300'
                       }`}>
                         {node.feedback === 'excellent' ? '优秀' : node.feedback === 'average' ? '一般' : '失败'}
                       </span>
                     )}
                     {node.outcome && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                        node.outcome === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                        node.outcome === 'partial' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                        'bg-red-500/20 text-red-400 border border-red-500/30'
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium border ${
+                        node.outcome === 'success' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' :
+                        node.outcome === 'partial' ? 'bg-amber-500/15 text-amber-300 border-amber-500/25' :
+                        'bg-red-500/15 text-red-300 border-red-500/25'
                       }`}>
-                        {node.outcome === 'success' ? '✓ 成功' : node.outcome === 'partial' ? '◐ 部分' : '✗ 失败'}
+                        {node.outcome === 'success' ? '成功' : node.outcome === 'partial' ? '部分' : '失败'}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 truncate">{node.description}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] truncate">{node.description}</p>
                   {node.failureReason && (
-                    <p className="text-xs text-red-400/70 mt-1 truncate">{node.failureReason}</p>
+                    <p className="text-xs text-red-400/80 mt-1 truncate">{node.failureReason}</p>
                   )}
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-[var(--text-muted)]">
                       {new Date(node.timestamp).toLocaleDateString()} {new Date(node.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {node.promptId && (
                       <Link
                         href={`/prompt/history?id=${node.promptId}`}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                        className="text-[10px] text-violet-300 hover:text-violet-200 transition-colors"
                       >
                         查看详情 →
                       </Link>

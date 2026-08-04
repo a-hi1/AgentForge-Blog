@@ -21,17 +21,26 @@ export interface DebugResult {
   confidence: number;
 }
 
-const CATEGORY_CONFIG: Record<ErrorCategory, { label: string; icon: string; color: string }> = {
-  'frontend-ui': { label: '前端 UI', icon: '🎨', color: 'text-pink-400 bg-pink-500/10 border-pink-500/30' },
-  'backend-logic': { label: '后端逻辑', icon: '⚙️', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-  'api': { label: 'API', icon: '🔌', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
-  'database': { label: '数据库', icon: '🗄️', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
-  'deploy': { label: '部署', icon: '🚀', color: 'text-green-400 bg-green-500/10 border-green-500/30' },
-  'performance': { label: '性能', icon: '⚡', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
-  'prompt-ambiguity': { label: 'Prompt 表达歧义', icon: '💬', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
+const CATEGORY_CONFIG: Record<ErrorCategory, { label: string; color: string }> = {
+  'frontend-ui': { label: '前端 UI', color: 'text-pink-300 bg-pink-500/10 border-pink-500/25' },
+  'backend-logic': { label: '后端逻辑', color: 'text-blue-300 bg-blue-500/10 border-blue-500/25' },
+  api: { label: 'API', color: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/25' },
+  database: { label: '数据库', color: 'text-amber-300 bg-amber-500/10 border-amber-500/25' },
+  deploy: { label: '部署', color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25' },
+  performance: { label: '性能', color: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/25' },
+  'prompt-ambiguity': {
+    label: 'Prompt 表达歧义',
+    color: 'text-violet-300 bg-violet-500/10 border-violet-500/25',
+  },
 };
 
-const ERROR_PATTERNS: { pattern: RegExp; category: ErrorCategory; attribution: string; fragmentHint: string; suggestions: string[] }[] = [
+const ERROR_PATTERNS: {
+  pattern: RegExp;
+  category: ErrorCategory;
+  attribution: string;
+  fragmentHint: string;
+  suggestions: string[];
+}[] = [
   {
     pattern: /样式|布局|css|ui|界面|显示|渲染|组件|响应式|移动端|居中|对齐|间距/i,
     category: 'frontend-ui',
@@ -118,10 +127,20 @@ const ERROR_PATTERNS: { pattern: RegExp; category: ErrorCategory; attribution: s
   },
 ];
 
-function classifyError(errorDesc: string): { category: ErrorCategory; attribution: string; fragmentHint: string; suggestions: string[] } {
+function classifyError(errorDesc: string): {
+  category: ErrorCategory;
+  attribution: string;
+  fragmentHint: string;
+  suggestions: string[];
+} {
   for (const p of ERROR_PATTERNS) {
     if (p.pattern.test(errorDesc)) {
-      return { category: p.category, attribution: p.attribution, fragmentHint: p.fragmentHint, suggestions: p.suggestions };
+      return {
+        category: p.category,
+        attribution: p.attribution,
+        fragmentHint: p.fragmentHint,
+        suggestions: p.suggestions,
+      };
     }
   }
   return {
@@ -138,13 +157,13 @@ function classifyError(errorDesc: string): { category: ErrorCategory; attributio
 }
 
 function extractErrorFragment(errorDesc: string): string {
-  const lines = errorDesc.split('\n').filter(l => l.trim());
-  const errorLines = lines.filter(l =>
+  const lines = errorDesc.split('\n').filter((l) => l.trim());
+  const errorLines = lines.filter((l) =>
     /error|错误|fail|失败|exception|异常|undefined|null|cannot|unable|bug/i.test(l)
   );
   if (errorLines.length > 0) return errorLines.slice(0, 3).join('\n');
   if (lines.length <= 3) return errorDesc;
-  return lines.slice(0, 3).join('\n') + '\n...';
+  return lines.slice(0, 3).join('\n') + '\n…';
 }
 
 function generateFixedPrompt(errorDesc: string, category: ErrorCategory): string {
@@ -157,7 +176,10 @@ function generateFixedPrompt(errorDesc: string, category: ErrorCategory): string
 ### 任务
 请分析并修复以下问题：
 
-${errorDesc.split('\n').map(l => `> ${l}`).join('\n')}
+${errorDesc
+  .split('\n')
+  .map((l) => `> ${l}`)
+  .join('\n')}
 
 ### 要求
 1. 首先定位问题根因
@@ -181,12 +203,13 @@ export default function PromptDebugger({ initialError = '', onApplyFix }: Prompt
   const [errorInput, setErrorInput] = useState(initialError);
   const [debugResult, setDebugResult] = useState<DebugResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleAnalyze = async () => {
     if (!errorInput.trim()) return;
     setAnalyzing(true);
 
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 800));
 
     const classification = classifyError(errorInput);
     const result: DebugResult = {
@@ -203,98 +226,131 @@ export default function PromptDebugger({ initialError = '', onApplyFix }: Prompt
     setAnalyzing(false);
   };
 
+  const handleCopy = async () => {
+    if (!debugResult) return;
+    try {
+      await navigator.clipboard.writeText(debugResult.fixedPrompt);
+    } catch {
+      /* ignore */
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-700/50">
-        <h2 className="text-lg font-bold text-white mb-4">Prompt Debugger</h2>
-        <p className="text-sm text-gray-400 mb-4">粘贴 Agent 执行失败描述，自动分析问题根因并生成修复版 Prompt</p>
+      <div className="glass-card p-5 sm:p-6">
+        <h2 className="text-lg font-bold text-white mb-2">Prompt Debugger</h2>
+        <p className="text-sm text-[var(--text-tertiary)] mb-4">
+          粘贴 Agent 执行失败描述，自动分析问题根因并生成修复版 Prompt
+        </p>
+        <label htmlFor="debug-error-input" className="sr-only">
+          错误描述
+        </label>
         <textarea
+          id="debug-error-input"
           value={errorInput}
-          onChange={e => setErrorInput(e.target.value)}
+          onChange={(e) => setErrorInput(e.target.value)}
           placeholder="粘贴错误信息、执行失败描述、或不理想的执行结果..."
-          className="w-full h-40 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none font-mono"
+          className="input-field h-40 resize-none font-mono"
         />
         <button
+          type="button"
           onClick={handleAnalyze}
           disabled={!errorInput.trim() || analyzing}
-          className="mt-3 px-6 py-2.5 rounded-lg bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-all"
+          className="btn-primary mt-3"
         >
-          {analyzing ? '分析中...' : '🔍 分析问题'}
+          {analyzing ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              分析中…
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              分析问题
+            </>
+          )}
         </button>
       </div>
 
       {debugResult && (
         <div className="space-y-4">
-          <div className="p-5 rounded-xl bg-slate-900/40 border border-slate-700/50">
-            <div className="flex items-center justify-between mb-4">
+          <div className="glass-card p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-base font-bold text-white">问题归因</h3>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs px-2.5 py-1 rounded-full border ${CATEGORY_CONFIG[debugResult.category].color}`}>
-                  {CATEGORY_CONFIG[debugResult.category].icon} {debugResult.categoryLabel}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className={`text-xs px-2.5 py-1 rounded-md border ${CATEGORY_CONFIG[debugResult.category].color}`}
+                >
+                  {debugResult.categoryLabel}
                 </span>
-                <span className="text-xs text-gray-500">置信度 {debugResult.confidence}%</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  置信度 {debugResult.confidence}%
+                </span>
               </div>
             </div>
-            <p className="text-sm text-gray-300">{debugResult.attribution}</p>
+            <p className="text-sm text-[var(--text-secondary)]">{debugResult.attribution}</p>
           </div>
 
-          <div className="p-5 rounded-xl bg-slate-900/40 border border-red-500/20">
+          <div className="glass-card p-5 border border-red-500/20">
             <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               错误片段定位
             </h3>
-            <pre className="text-sm text-red-300 bg-red-500/5 border border-red-500/20 rounded-lg p-4 font-mono whitespace-pre-wrap">
+            <pre className="text-sm text-red-300 bg-red-500/5 border border-red-500/20 rounded-xl p-4 font-mono whitespace-pre-wrap">
               {debugResult.errorFragment}
             </pre>
           </div>
 
-          <div className="p-5 rounded-xl bg-slate-900/40 border border-yellow-500/20">
+          <div className="glass-card p-5 border border-amber-500/20">
             <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
               修复建议
             </h3>
             <ul className="space-y-2">
               {debugResult.fixSuggestions.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                  <span className="text-yellow-400 mt-0.5 shrink-0">{i + 1}.</span>
+                <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                  <span className="text-amber-400 mt-0.5 shrink-0">{i + 1}.</span>
                   {s}
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="p-5 rounded-xl bg-slate-900/40 border border-green-500/20">
-            <div className="flex items-center justify-between mb-3">
+          <div className="glass-card p-5 border border-emerald-500/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 完整修复版 Prompt
               </h3>
               <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(debugResult.fixedPrompt);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-gray-300 text-xs transition-colors"
-                >
-                  复制
+                <button type="button" onClick={handleCopy} className="btn-secondary text-xs">
+                  {copied ? '已复制' : '复制'}
                 </button>
                 {onApplyFix && (
                   <button
+                    type="button"
                     onClick={() => onApplyFix(debugResult.fixedPrompt)}
-                    className="px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 text-xs transition-colors"
+                    className="btn-primary text-xs"
                   >
                     应用修复
                   </button>
                 )}
               </div>
             </div>
-            <pre className="text-sm text-gray-300 bg-green-500/5 border border-green-500/20 rounded-lg p-4 whitespace-pre-wrap font-sans">
+            <pre className="text-sm text-[var(--text-secondary)] bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 whitespace-pre-wrap font-sans">
               {debugResult.fixedPrompt}
             </pre>
           </div>

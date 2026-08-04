@@ -148,55 +148,62 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] py-12 px-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
+    <div className="page-shell py-12 sm:py-16">
+        <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-5 animate-fade-up">
           <div>
-            <h1 className="text-2xl font-bold text-white">项目记忆</h1>
-            <p className="mt-1 text-sm text-zinc-400">导入并管理你的 GitHub 仓库</p>
+            <span className="badge badge-blue mb-4">Project Memory</span>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">项目记忆</h1>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">导入 GitHub 仓库，沉淀代码结构、技术决策与会话上下文。</p>
           </div>
           <button
             onClick={() => setShowImport(!showImport)}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 transition"
+            className={showImport ? 'btn-secondary' : 'btn-primary'}
           >
-            {showImport ? '取消' : '+ 导入仓库'}
+            {showImport ? '取消导入' : '导入仓库'}
           </button>
         </div>
 
         {/* Import Form */}
         {showImport && (
-          <div className="mb-6 space-y-3">
-            <input
-              type="text"
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !importLoading) handleImport(); }}
-              placeholder="https://github.com/user/repo"
-              className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-4 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
-            />
-            <button
-              onClick={handleImport}
-              disabled={importLoading || !importUrl.trim()}
-              className="rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
-            >
-              {importLoading ? '分析中...' : '导入并分析'}
-            </button>
+          <div className="glass-card mesh-panel mb-6 p-5 sm:p-6 animate-fade-up">
+            <label htmlFor="repo-url" className="block text-sm font-medium text-white mb-2">GitHub 仓库地址</label>
+            <p className="text-xs text-[var(--text-tertiary)] mb-4">支持公开仓库；设置 GITHUB_TOKEN 可提高 API 限额。</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                id="repo-url"
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !importLoading) handleImport(); }}
+                placeholder="https://github.com/user/repo"
+                className="input-field flex-1 font-mono"
+              />
+              <button
+                onClick={handleImport}
+                disabled={importLoading || !importUrl.trim()}
+                className="btn-primary shrink-0"
+              >
+                {importLoading ? '分析中...' : '导入并分析'}
+              </button>
+            </div>
             {importError && (
-              <div className="rounded-xl border border-red-800 bg-red-950 p-4">
+              <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 p-4" role="alert">
                 <p className="text-sm text-red-300">{importError}</p>
               </div>
             )}
           </div>
         )}
 
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6 animate-fade-up animate-delay-1">
           {/* Left: Repo List */}
-          <div className="w-72 shrink-0">
+          <div className="w-full lg:w-72 shrink-0">
             {repos.length === 0 ? (
-              <div className="text-center py-12 text-zinc-600">
-                <div className="text-4xl mb-3">📦</div>
-                <p className="text-sm">还没有导入过仓库</p>
-                <p className="text-xs mt-1">点击"导入仓库"开始</p>
+              <div className="glass-card text-center py-10 px-5">
+                <div className="w-11 h-11 rounded-xl bg-white/[0.03] border border-[var(--border)] flex items-center justify-center mx-auto mb-4 text-[var(--text-muted)]">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4 9-4V7M12 11v10" /></svg>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)]">还没有导入仓库</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">点击「导入仓库」开始</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -204,21 +211,22 @@ export default function ProjectsPage() {
                   <div
                     key={repo.id}
                     onClick={() => setActiveId(repo.id)}
-                    className={`group relative rounded-xl border p-4 cursor-pointer transition-all ${
+                    className={`group relative rounded-xl border p-4 cursor-pointer transition-all duration-200 ${
                       activeId === repo.id
-                        ? 'border-violet-500 bg-violet-500/10'
-                        : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                        ? 'border-violet-500/50 bg-violet-500/10 shadow-glow-sm'
+                        : 'border-[var(--border)] bg-white/[0.02] hover:border-[var(--border-strong)] hover:bg-white/[0.04]'
                     }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-white truncate">{repo.meta.owner}/{repo.meta.name}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5 truncate">{repo.meta.description || '无描述'}</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-0.5 truncate">{repo.meta.description || '无描述'}</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(repo.id); }}
-                        className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-opacity ml-2 shrink-0"
+                        className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition-opacity ml-2 shrink-0 p-1.5 rounded-lg hover:bg-red-500/10"
                         title="删除"
+                        aria-label={`删除 ${repo.meta.name}`}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -226,15 +234,15 @@ export default function ProjectsPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[10px] text-zinc-600">{repo.meta.language || '-'}</span>
-                      <span className="text-[10px] text-zinc-600">⭐ {repo.meta.stars}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      <span className="text-[10px] text-[var(--text-muted)]">{repo.meta.language || '-'}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">Stars {repo.meta.stars}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
                         repo.maturity.score >= 71 ? 'text-emerald-400 bg-emerald-500/10'
-                        : repo.maturity.score >= 51 ? 'text-yellow-400 bg-yellow-500/10'
+                        : repo.maturity.score >= 51 ? 'text-amber-400 bg-amber-500/10'
                         : 'text-red-400 bg-red-500/10'
                       }`}>{repo.maturity.score}分</span>
                     </div>
-                    <p className="text-[10px] text-zinc-600 mt-1.5">
+                    <p className="text-[10px] text-[var(--text-muted)] mt-1.5">
                       更新于 {formatRelativeTime(repo.savedAt)}
                     </p>
                   </div>
@@ -256,16 +264,17 @@ export default function ProjectsPage() {
                 />
 
                 {/* Export Section */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                  <h3 className="text-sm font-semibold text-white mb-4">导出给 AI</h3>
-                  <div className="flex items-center gap-3">
+                <div className="glass-card p-5 sm:p-6">
+                  <h3 className="text-sm font-semibold text-white mb-1">导出给 AI</h3>
+                  <p className="text-xs text-[var(--text-tertiary)] mb-4">复制针对不同工具优化的项目上下文。</p>
+                  <div className="flex flex-wrap items-center gap-3">
                     {(['claude', 'cursor', 'gpt'] as ExportTarget[]).map(target => {
                       const labels: Record<ExportTarget, string> = { claude: 'Claude', cursor: 'Cursor', gpt: 'GPT' };
                       return (
                         <button
                           key={target}
                           onClick={() => handleCopy(target)}
-                          className="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition"
+                          className="btn-secondary"
                         >
                           复制给 {labels[target]}
                         </button>
@@ -278,22 +287,23 @@ export default function ProjectsPage() {
                 </div>
 
                 {/* Session Memory */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-                  <h3 className="text-sm font-semibold text-white mb-3">会话记忆</h3>
-                  <p className="text-sm text-zinc-500 mb-4">粘贴 Cursor / Claude / GPT 的对话记录，AI 自动提取技术决策和约束</p>
+                <div className="glass-card p-5 sm:p-6">
+                  <h3 className="text-sm font-semibold text-white mb-2">会话记忆</h3>
+                  <p className="text-sm text-[var(--text-tertiary)] mb-4">粘贴 Cursor / Claude / GPT 对话，保留技术决策、Bug 修复与约束。</p>
                   <SessionMemoryInput repoId={activeRepo.id} />
                 </div>
               </div>
             ) : (
-              <div className="text-center py-20 text-zinc-600">
-                <div className="text-4xl mb-3">👈</div>
-                <p>选择左侧仓库查看详情</p>
-                <p className="text-sm mt-1">或点击"导入仓库"添加新项目</p>
+              <div className="glass-card text-center py-16 px-6">
+                <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4 text-violet-300">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" /></svg>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)]">选择仓库查看详情</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">或导入新的 GitHub 项目</p>
               </div>
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }
@@ -321,14 +331,14 @@ function SessionMemoryInput({ repoId }: { repoId: string }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="粘贴 AI 对话中关于技术决策、Bug 修复、代码约束的部分..."
-        className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
+        className="input-field resize-none"
         rows={4}
       />
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
           disabled={!text.trim()}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
+          className="btn-primary"
         >
           保存到项目记忆
         </button>

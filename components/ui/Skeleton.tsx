@@ -15,8 +15,8 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   width,
   height,
 }) => {
-  const baseStyles = 'animate-pulse bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 bg-[length:200%_100%]';
-  
+  const baseStyles = 'shimmer';
+
   const variantStyles = {
     text: 'h-4 rounded',
     circular: 'rounded-full',
@@ -31,6 +31,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     <div
       className={`${baseStyles} ${variantStyles[variant]} ${className}`}
       style={style}
+      aria-hidden="true"
     />
   );
 };

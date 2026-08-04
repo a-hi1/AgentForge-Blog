@@ -155,7 +155,7 @@ export default function DemoRunner({
         }
         return newSteps;
       });
-      addLog(`✅ ${event.agent} 已完成`);
+      addLog(`[done] ${event.agent} 已完成`);
     } else if (event.type === 'complete') {
       setExecutionId(event.executionId || `exec-${Date.now()}`);
       addLog('执行完成!');
@@ -179,6 +179,7 @@ export default function DemoRunner({
           <div className="flex items-center gap-3">
             {isRunning ? (
               <button
+                type="button"
                 onClick={() => {
                   setIsLoading(false);
                   setIsRunning(false);
@@ -189,9 +190,10 @@ export default function DemoRunner({
               </button>
             ) : (
               <button
+                type="button"
                 onClick={runDemo}
                 disabled={isLoading}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] text-white rounded-lg text-sm font-medium hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? '执行中...' : '启动执行'}
               </button>
@@ -224,7 +226,7 @@ export default function DemoRunner({
             <p className="text-[#71717A]">选择场景后点击「启动执行」...</p>
           ) : (
             logs.map((log, i) => (
-              <p key={i} className={`mb-1 ${log.includes('✅') ? 'text-[#10B981]' : 'text-[#A1A1AA]'}`}>
+              <p key={i} className={`mb-1 ${log.startsWith('[done]') || log.includes('完成') ? 'text-[#10B981]' : 'text-[#A1A1AA]'}`}>
                 {log}
               </p>
             ))

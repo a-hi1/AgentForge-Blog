@@ -18,12 +18,12 @@ interface ArtifactsPanelProps {
   onExport?: (type: 'techspec' | 'scaffold' | 'apispec' | 'prd') => void;
 }
 
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'architecture', label: '架构', icon: '🏗' },
-  { id: 'datamodel', label: '数据模型', icon: '🗄' },
-  { id: 'api', label: '接口', icon: '🔌' },
-  { id: 'filetree', label: '文件树', icon: '📁' },
-  { id: 'deploy', label: '部署', icon: '🚀' },
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'architecture', label: '架构' },
+  { id: 'datamodel', label: '数据模型' },
+  { id: 'api', label: '接口' },
+  { id: 'filetree', label: '文件树' },
+  { id: 'deploy', label: '部署' },
 ];
 
 function ArtifactsPanel({ artifacts, onExport }: ArtifactsPanelProps) {
@@ -36,21 +36,25 @@ function ArtifactsPanel({ artifacts, onExport }: ArtifactsPanelProps) {
       <div className="px-5 pt-4 pb-3 border-b border-[rgba(255,255,255,0.06)]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#3B82F6]/20 to-[#8B5CF6]/20 flex items-center justify-center text-xs">📦</span>
-            <h3 className="text-sm font-semibold text-[#FAFAFA]">工程产物</h3>
+            <span className="w-6 h-6 rounded-lg bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-violet-300">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </span>
+            <h3 className="text-sm font-semibold text-white">工程产物</h3>
           </div>
           {onExport && (
             <div className="flex gap-1.5">
-              <button onClick={() => onExport('techspec')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(59,130,246,0.1)] text-[#60A5FA] hover:bg-[rgba(59,130,246,0.2)] transition-colors">
+              <button type="button" onClick={() => onExport('techspec')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(59,130,246,0.1)] text-[#60A5FA] hover:bg-[rgba(59,130,246,0.2)] transition-colors">
                 下载方案
               </button>
-              <button onClick={() => onExport('scaffold')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(16,185,129,0.1)] text-[#34D399] hover:bg-[rgba(16,185,129,0.2)] transition-colors">
+              <button type="button" onClick={() => onExport('scaffold')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(16,185,129,0.1)] text-[#34D399] hover:bg-[rgba(16,185,129,0.2)] transition-colors">
                 工程骨架
               </button>
-              <button onClick={() => onExport('apispec')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(139,92,246,0.1)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.2)] transition-colors">
+              <button type="button" onClick={() => onExport('apispec')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(139,92,246,0.1)] text-[#A78BFA] hover:bg-[rgba(139,92,246,0.2)] transition-colors">
                 API Spec
               </button>
-              <button onClick={() => onExport('prd')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(245,158,11,0.1)] text-[#FBBF24] hover:bg-[rgba(245,158,11,0.2)] transition-colors">
+              <button type="button" onClick={() => onExport('prd')} className="px-2.5 py-1 text-[10px] rounded-md bg-[rgba(245,158,11,0.1)] text-[#FBBF24] hover:bg-[rgba(245,158,11,0.2)] transition-colors">
                 导出 PRD
               </button>
             </div>
@@ -59,15 +63,16 @@ function ArtifactsPanel({ artifacts, onExport }: ArtifactsPanelProps) {
         <div className="flex gap-1">
           {TABS.map(tab => (
             <button
+              type="button"
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-[rgba(59,130,246,0.15)] text-[#60A5FA] border border-[rgba(59,130,246,0.3)]'
-                  : 'text-[#71717A] hover:text-[#A1A1AA] hover:bg-[rgba(255,255,255,0.03)]'
+                  ? 'bg-violet-500/15 text-violet-300 border border-violet-500/25'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/[0.03] border border-transparent'
               }`}
             >
-              {tab.icon} {tab.label}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -114,17 +119,17 @@ function ArchitectureTab({ nodes, edges }: { nodes: ArchitectureNode[]; edges: A
               <div className="flex flex-wrap gap-2">
                 {layerNodes.map(node => (
                   <button
+                    type="button"
                     key={node.id}
                     onClick={() => setSelectedNode(selectedNode?.id === node.id ? null : node)}
                     className={`px-3 py-2 rounded-lg border text-xs transition-all ${
                       selectedNode?.id === node.id
                         ? 'bg-[rgba(59,130,246,0.1)] border-[rgba(59,130,246,0.3)]'
-                        : 'bg-[#111113] border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)]'
+                        : 'bg-[rgba(255,255,255,0.02)] border-[var(--border)] hover:border-[var(--border-light)]'
                     }`}
                     style={{ borderLeftColor: typeColors[node.type], borderLeftWidth: 3 }}
                   >
-                    <span className="mr-1.5">{node.icon}</span>
-                    <span className="text-[#E4E4E7] font-medium">{node.label}</span>
+                    <span className="text-[var(--text)] font-medium">{node.label}</span>
                   </button>
                 ))}
               </div>
@@ -134,27 +139,26 @@ function ArchitectureTab({ nodes, edges }: { nodes: ArchitectureNode[]; edges: A
       </div>
 
       {selectedNode && (
-        <div className="p-3 rounded-lg bg-[#111113] border border-[rgba(59,130,246,0.2)]">
+        <div className="p-3 rounded-lg bg-[rgba(255,255,255,0.02)] border border-[rgba(59,130,246,0.2)]">
           <div className="flex items-center gap-2 mb-1">
-            <span>{selectedNode.icon}</span>
-            <span className="text-[#FAFAFA] text-sm font-medium">{selectedNode.label}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)] text-[#71717A]">{selectedNode.type}</span>
+            <span className="text-[var(--text)] text-sm font-medium">{selectedNode.label}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)] text-[var(--text-tertiary)]">{selectedNode.type}</span>
           </div>
-          <p className="text-[#A1A1AA] text-xs">{selectedNode.description}</p>
+          <p className="text-[var(--text-secondary)] text-xs">{selectedNode.description}</p>
         </div>
       )}
 
       <div className="mt-3 p-3 rounded-lg bg-[rgba(255,255,255,0.02)]">
-        <p className="text-[10px] text-[#52525B] uppercase tracking-wider mb-2">调用链路</p>
+        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">调用链路</p>
         {edges.map((edge, i) => {
           const fromNode = nodes.find(n => n.id === edge.from);
           const toNode = nodes.find(n => n.id === edge.to);
           return (
             <div key={i} className="flex items-center gap-2 mb-1 text-xs">
-              <span className="text-[#A1A1AA]">{fromNode?.icon} {fromNode?.label}</span>
-              <span className="text-[#52525B]">→</span>
-              <span className="text-[#A1A1AA]">{toNode?.icon} {toNode?.label}</span>
-              {edge.label && <span className="text-[10px] text-[#71717A]">({edge.label})</span>}
+              <span className="text-[var(--text-secondary)]">{fromNode?.label}</span>
+              <span className="text-[var(--text-muted)]">→</span>
+              <span className="text-[var(--text-secondary)]">{toNode?.label}</span>
+              {edge.label && <span className="text-[10px] text-[var(--text-tertiary)]">({edge.label})</span>}
             </div>
           );
         })}
@@ -171,15 +175,25 @@ function DataModelTab({ tables }: { tables: DataModelTable[] }) {
       {tables.map(table => (
         <div key={table.name} className="rounded-lg border border-[rgba(255,255,255,0.06)] overflow-hidden">
           <button
+            type="button"
             onClick={() => setExpandedTable(expandedTable === table.name ? null : table.name)}
-            className="w-full flex items-center justify-between px-4 py-2.5 bg-[#111113] hover:bg-[rgba(24,24,27,0.9)] transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+            aria-expanded={expandedTable === table.name}
           >
             <div className="flex items-center gap-2">
-              <span className="text-[#F59E0B] text-xs">🗄</span>
+              <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
               <span className="text-[#FAFAFA] text-sm font-mono font-medium">{table.name}</span>
               <span className="text-[#71717A] text-[10px]">— {table.description}</span>
             </div>
-            <span className="text-[#52525B] text-xs">{expandedTable === table.name ? '▼' : '▶'}</span>
+            <svg
+              className={`w-3 h-3 text-[var(--text-muted)] transition-transform ${expandedTable === table.name ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
           {expandedTable === table.name && (
             <div className="p-3">
@@ -262,6 +276,7 @@ function FileTreeLevel({ nodes, indent }: { nodes: FileTreeNode[]; indent: numbe
       {nodes.map(node => (
         <div key={node.name}>
           <button
+            type="button"
             onClick={() => {
               if (node.type === 'directory') {
                 const next = new Set(expanded);
@@ -272,9 +287,18 @@ function FileTreeLevel({ nodes, indent }: { nodes: FileTreeNode[]; indent: numbe
             }}
             className="w-full flex items-center gap-2 py-1 hover:bg-[rgba(255,255,255,0.02)] rounded transition-colors"
             style={{ paddingLeft: `${indent * 16 + 4}px` }}
+            aria-expanded={node.type === 'directory' ? expanded.has(node.name) : undefined}
           >
             {node.type === 'directory' ? (
-              <span className="text-[#52525B] text-[10px] w-3">{expanded.has(node.name) ? '▼' : '▶'}</span>
+              <svg
+                className={`w-3 h-3 text-[var(--text-muted)] transition-transform ${expanded.has(node.name) ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             ) : (
               <span className="w-3" />
             )}
@@ -327,8 +351,14 @@ function DeployTab({ items }: { items: DeployChecklistItem[] }) {
                 : 'bg-[#111113] border-[rgba(255,255,255,0.05)]'
             }`}
           >
-            <span className={`text-xs mt-0.5 ${item.checked ? 'text-[#10B981]' : 'text-[#52525B]'}`}>
-              {item.checked ? '✓' : '○'}
+            <span className={`text-xs mt-0.5 ${item.checked ? 'text-[#10B981]' : 'text-[var(--text-muted)]'}`}>
+              {item.checked ? (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <span className="inline-block w-3.5 h-3.5 rounded-full border border-current" />
+              )}
             </span>
             <div>
               <p className={`text-xs font-medium ${item.checked ? 'text-[#10B981]' : 'text-[#E4E4E7]'}`}>

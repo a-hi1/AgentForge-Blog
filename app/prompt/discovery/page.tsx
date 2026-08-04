@@ -200,7 +200,7 @@ export default function IdeaDiscoveryPage() {
   const isExploring = session && session.currentPhase !== 'complete';
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex">
+    <div className="relative z-10 min-h-[calc(100dvh-72px)] flex bg-transparent">
       <Sidebar
         currentSessionId={session?.id}
         onSelectRecord={loadRecord}
@@ -211,25 +211,24 @@ export default function IdeaDiscoveryPage() {
 
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* 顶部标题栏 */}
-        <div className="shrink-0 border-b border-zinc-800 px-6 py-4">
+        <div className="shrink-0 border-b border-[var(--border)] bg-[rgba(5,5,7,0.5)] backdrop-blur-md px-5 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-white">方向探索</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                AI 联合创始人 — 把模糊想法收缩成可验证的产品方向
-              </p>
+              <div className="badge badge-violet mb-2">Idea Discovery</div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">方向探索</h1>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">AI 联合创始人 · 把模糊想法收缩成可验证的产品方向</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleClearHistory}
-                className="rounded-lg border border-red-800/50 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 transition"
+                className="btn-ghost text-red-300 hover:bg-red-500/10"
               >
                 清除历史
               </button>
               {loading && (
                 <button
                   onClick={() => abortRef.current?.abort()}
-                  className="rounded-lg border border-red-800 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950 transition"
+                  className="btn-ghost text-red-300 hover:bg-red-500/10"
                 >
                   取消
                 </button>
@@ -237,7 +236,7 @@ export default function IdeaDiscoveryPage() {
               {session && (
                 <button
                   onClick={reset}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 transition"
+                  className="btn-secondary"
                 >
                   重新开始
                 </button>
@@ -250,23 +249,26 @@ export default function IdeaDiscoveryPage() {
         <div className="flex-1 overflow-hidden flex">
           {/* 无session时：居中显示输入区 */}
           {!session && (
-            <div className="flex-1 flex items-center justify-center px-6">
+            <div className="flex-1 flex items-center justify-center px-5 sm:px-6">
               <div className="w-full max-w-xl">
                 <div className="text-center mb-8">
-                  <div className="text-4xl mb-3">🧭</div>
-                  <h2 className="text-2xl font-bold text-white mb-2">描述你的想法</h2>
-                  <p className="text-sm text-zinc-400">AI 会引导你一步步把模糊想法变成可执行的方向</p>
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/12 border border-violet-500/25 flex items-center justify-center mx-auto mb-5 text-violet-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v2m6.364.636l-1.414 1.414M21 12h-2M18.364 18.364l-1.414-1.414M12 21v-2M5.636 18.364l1.414-1.414M3 12h2M5.636 5.636L7.05 7.05" /></svg>
+                  </div>
+                  <span className="badge badge-violet mb-4">Start with a thought</span>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">描述你的想法</h2>
+                  <p className="text-sm text-[var(--text-secondary)]">AI 会引导你一步步把模糊想法变成可执行的方向</p>
                 </div>
 
                 {error && (
-                  <div className="mb-4 rounded-xl border border-red-800 bg-red-950 p-4">
+                  <div className="mb-4 rounded-xl border border-red-500/25 bg-red-500/10 p-4" role="alert">
                     <p className="text-sm text-red-300">{error}</p>
                     <button onClick={reset} className="mt-2 rounded-lg bg-red-800 px-4 py-1.5 text-xs text-white hover:bg-red-700 transition">重试</button>
                   </div>
                 )}
 
                 {warnings.length > 0 && (
-                  <div className="mb-4 rounded-xl border border-amber-800/50 bg-amber-950/30 p-4">
+                  <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4" role="status">
                     {warnings.map((w, i) => <p key={i} className="text-xs text-amber-400/80">{w}</p>)}
                   </div>
                 )}
@@ -280,14 +282,14 @@ export default function IdeaDiscoveryPage() {
                     }
                   }}
                   placeholder="你现在最想解决什么问题？描述你的想法..."
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-4 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
+                  className="input-field min-h-[132px] resize-y"
                   rows={4}
                 />
                 <div className="flex items-center gap-2 flex-wrap mt-4">
                   <button
                     onClick={handleStartDiscovery}
                     disabled={loading || !idea.trim()}
-                    className="rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40 transition"
+                    className="btn-primary"
                   >
                     {loading ? '探索中...' : '开始探索'}
                   </button>
@@ -295,7 +297,7 @@ export default function IdeaDiscoveryPage() {
                     <button
                       key={ex}
                       onClick={() => setIdea(ex)}
-                      className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 transition"
+                      className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-xs text-[var(--text-tertiary)] hover:text-white hover:border-[var(--border-strong)] transition-colors cursor-pointer"
                     >
                       {ex}
                     </button>
@@ -309,7 +311,7 @@ export default function IdeaDiscoveryPage() {
           {session && (
             <>
               {/* 左侧：垂直时间线 */}
-              <div className="w-56 shrink-0 border-r border-zinc-800 p-4 overflow-y-auto hidden md:block">
+              <div className="w-56 shrink-0 border-r border-[var(--border)] bg-[rgba(12,12,16,0.35)] p-4 overflow-y-auto hidden md:block">
                 <PhaseTimeline
                   allPhases={allPhases}
                   getPhaseStatus={getPhaseStatus}
@@ -319,7 +321,7 @@ export default function IdeaDiscoveryPage() {
 
               {/* 右侧：当前阶段内容 + 问题 */}
               <div className="flex-1 overflow-y-auto">
-                <div className="max-w-2xl mx-auto px-6 py-6 space-y-4">
+                <div className="max-w-2xl mx-auto px-5 sm:px-6 py-6 space-y-4">
                   {/* 移动端：水平进度条 */}
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:hidden">
                     {allPhases.map((phase) => {
@@ -332,7 +334,7 @@ export default function IdeaDiscoveryPage() {
                               ? 'bg-violet-500/20 text-violet-300 border border-violet-500/50'
                               : status === 'completed'
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
-                              : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                              : 'bg-white/[0.04] text-[var(--text-muted)] border border-[var(--border)]'
                           }`}
                         >
                           {status === 'completed' && '✓'}
@@ -346,7 +348,7 @@ export default function IdeaDiscoveryPage() {
                   {error && (
                     <div className="rounded-xl border border-red-800 bg-red-950 p-4">
                       <p className="text-sm text-red-300">{error}</p>
-                      <button onClick={reset} className="mt-2 rounded-lg bg-red-800 px-4 py-1.5 text-xs text-white hover:bg-red-700 transition">重试</button>
+                      <button onClick={reset} className="btn-ghost mt-2 text-red-300">重试</button>
                     </div>
                   )}
 
@@ -453,14 +455,16 @@ export default function IdeaDiscoveryPage() {
                   {session.currentPhase === 'complete' && finalReport && (
                     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-6">
                       <div className="text-center mb-6">
-                        <div className="text-4xl mb-3">🎉</div>
-                        <h3 className="text-xl font-semibold text-emerald-300 mb-1">探索完成！</h3>
-                        <p className="text-sm text-zinc-500">以下是你的方向建议报告</p>
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 flex items-center justify-center mx-auto mb-4 text-emerald-300">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        <h3 className="text-xl font-semibold text-emerald-300 mb-1">探索完成</h3>
+                        <p className="text-sm text-[var(--text-muted)]">以下是你的方向建议报告</p>
                       </div>
 
                       <div className="space-y-3">
-                        <div className="rounded-lg bg-zinc-800/50 p-4">
-                          <h4 className="text-sm font-medium text-zinc-300 mb-2">核心判断</h4>
+                        <div className="rounded-lg bg-white/[0.03] p-4">
+                          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">核心判断</h4>
                           <p className={`text-lg font-semibold ${
                             finalReport.worthDoing.includes('值得') ? 'text-emerald-400' :
                             finalReport.worthDoing.includes('验证') ? 'text-amber-400' :
@@ -470,27 +474,27 @@ export default function IdeaDiscoveryPage() {
                           </p>
                         </div>
 
-                        <div className="rounded-lg bg-zinc-800/50 p-4">
-                          <h4 className="text-sm font-medium text-zinc-300 mb-2">关键洞察</h4>
-                          <p className="text-zinc-400 text-sm">{finalReport.summary}</p>
+                        <div className="rounded-lg bg-white/[0.03] p-4">
+                          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">关键洞察</h4>
+                          <p className="text-[var(--text-tertiary)] text-sm">{finalReport.summary}</p>
                         </div>
 
-                        <div className="rounded-lg bg-zinc-800/50 p-4">
-                          <h4 className="text-sm font-medium text-zinc-300 mb-2">从这里开始</h4>
-                          <p className="text-zinc-400 text-sm">{finalReport.whereToStart}</p>
+                        <div className="rounded-lg bg-white/[0.03] p-4">
+                          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">从这里开始</h4>
+                          <p className="text-[var(--text-tertiary)] text-sm">{finalReport.whereToStart}</p>
                         </div>
 
-                        <div className="rounded-lg bg-zinc-800/50 p-4">
-                          <h4 className="text-sm font-medium text-zinc-300 mb-2">风险提示</h4>
-                          <p className="text-zinc-400 text-sm">{finalReport.risks}</p>
+                        <div className="rounded-lg bg-white/[0.03] p-4">
+                          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">风险提示</h4>
+                          <p className="text-[var(--text-tertiary)] text-sm">{finalReport.risks}</p>
                         </div>
 
                         <div className="rounded-lg bg-violet-500/10 border border-violet-500/30 p-4">
-                          <h4 className="text-sm font-medium text-violet-300 mb-3">📋 项目描述（可直接复制到AI导出）</h4>
+                          <h4 className="text-sm font-medium text-violet-300 mb-3">项目描述（可直接复制到 AI 导出）</h4>
                           <textarea
                             value={`${session.collectedFacts.originalIdea}\n\n项目方向：${session.collectedFacts.selectedDirection?.name || '简洁实用版'}\n${session.collectedFacts.selectedDirection?.whyFits || ''}\n\n核心功能：${session.collectedFacts.mvp?.mustHave?.join('、') || ''}\n\n从这里开始：${finalReport.whereToStart}\n\n验证方式：${finalReport.minimalValidation || session.collectedFacts.mvp?.fastestValidation || ''}`}
                             readOnly
-                            className="w-full h-32 bg-zinc-900/50 border border-zinc-700 rounded-lg p-3 text-zinc-300 text-sm resize-none"
+                            className="input-field min-h-[128px] resize-y"
                           />
                         </div>
                       </div>
@@ -501,13 +505,13 @@ export default function IdeaDiscoveryPage() {
                             const text = `${session.collectedFacts.originalIdea}\n\n项目方向：${session.collectedFacts.selectedDirection?.name || '简洁实用版'}\n${session.collectedFacts.selectedDirection?.whyFits || ''}\n\n核心功能：${session.collectedFacts.mvp?.mustHave?.join('、') || ''}\n\n从这里开始：${finalReport.whereToStart}\n\n验证方式：${finalReport.minimalValidation || session.collectedFacts.mvp?.fastestValidation || ''}`;
                             navigator.clipboard.writeText(text);
                           }}
-                          className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 transition"
+                          className="btn-secondary"
                         >
                           复制项目描述
                         </button>
                         <Link
                           href="/prompt"
-                          className="inline-block rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-violet-500 transition"
+                          className="btn-primary"
                         >
                           去AI导出，开始开发
                         </Link>

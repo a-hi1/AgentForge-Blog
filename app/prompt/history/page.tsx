@@ -25,10 +25,10 @@ import { zhCN } from 'date-fns/locale';
 type TabKey = 'drafts' | 'verified' | 'skills';
 type SortKey = 'recent' | 'score' | 'usage' | 'success';
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'skills', label: 'Skills', icon: '⭐' },
-  { key: 'verified', label: 'Verified', icon: '🟢' },
-  { key: 'drafts', label: 'Drafts', icon: '📝' },
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'skills', label: 'Skills' },
+  { key: 'verified', label: 'Verified' },
+  { key: 'drafts', label: 'Drafts' },
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -39,12 +39,12 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ];
 
 const PHASE_LABELS: Record<string, string> = {
-  idea: '💡 想法',
-  architecture: '🏗️ 架构',
-  implementation: '⚙️ 实现',
-  optimization: '🚀 优化',
-  debug: '🐛 调试',
-  deployment: '🚢 部署',
+  idea: '想法',
+  architecture: '架构',
+  implementation: '实现',
+  optimization: '优化',
+  debug: '调试',
+  deployment: '部署',
 };
 
 const PHASE_USAGE_TIPS: Record<string, { suitable: string; notSuitable: string; prerequisite: string }> = {
@@ -329,15 +329,16 @@ export default function PromptHistoryPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] py-6 px-4">
+    <div className="page-shell py-10 sm:py-14">
       <div className="max-w-7xl mx-auto">
         {showFlowGuide && (
-          <div className="mb-6 p-4 rounded-xl bg-[rgba(139,92,246,0.05)] border border-[rgba(139,92,246,0.15)]">
+          <div className="mb-6 p-4 rounded-xl bg-violet-500/5 border border-violet-500/15">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-[#A78BFA]">📋 使用流程</h3>
+              <h3 className="text-sm font-semibold text-violet-300">使用流程</h3>
               <button
+                type="button"
                 onClick={() => setShowFlowGuide(false)}
-                className="text-[#71717A] hover:text-[#A1A1AA] text-xs"
+                className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-xs cursor-pointer"
               >
                 收起
               </button>
@@ -368,34 +369,32 @@ export default function PromptHistoryPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#FAFAFA] mb-1">Skill Vault</h1>
-            <p className="text-sm text-[#71717A]">管理已验证的 Prompt 和沉淀的 Skill</p>
+            <span className="badge badge-violet mb-3">Skill Vault</span>
+            <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Prompt 历史</h1>
+            <p className="text-sm text-[var(--text-secondary)]">管理已验证的 Prompt 和沉淀的 Skill</p>
           </div>
-          <Link
-            href="/prompt"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] text-white text-sm hover:shadow-lg transition-all"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <Link href="/prompt" className="btn-primary">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             生成新 Prompt
           </Link>
         </div>
 
-        <div className="flex items-center gap-1 mb-4 border-b border-[rgba(255,255,255,0.06)]">
+        <div className="flex items-center gap-1 mb-4 border-b border-[var(--border)] overflow-x-auto">
           {TABS.map(tab => (
             <button
+              type="button"
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); setSelectedId(null); }}
-              className={`px-4 py-2.5 text-sm font-medium transition-all border-b-2 ${
+              className={`px-4 py-2.5 text-sm font-medium transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                 activeTab === tab.key
-                  ? 'text-[#A78BFA] border-[#8B5CF6]'
-                  : 'text-[#71717A] border-transparent hover:text-[#A1A1AA]'
+                  ? 'text-violet-300 border-violet-500'
+                  : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'
               }`}
             >
-              <span className="mr-1.5">{tab.icon}</span>
               {tab.label}
               {tab.key === 'skills' && (
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#A78BFA]">
@@ -476,7 +475,7 @@ export default function PromptHistoryPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0 pr-4">
                           <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-[10px]">⭐</span>
+                            <svg className="w-3 h-3 text-amber-300" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                             <h3 className="text-[#FAFAFA] font-medium text-sm truncate">{skill.title}</h3>
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-[rgba(139,92,246,0.15)] text-[#A78BFA]">{skill.category}</span>
                           </div>
@@ -591,7 +590,7 @@ export default function PromptHistoryPage() {
                                   : 'bg-[rgba(245,158,11,0.15)] text-[#F59E0B]'
                             }`}>
                               {asset.provenance.realExecution && asset.executionSuccess !== false
-                                ? '🟢 Real Verified'
+                                ? 'Real Verified'
                                 : asset.executionSuccess === false
                                   ? '🔴 Failed'
                                   : '🟡 Simulated'}
@@ -610,7 +609,7 @@ export default function PromptHistoryPage() {
                             <span className={`px-1.5 py-0.5 rounded ${
                               asset.executionSuccess ? 'bg-[rgba(16,185,129,0.15)] text-[#10B981]' : 'bg-[rgba(239,68,68,0.15)] text-[#EF4444]'
                             }`}>
-                              {asset.executionSuccess ? '✓ 已执行' : '✗ 执行失败'}
+                              {asset.executionSuccess ? '已执行' : '执行失败'}
                             </span>
                           )}
                           {asset.rating && (
@@ -768,7 +767,7 @@ export default function PromptHistoryPage() {
                           onClick={() => handleCopy(selectedRecord.fullPrompt, 'drawer')}
                           className="inline-flex items-center gap-1 text-[10px] text-[#60A5FA] hover:text-[#93C5FD] transition-colors"
                         >
-                          {copiedId === 'drawer' ? '✓ 已复制' : '复制'}
+                          {copiedId === 'drawer' ? '已复制' : '复制'}
                         </button>
                       </div>
                     </div>
@@ -907,7 +906,7 @@ export default function PromptHistoryPage() {
                                       v.feedback === 'average' ? 'text-[#F59E0B]' :
                                       'text-[#EF4444]'
                                     }`}>
-                                      {v.feedback === 'excellent' ? '✓' : v.feedback === 'average' ? '—' : '✗'}
+                                      {v.feedback === 'excellent' ? '优' : v.feedback === 'average' ? '中' : '差'}
                                     </span>
                                   )}
                                 </div>
@@ -1080,7 +1079,12 @@ export default function PromptHistoryPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-[#FAFAFA] mb-2">改进点</h3>
-                  <ul className="space-y-1">{refinementResult.improvements.map((imp, idx) => <li key={idx} className="text-sm text-[#10B981]">✓ {imp}</li>)}</ul>
+                  <ul className="space-y-1">{refinementResult.improvements.map((imp, idx) => (
+                    <li key={idx} className="text-sm text-[#10B981] flex items-start gap-1.5">
+                      <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      <span>{imp}</span>
+                    </li>
+                  ))}</ul>
                 </div>
 
                 {refinementResult.originalScore && refinementResult.improvedScore && (

@@ -17,7 +17,7 @@
 | 痛点 | AgentForge 做法 |
 |------|----------------|
 | 一次对话从头编，无工程结构 | Planner + 多角色流水线（Architect / Coding / Debug / Deploy） |
-| 历史经验无法复用 | Supabase `agent_memory` + **pgvector 语义召回** + 关键词回退 |
+| 历史经验无法复用 | Supabase `agent_memory` + **pgvector 语义召回**（可接 MaxKB 内置 `text2vec-base-chinese`）+ 关键词回退 |
 | 模型输出质量不稳 | 规则化质量门禁 + 不达标自动重试 |
 | 过程是黑盒 | SSE 流式步骤、执行记录、回放与对比面板 |
 | 密钥与滥用风险 | 环境变量注入、API 限流、无硬编码密钥 |

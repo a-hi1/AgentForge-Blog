@@ -203,10 +203,11 @@ function QualityScorePanel({ steps }: QualityScorePanelProps) {
           const isExpanded = expandedDetail === item.label;
           return (
             <button
+              type="button"
               key={item.label}
               onClick={() => setExpandedDetail(isExpanded ? null : item.label)}
-              className={`p-3 rounded-lg bg-[#111113] border text-left transition-all ${
-                isExpanded ? 'border-[rgba(59,130,246,0.3)]' : 'border-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.1)]'
+              className={`p-3 rounded-lg bg-[rgba(255,255,255,0.02)] border text-left transition-all ${
+                isExpanded ? 'border-[rgba(59,130,246,0.3)]' : 'border-[var(--border)] hover:border-[var(--border-light)]'
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
@@ -240,12 +241,14 @@ function QualityScorePanel({ steps }: QualityScorePanelProps) {
       {metrics.issues.length > 0 && (
         <div className="p-3 rounded-lg bg-[rgba(245,158,11,0.05)] border border-[rgba(245,158,11,0.15)]">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[#F59E0B] text-xs">⚠️</span>
+            <svg className="w-3.5 h-3.5 text-[#F59E0B]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
             <span className="text-[#F59E0B] text-xs font-medium">优化建议</span>
           </div>
           <div className="space-y-1">
             {metrics.issues.map((issue, i) => (
-              <p key={i} className="text-[#A1A1AA] text-xs">• {issue}</p>
+              <p key={i} className="text-[var(--text-secondary)] text-xs">• {issue}</p>
             ))}
           </div>
         </div>

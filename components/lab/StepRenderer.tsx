@@ -136,8 +136,14 @@ function StepRendererInner({ step, isActive }: { step: Step; isActive: boolean }
         : 'border-[rgba(255,255,255,0.06)] bg-[rgba(24,24,27,0.5)]'
     }`}>
       <div className="flex items-start gap-3 mb-3">
-        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${typeColors[step.type] || 'from-[#3B82F6] to-[#60A5FA]'} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-          {step.status === 'completed' ? '✓' : step.status === 'in_progress' ? '…' : '○'}
+        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${typeColors[step.type] || 'from-[#3B82F6] to-[#60A5FA]'} flex items-center justify-center text-white shrink-0`}>
+          {step.status === 'completed' ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" /></svg>
+          ) : step.status === 'in_progress' ? (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+          ) : (
+            <span className="w-2 h-2 rounded-full bg-white/50" />
+          )}
         </div>
 
         <div className="flex-grow min-w-0">
