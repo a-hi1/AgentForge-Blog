@@ -60,39 +60,36 @@ const healthCheck = async (): Promise<HealthCheckResult> => {
   }
 
   // ==============================
-  // 3. Performance Benchmarks
+  // 3. Local module smoke checks
   // ==============================
-  console.log('⏱️ Running Performance Checks...');
+  console.log('🧩 Checking local modules...');
 
-  // Simulated page load times (in production this would be real)
-  const labLoadTime = Math.random() * 2 + 0.5;
-  const showcaseLoadTime = Math.random() * 3 + 0.8;
-  const apiResponseTime = Math.random() * 3 + 0.5;
-
-  result.metrics.labLoadTime = `${labLoadTime.toFixed(1)}s`;
-  result.metrics.showcaseLoadTime = `${showcaseLoadTime.toFixed(1)}s`;
-  result.metrics.apiResponseTime = `${apiResponseTime.toFixed(1)}s`;
-
-  if (labLoadTime > 2) {
-    result.issues.push(`/lab load time: ${labLoadTime.toFixed(1)}s (target: <2s)`);
+  try {
+    const { validateOutput } = await import('../lib/agent-runtime/outputValidator');
+    const sample = validateOutput('# 标题\n\n- 列表\n\n```ts\nexport const ok = 1\n```\n中文说明');
+    result.metrics.sampleQualityScore = sample.score;
+    console.log(`✓ outputValidator sample score: ${sample.score}`);
+  } catch (e) {
+    result.issues.push(`outputValidator import/run failed: ${String(e)}`);
     result.status = 'degraded';
-  } else {
-    console.log(`✓ /lab load time: ${labLoadTime.toFixed(1)}s`);
+    console.log('✗ outputValidator check failed');
   }
 
-  if (showcaseLoadTime > 3) {
-    result.issues.push(`/showcase load time: ${showcaseLoadTime.toFixed(1)}s (target: <3s)`);
+  try {
+    const { fallbackEmbedding, cosineSimilarity } = await import('../lib/embeddings');
+    const a = fallbackEmbedding('博客系统登录');
+    const b = fallbackEmbedding('用户认证与博客');
+    const sim = cosineSimilarity(a, b);
+    result.metrics.fallbackEmbeddingDim = a.length;
+    result.metrics.sampleCosine = Number(sim.toFixed(4));
+    console.log(`✓ embeddings fallback dim=${a.length} cosine=${sim.toFixed(4)}`);
+  } catch (e) {
+    result.issues.push(`embeddings check failed: ${String(e)}`);
     result.status = 'degraded';
-  } else {
-    console.log(`✓ /showcase load time: ${showcaseLoadTime.toFixed(1)}s`);
+    console.log('✗ embeddings check failed');
   }
 
-  if (apiResponseTime > 10) {
-    result.issues.push(`API response time: ${apiResponseTime.toFixed(1)}s (target: <10s)`);
-    result.status = 'degraded';
-  } else {
-    console.log(`✓ API response time: ${apiResponseTime.toFixed(1)}s`);
-  }
+  result.metrics.note = 'No synthetic latency numbers; run real Lighthouse / API probes in staging if needed.';
 
   // ==============================
   // 4. Summary

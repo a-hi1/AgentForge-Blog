@@ -17,31 +17,37 @@
 在 Vercel Dashboard → Project → Settings → Environment Variables 中添加：
 
 ```env
-OPENAI_API_KEY=your_key
-OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-OPENAI_MODEL=glm-4-flash
+# DeepSeek（当前默认）
+OPENAI_API_KEY=你的_DeepSeek_API_Key
+OPENAI_BASE_URL=https://api.deepseek.com/v1
+OPENAI_MODEL=deepseek-chat
+
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=your_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
 SUPABASE_SERVICE_ROLE_KEY=your_key
+
+# 可选
+# GITHUB_TOKEN=
+# EMBEDDING_MODEL=   # DeepSeek 无 embedding 时可不填，将使用本地回退向量
 ```
+
+> 若改用智谱：`OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4`，`OPENAI_MODEL=glm-4-flash`，可选 `EMBEDDING_MODEL=embedding-2`。
 
 ### 4. 部署
 
-点击 Deploy 按钮即可。
+点击 Deploy 按钮即可。部署后如 Demo 仍走旧环境变量，在 Vercel 里改完需 **Redeploy**。
 
 ---
 
 ## 本地部署验证
 
 ```bash
-# 清理
-rm -rf .next node_modules
-
-# 重新安装
 npm install
-
-# 构建测试
+cp .env.example .env.local
+# 填入 DeepSeek Key 与 Supabase
 npm run build
+npm run dev
 ```
 
 确保 `npm run build` 成功后再推送到仓库。

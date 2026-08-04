@@ -1,191 +1,155 @@
-# 🏗️ AgentForge 智能工程系统
+# AgentForge · 记忆增强多智能体工程工作台
 
-> **Memory-Augmented Adaptive Engineering OS**
->
-> 基于多智能体协作 + 记忆增强 + 实时可观测的 AI 工程操作系统
+[![CI](https://github.com/a-hi1/AgentForge-Blog/actions/workflows/ci.yml/badge.svg)](https://github.com/a-hi1/AgentForge-Blog/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Demo](https://img.shields.io/badge/Demo-Vercel-black)](https://agent-forge-blog-mocha.vercel.app)
 
----
+> **一句话**：把工程需求变成「可规划、可执行、可校验、可记忆、可回放」的 Multi-Agent 流水线。  
+> 适合作为 **AI Agent / RAG / 全栈实习** 作品集核心项目。
 
-## 🎯 核心能力矩阵
-
-| 能力模块 | 功能说明 | 技术实现 |
-|---------|---------|---------|
-| **多智能体协作** | Architect / Coding / Debug / Deploy 流水线 | 自适应动态编排 |
-| **记忆增强** | 历史经验检索，相似度匹配，经验复用 | Supabase pgvector + 语义检索 |
-| **自适应规划** | 根据任务类型动态调整执行策略 | Planner + Domain Analyzer |
-| **质量验证** | 5 维度输出质量评分 + 自动重试 | 结构 / 代码 / 中文 / 贴合度 / 可执行性 |
-| **工程产物生成** | 架构图 / 数据模型 / API / 文件树 / 部署清单 | Artifact Generator |
-| **可观测性** | 实时日志 / 指标 / 链路追踪 | Observability Panel |
-| **执行回放** | 步骤级回放 + 执行对比 | Replay Engine + Compare |
-| **决策可视化** | 需求解析 → 领域识别 → 记忆召回 → 规划 → 执行 | Decision Graph |
+**Demo**：https://agent-forge-blog-mocha.vercel.app  
+**简历话术**：见 [`RESUME_HIGHLIGHTS.md`](./RESUME_HIGHLIGHTS.md)
 
 ---
 
-## 🏛️ 系统架构
+## 解决什么问题
 
-```mermaid
-flowchart TD
-    A[用户输入 Prompt] --> B[Planner 规划引擎]
-    B --> C{领域识别}
-    C --> D[任务分类\nbuild / optimize / debug]
-    D --> E[记忆召回\nMemory Retrieval]
-    E --> F[自适应运行时\nAdaptive Runtime]
-    F --> G[多智能体协作执行]
-    G --> H[质量验证\nQuality Validation]
-    H -->|不达标| I[自动重试]
-    I --> G
-    H -->|达标| J[工程产物生成\nArtifact Generation]
-    J --> K[架构图 / 数据模型 / API / 文件树 / 部署清单]
+| 痛点 | AgentForge 做法 |
+|------|----------------|
+| 一次对话从头编，无工程结构 | Planner + 多角色流水线（Architect / Coding / Debug / Deploy） |
+| 历史经验无法复用 | Supabase `agent_memory` + **pgvector 语义召回** + 关键词回退 |
+| 模型输出质量不稳 | 规则化质量门禁 + 不达标自动重试 |
+| 过程是黑盒 | SSE 流式步骤、执行记录、回放与对比面板 |
+| 密钥与滥用风险 | 环境变量注入、API 限流、无硬编码密钥 |
 
-    style A fill:#6366f1,color:#fff
-    style B fill:#8b5cf6,color:#fff
-    style E fill:#ec4899,color:#fff
-    style F fill:#f59e0b,color:#fff
-    style H fill:#10b981,color:#fff
-    style J fill:#3b82f6,color:#fff
+---
+
+## 架构（与代码目录对齐）
+
+```text
+User Prompt
+   │
+   ▼
+Domain Analyzer ──► Planner（可注入记忆）
+   │
+   ▼
+Memory Retrieve（pgvector match_memories → keyword fallback）
+   │
+   ▼
+Agent Pipeline（SSE 流式输出每步 delta）
+   │
+   ▼
+Quality Gate（outputValidator）── fail ──► Retry with fix instruction
+   │
+   ▼
+Persist Execution + Extract Lessons + Store Embedding
 ```
 
----
-
-## 🎬 演示
-
-<p align="center">
-  <img src="/assets/demo.gif" alt="AgentForge Demo" width="800" />
-  <br/>
-  <em>智能工程系统实时演示</em>
-</p>
-
----
-
-## 🛠️ 技术栈
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Next.js-14-black?logo=next.js" alt="Next.js" />
-  <img src="https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Tailwind-3.4-38bdf8?logo=tailwindcss" alt="Tailwind" />
-  <img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ecf8e?logo=supabase" alt="Supabase" />
-  <img src="https://img.shields.io/badge/Vercel-Deploy-000?logo=vercel" alt="Vercel" />
-  <img src="https://img.shields.io/badge/OpenAI-Compatible-412991?logo=openai" alt="OpenAI Compatible" />
-</p>
-
-| 层级 | 技术 | 说明 |
+| 模块 | 路径 | 职责 |
 |------|------|------|
-| 前端框架 | Next.js 14 App Router | SSR + RSC + API Routes |
-| 语言 | TypeScript 5.0 | 全栈类型安全 |
-| 样式 | Tailwind CSS + Glassmorphism | 深色主题 + 玻璃态 UI |
-| 数据库 | Supabase PostgreSQL | 向量检索 + 关系存储 |
-| AI 模型 | OpenAI 兼容 API（智谱 GLM-4） | 可替换任意兼容模型 |
-| 部署 | Vercel | 一键部署，边缘函数 |
-| 可观测性 | 自研 Observability 系统 | 日志 / 指标 / 追踪 |
+| Agent Runtime | `lib/agent-runtime/` | 规划、执行、校验、记忆、产物 |
+| Embeddings / RAG | `lib/embeddings.ts` + `supabase/migrations/004_vector_search.sql` | 向量生成与检索 RPC |
+| Prompt 编排 | `lib/prompt-orchestrator/` | 意图拆解、方案导出 |
+| Idea Discovery | `lib/idea-discovery/` | 方向探索状态机 |
+| Observability | `lib/observability/` | 进程内日志 / 指标 / 追踪 |
+| API | `app/api/*` | agent SSE、prompt 生成、GitHub 代理等 |
 
 ---
 
-## 🚀 快速部署
+## 技术栈
 
-### 1. 克隆项目
+- **前端 / 全栈**：Next.js 14 App Router · React 18 · TypeScript · Tailwind
+- **AI**：OpenAI 兼容 API（默认 DeepSeek，可换智谱等）· SSE Streaming
+- **数据**：Supabase PostgreSQL · **pgvector**
+- **工程化**：ESLint-free 精简配置 · `tsc` · Node test runner · GitHub Actions CI · Vercel
+
+---
+
+## 快速开始
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/agentforge-blog.git
-cd agentforge-blog
+git clone https://github.com/a-hi1/AgentForge-Blog.git
+cd AgentForge-Blog
 npm install
-```
-
-### 2. 配置环境变量
-
-```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
 编辑 `.env.local`：
 
 ```env
-OPENAI_API_KEY=your_zhipu_api_key
-OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-OPENAI_MODEL=glm-4-flash
+# DeepSeek（推荐默认）
+OPENAI_API_KEY=你的_DeepSeek_Key
+OPENAI_BASE_URL=https://api.deepseek.com/v1
+OPENAI_MODEL=deepseek-chat
 
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# 也可换成智谱等 OpenAI 兼容接口：
+# OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+# OPENAI_MODEL=glm-4-flash
+# EMBEDDING_MODEL=embedding-2
+
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+# 可选：提高 GitHub API 限额
+GITHUB_TOKEN=
 ```
 
-### 3. 初始化数据库
-
-在 Supabase Dashboard → SQL Editor 中执行 `supabase/migrations/` 下的迁移文件。
-
-### 4. 启动
+在 Supabase SQL Editor **按序执行** `supabase/migrations/001_*.sql` → `004_vector_search.sql`。
 
 ```bash
-npm run dev
-```
-
-访问 `http://localhost:3000` 即可体验。
-
-### 5. 部署到 Vercel
-
-```bash
-npx vercel --prod
+npm run dev          # http://localhost:3000
+npm test             # 单元测试（embeddings / 质量门禁 / 限流）
+npm run eval         # 离线质量评测，输出 eval-results/latest.json
+npm run typecheck
+npm run build
 ```
 
 ---
 
-## 📊 系统指标
+## 仓库规模（可核实，非运营注水指标）
 
-| 指标 | 数值 |
-|------|------|
-| 总执行次数 | 1,247 |
-| 平均质量评分 | 92.4 / 100 |
-| 记忆命中率 | 87% |
-| 自动重试成功率 | 94% |
-| 平均响应时间 | 8.2s |
-| 记忆库条目 | 500+ |
+| 项 | 说明 |
+|----|------|
+| 语言 | TypeScript 为主 |
+| 核心运行时 | `lib/agent-runtime/*` |
+| API | `/api/agent`（SSE）、`/api/prompt-generate`、`/api/idea-discovery`、`/api/github-proxy`、`/api/executions` |
+| 数据迁移 | 4 个 SQL（含 pgvector） |
+| 质量 | 规则门禁 + `npm run eval` fixture |
+| CI | `.github/workflows/ci.yml` |
 
----
-
-## 🗺️ Roadmap
-
-| Phase | 名称 | 状态 | 核心能力 |
-|-------|------|------|---------|
-| **Phase 1** | Foundation | ✅ 完成 | 基础 Agent Runtime + Web UI |
-| **Phase 2** | Intelligence | ✅ 完成 | Planner + Domain Analyzer + 质量验证 |
-| **Phase 3** | Memory | ✅ 完成 | 记忆存储 / 检索 / 经验复用 |
-| **Phase 4** | Observability | ✅ 完成 | 可观测性 + 执行回放 + 对比分析 |
-| **Phase 5** | Production | ✅ 完成 | 工程产物生成 + 一键导出 + 决策可视化 |
+> 运营类数字（总执行次数、命中率百分比等）以你自己的 Supabase 统计为准，README 不再写不可审计的展示值。
 
 ---
 
-## 📁 项目结构
+## 安全说明
 
-```
-AgentForge/
-├── app/                    # Next.js App Router
-│   ├── api/               # API 路由
-│   ├── playground/        # 智能交互
-│   ├── lab/               # 实验室（执行记录）
-│   └── showcase/          # 能力展示
-├── components/
-│   ├── artifacts/         # 工程产物面板
-│   ├── home/              # 首页组件
-│   ├── lab/               # 实验室组件
-│   ├── planner/           # 决策可视化
-│   └── showcase/          # 展示组件
-├── lib/
-│   ├── agent-runtime/     # Agent 核心运行时
-│   ├── observability/     # 可观测性系统
-│   └── supabase/          # 数据库客户端
-├── scripts/               # 工具脚本
-└── supabase/              # 数据库迁移
-```
+- **禁止**把 API Key 写进源码；缺失密钥时接口应失败而不是静默用默认 key。
+- `.env` / `.env.local` 已在 `.gitignore`。
+- 若历史 commit 曾误提交密钥，请在对应云平台 **立即轮换**。
 
 ---
 
-## 📜 License
+## 路线图（诚实版）
 
-MIT
+- [x] Multi-Agent 顺序流水线 + SSE
+- [x] 质量门禁与重试
+- [x] 记忆存储 + pgvector schema / RPC
+- [x] GitHub 仓库导入与分析
+- [x] CI + 单测 + 离线评测
+- [ ] Tool-calling / 并行 agent 分支
+- [ ] 分布式限流（Redis）与多租户鉴权
+- [ ] LLM-as-judge 与规则分融合
 
 ---
 
-<p align="center">
-  <strong>AgentForge</strong> — 打开即能证明工程能力的 AI 工程操作系统
-  <br/>
-  Built with 🤖 + 🧠
-</p>
+## 作品集使用
+
+- 简历 STAR 与面试问答：[`RESUME_HIGHLIGHTS.md`](./RESUME_HIGHLIGHTS.md)
+- 架构摘要：[`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- 部署：[`DEPLOY.md`](./DEPLOY.md)
+
+---
+
+## License
+
+MIT © 2026 匡宸伟

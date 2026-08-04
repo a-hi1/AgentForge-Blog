@@ -151,8 +151,21 @@ function deriveProjectState(executions: ExecutionRecord[]): ProjectState {
   const totalCount = Math.max(executions.length, 1);
   const successRate = Math.round((completedCount / totalCount) * 100);
 
-  const avgTime = 35 + Math.floor(Math.random() * 30);
-  const memoryHit = 55 + Math.floor(Math.random() * 30);
+  // Derive from real execution records only (no Math.random cosmetics)
+  let durationSum = 0;
+  let durationCount = 0;
+  for (const exec of executions) {
+    for (const step of exec.steps || []) {
+      const d = (step as { duration?: number }).duration;
+      if (typeof d === 'number' && d > 0) {
+        durationSum += d;
+        durationCount += 1;
+      }
+    }
+  }
+  const avgTime = durationCount > 0 ? Math.round(durationSum / durationCount / 1000) : 0;
+  const memoryHits = executions.filter((e) => (e as { memory_influenced?: boolean }).memory_influenced).length;
+  const memoryHit = executions.length > 0 ? Math.round((memoryHits / executions.length) * 100) : 0;
 
   const blockers: ProjectBlocker[] = [];
   if (successRate < 90) {

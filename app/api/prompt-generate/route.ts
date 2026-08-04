@@ -6,6 +6,7 @@ import {
   DecomposeResult,
 } from '@/lib/prompt-orchestrator/reasoner';
 import { callLLMWithJSON } from '@/lib/prompt-orchestrator/llm';
+import { enforceRateLimit } from '@/lib/rate-limiter';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -275,6 +276,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 export async function POST(req: NextRequest) {
+  const limited = enforceRateLimit(req);
+  if (limited) return limited;
+
   const encoder = new TextEncoder();
   let pingTimer: ReturnType<typeof setInterval> | null = null;
 

@@ -7,8 +7,12 @@ import { generateId } from '@/lib/agent-runtime/storage';
 import { validateOutput } from '@/lib/agent-runtime/outputValidator';
 import { analyzeDomain, buildDomainContext } from '@/lib/agent-runtime/domainAnalyzer';
 import type { ExecutionRecord } from '@/lib/agent-runtime/storage';
+import { enforceRateLimit } from '@/lib/rate-limiter';
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request);
+  if (limited) return limited;
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {

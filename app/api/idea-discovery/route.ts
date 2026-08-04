@@ -5,6 +5,7 @@ import {
   continueDiscovery,
   DiscoverySession,
 } from '@/lib/idea-discovery';
+import { enforceRateLimit } from '@/lib/rate-limiter';
 
 export const maxDuration = 300;
 export const runtime = 'nodejs';
@@ -22,6 +23,9 @@ function sendSSE(
 }
 
 export async function POST(req: NextRequest) {
+  const limited = enforceRateLimit(req);
+  if (limited) return limited;
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({

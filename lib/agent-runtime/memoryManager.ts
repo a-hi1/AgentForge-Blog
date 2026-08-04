@@ -1,4 +1,5 @@
 import { getSupabaseServer, isSupabaseConfigured } from '../supabase/client';
+import { generateEmbedding } from '../embeddings';
 import { CHINESE_OUTPUT_INSTRUCTION_SIMPLE } from './constants';
 import { safeParseLLMJson } from '../utils/safeJson';
 
@@ -21,6 +22,7 @@ export interface AgentMemory {
   tags: string[];
   memory_type: string;
   importance_score: number;
+  embedding?: number[];
   created_at: string;
 }
 
@@ -53,7 +55,7 @@ export interface MemoryInfluence {
 
 const MAX_RETRIEVED_MEMORIES = 5;
 const MAX_TOKEN_LENGTH = 1200;
-const IMPORTANCE_THRESHOLD = 0.3;
+const VECTOR_SIMILARITY_THRESHOLD = 0.6;
 
 // ============================================
 // MEMORY MANAGER
@@ -72,7 +74,6 @@ export class MemoryManager {
 
   static async extractExecutionLessons(execution: any): Promise<ExecutionLesson> {
     try {
-      // First try real LLM extraction
       const llmLessons = await this.extractLessonsWithLLM(execution);
       if (llmLessons) {
         return llmLessons;
@@ -81,14 +82,12 @@ export class MemoryManager {
       console.warn('[Memory] LLM lesson extraction failed, falling back to rules');
     }
 
-    // Fallback: basic extraction without LLM
     const lessons: ExecutionLesson = {
       successes: [],
       failures: [],
       optimizations: []
     };
 
-    // Extract from execution data
     if (execution.steps) {
       for (const step of execution.steps) {
         if (step.status === 'completed') {
@@ -99,15 +98,13 @@ export class MemoryManager {
             lessons.successes.push('代码生成完成，核心模块实现就绪');
           }
         }
-        
-        // Check for issues in outputs
+
         if (step.output && step.output.toLowerCase().includes('error')) {
           lessons.failures.push(`${step.agent} 执行过程中发现潜在问题: ${step.output.slice(0, 100)}`);
         }
       }
     }
 
-    // Default lessons if none found
     if (lessons.successes.length === 0) {
       lessons.successes.push('执行完成，未发现严重问题');
     }
@@ -118,14 +115,11 @@ export class MemoryManager {
   private static async extractLessonsWithLLM(execution: any): Promise<ExecutionLesson | null> {
     try {
       const apiKey = process.env.OPENAI_API_KEY;
-      const baseUrl = process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-      const model = process.env.OPENAI_MODEL || 'glm-4-flash';
+      const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1';
+      const model = process.env.OPENAI_MODEL || 'deepseek-chat';
 
-      if (!apiKey) {
-        return null;
-      }
+      if (!apiKey) return null;
 
-      // Prepare execution data
       const executionData = {
         prompt: execution.prompt || '',
         steps: execution.steps || [],
@@ -150,10 +144,7 @@ ${JSON.stringify(executionData, null, 2)}
 
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: model,
           messages: [
@@ -164,10 +155,7 @@ ${JSON.stringify(executionData, null, 2)}
         }),
       });
 
-      if (!response.ok) {
-        console.error('[Memory] LLM extraction API failed');
-        return null;
-      }
+      if (!response.ok) return null;
 
       const result = await response.json();
       const content = result.choices[0]?.message?.content;
@@ -189,7 +177,7 @@ ${JSON.stringify(executionData, null, 2)}
   }
 
   // ============================================
-  // TASK 2: STORE MEMORY
+  // TASK 2: STORE MEMORY (WITH EMBEDDING)
   // ============================================
 
   static async storeExecutionMemory(
@@ -211,16 +199,20 @@ ${JSON.stringify(executionData, null, 2)}
       const autoTags = tags || MemoryManager.extractTags(prompt, lessons);
       const importanceScore = MemoryManager.calculateImportance(lessons);
 
+      // 生成 embedding（异步，不阻塞存储）
+      const embedding = await generateEmbedding(prompt);
+
       const { data, error } = await supabase
         .from('agent_memory')
         .insert({
           execution_id: executionId,
           prompt: prompt,
           summary: summary || MemoryManager.generateSummary(lessons),
-          lessons: lessons,
+          lessons: lessons as any,
           tags: autoTags,
           importance_score: importanceScore,
-          memory_type: 'execution'
+          memory_type: 'execution',
+          embedding: embedding, // pgvector 向量列
         })
         .select()
         .single();
@@ -230,7 +222,7 @@ ${JSON.stringify(executionData, null, 2)}
         return null;
       }
 
-      return data as AgentMemory;
+      return data as unknown as AgentMemory;
     } catch (error) {
       console.error('[Memory] Storage failed:', error);
       return null;
@@ -238,7 +230,7 @@ ${JSON.stringify(executionData, null, 2)}
   }
 
   // ============================================
-  // TASK 3: RETRIEVAL
+  // TASK 3: VECTOR RETRIEVAL (pgvector)
   // ============================================
 
   static async retrieveRelevantMemories(newPrompt: string): Promise<RetrievedMemory[]> {
@@ -250,48 +242,148 @@ ${JSON.stringify(executionData, null, 2)}
     if (!supabase) return [];
 
     try {
-      const { data: memories, error } = await supabase
-        .from('agent_memory')
-        .select('*')
-        .order('importance_score', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        console.error('[Memory] Retrieval error:', error);
-        return [];
+      // 优先使用 pgvector 语义检索
+      const vectorResults = await this.vectorRetrieve(supabase, newPrompt);
+      if (vectorResults.length > 0) {
+        return vectorResults.slice(0, MAX_RETRIEVED_MEMORIES);
       }
 
-      // Calculate relevance for each
-      const scored = (memories || []).map(memory => ({
-        memory: memory as unknown as AgentMemory,
-        relevance_score: MemoryManager.calculateRelevance(newPrompt, memory as unknown as AgentMemory),
-        relevance_reason: MemoryManager.explainRelevance(newPrompt, memory as unknown as AgentMemory)
-      }));
-
-      // Sort and return top 5
-      return scored
-        .sort((a, b) => b.relevance_score - a.relevance_score)
-        .slice(0, MAX_RETRIEVED_MEMORIES)
-        .filter(m => m.relevance_score > 0);
+      // 回退：关键词 + 标签匹配
+      console.warn('[Memory] Vector retrieval returned no results, falling back to keyword matching');
+      return await this.keywordRetrieve(supabase, newPrompt);
     } catch (error) {
       console.error('[Memory] Retrieval failed:', error);
       return [];
     }
   }
 
+  /**
+   * pgvector 向量检索：调用 match_memories RPC 或直接 cosine 排序
+   */
+  private static async vectorRetrieve(supabase: any, newPrompt: string): Promise<RetrievedMemory[]> {
+    // 1. 为新 prompt 生成查询向量
+    const queryEmbedding = await generateEmbedding(newPrompt);
+    if (!queryEmbedding) return [];
+
+    try {
+      // 方案 A：通过 match_memories RPC 检索（推荐）
+      const { data, error } = await supabase.rpc('match_memories', {
+        query_embedding: queryEmbedding,
+        match_threshold: VECTOR_SIMILARITY_THRESHOLD,
+        match_count: MAX_RETRIEVED_MEMORIES + 5,
+      });
+
+      if (!error && data && data.length > 0) {
+        return data.map((row: any) => ({
+          memory: {
+            id: row.id,
+            execution_id: row.execution_id,
+            prompt: row.prompt,
+            summary: row.summary,
+            lessons: row.lessons,
+            tags: row.tags,
+            memory_type: 'execution',
+            importance_score: row.importance_score,
+            created_at: row.created_at,
+          },
+          relevance_score: row.similarity,
+          relevance_reason: `语义相似度: ${(row.similarity * 100).toFixed(1)}%`,
+        }));
+      }
+    } catch (e) {
+      console.warn('[Memory] RPC match_memories failed, trying client-side filter');
+    }
+
+    // 方案 B：取回所有带 embedding 的记忆，客户端算距离（数据量小时可用）
+    try {
+      const { data: memories, error } = await supabase
+        .from('agent_memory')
+        .select('*')
+        .not('embedding', 'is', null)
+        .order('importance_score', { ascending: false })
+        .limit(50);
+
+      if (error || !memories || memories.length === 0) return [];
+
+      // 计算余弦相似度
+      const scored = memories.map((memory: any) => {
+        if (!memory.embedding) return null;
+        const similarity = MemoryManager.cosineSimilarity(queryEmbedding, memory.embedding);
+        return {
+          memory: memory as unknown as AgentMemory,
+          relevance_score: similarity,
+          relevance_reason: similarity > VECTOR_SIMILARITY_THRESHOLD
+            ? `语义相似度: ${(similarity * 100).toFixed(1)}%`
+            : '低相似度',
+        };
+      }).filter(Boolean) as RetrievedMemory[];
+
+      return scored
+        .sort((a, b) => b.relevance_score - a.relevance_score)
+        .filter(m => m.relevance_score > VECTOR_SIMILARITY_THRESHOLD);
+    } catch (e) {
+      console.warn('[Memory] Client-side vector retrieval failed:', e);
+      return [];
+    }
+  }
+
+  /**
+   * 关键词回退检索（当向量检索不可用时）
+   */
+  private static async keywordRetrieve(supabase: any, newPrompt: string): Promise<RetrievedMemory[]> {
+    try {
+      const { data: memories, error } = await supabase
+        .from('agent_memory')
+        .select('*')
+        .order('importance_score', { ascending: false })
+        .limit(20);
+
+      if (error || !memories) return [];
+
+      const scored = memories.map((memory: any) => ({
+        memory: memory as unknown as AgentMemory,
+        relevance_score: MemoryManager.calculateRelevance(newPrompt, memory as unknown as AgentMemory),
+        relevance_reason: MemoryManager.explainRelevance(newPrompt, memory as unknown as AgentMemory)
+      }));
+
+      return scored
+        .sort((a: any, b: any) => b.relevance_score - a.relevance_score)
+        .slice(0, MAX_RETRIEVED_MEMORIES)
+        .filter((m: any) => m.relevance_score > 0);
+    } catch (e) {
+      console.error('[Memory] Keyword retrieval failed:', e);
+      return [];
+    }
+  }
+
   // ============================================
-  // TASK 4: RELEVANCE CALCULATION
+  // TASK 4: COSINE SIMILARITY
+  // ============================================
+
+  static cosineSimilarity(a: number[], b: number[]): number {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      na += a[i] * a[i];
+      nb += b[i] * b[i];
+    }
+    const denom = Math.sqrt(na) * Math.sqrt(nb);
+    return denom === 0 ? 0 : dot / denom;
+  }
+
+  // ============================================
+  // TASK 5: KEYWORD RELEVANCE (FALLBACK)
   // ============================================
 
   static calculateRelevance(newPrompt: string, memory: AgentMemory): number {
     let score = 0;
-
     const promptLower = newPrompt.toLowerCase();
     const memoryPromptLower = memory.prompt.toLowerCase();
 
     // 1. Keyword overlap (40%)
     const keywords = ['build', 'design', 'deploy', 'debug', 'fix', 'saas', 'blog', 'auth', 'frontend', 'backend', 'api'];
-    const overlapKeywords = keywords.filter(k => 
+    const overlapKeywords = keywords.filter(k =>
       promptLower.includes(k) && memoryPromptLower.includes(k)
     );
     score += (overlapKeywords.length / Math.max(keywords.length, 1)) * 0.4;
@@ -309,36 +401,33 @@ ${JSON.stringify(executionData, null, 2)}
     // 4. Recency boost (10%)
     const memoryDate = new Date(memory.created_at);
     const daysAgo = (Date.now() - memoryDate.getTime()) / (1000 * 60 * 60 * 24);
-    const recencyScore = Math.max(0, 1 - (daysAgo / 30));
-    score += recencyScore * 0.1;
+    score += Math.max(0, 1 - (daysAgo / 30)) * 0.1;
 
     return Math.min(score, 1);
   }
 
   static explainRelevance(newPrompt: string, memory: AgentMemory): string {
     const reasons: string[] = [];
-    
     const promptLower = newPrompt.toLowerCase();
-    const memoryPromptLower = memory.prompt.toLowerCase();
-    
+
     if (memory.tags) {
-      const overlappingTags = memory.tags.filter(tag => 
+      const overlappingTags = memory.tags.filter(tag =>
         promptLower.includes(tag.toLowerCase())
       );
       if (overlappingTags.length > 0) {
         reasons.push(`相似标签: ${overlappingTags.slice(0, 2).join(', ')}`);
       }
     }
-    
+
     if (memory.importance_score > 0.7) {
       reasons.push('高重要度记忆');
     }
-    
+
     return reasons.length > 0 ? reasons.join('; ') : '相关历史上下文';
   }
 
   // ============================================
-  // TASK 5: MEMORY RELATIONS
+  // TASK 6: MEMORY RELATIONS
   // ============================================
 
   static async linkExecutionMemory(
@@ -364,10 +453,7 @@ ${JSON.stringify(executionData, null, 2)}
         .select()
         .single();
 
-      if (error) {
-        console.error('[Memory] Linking error:', error);
-        return null;
-      }
+      if (error) return null;
 
       return data as MemoryRelation;
     } catch (error) {
@@ -391,17 +477,12 @@ ${JSON.stringify(executionData, null, 2)}
 
       if (error) return [];
 
-      // Build simple lineage
       const executionIds = new Set<string>();
       executionIds.add(executionId);
-      
+
       for (const rel of relations || []) {
-        if (rel.source_execution_id === executionId) {
-          executionIds.add(rel.target_execution_id);
-        }
-        if (rel.target_execution_id === executionId) {
-          executionIds.add(rel.source_execution_id);
-        }
+        if (rel.source_execution_id === executionId) executionIds.add(rel.target_execution_id);
+        if (rel.target_execution_id === executionId) executionIds.add(rel.source_execution_id);
       }
 
       return Array.from(executionIds);
@@ -434,26 +515,16 @@ ${JSON.stringify(executionData, null, 2)}
 
   private static calculateImportance(lessons: ExecutionLesson): number {
     let score = 0.5;
-
-    // Higher importance if there are valuable lessons
     if (lessons.failures.length > 0) score += 0.2;
     if (lessons.optimizations.length > 0) score += 0.15;
     if (lessons.successes.length > 1) score += 0.15;
-
     return Math.min(score, 1);
   }
 
   private static generateSummary(lessons: ExecutionLesson): string {
     const parts: string[] = [];
-    
-    if (lessons.successes.length > 0) {
-      parts.push(`成功经验: ${lessons.successes[0]}`);
-    }
-    
-    if (lessons.failures.length > 0) {
-      parts.push(`遇到挑战: ${lessons.failures[0]}`);
-    }
-    
+    if (lessons.successes.length > 0) parts.push(`成功经验: ${lessons.successes[0]}`);
+    if (lessons.failures.length > 0) parts.push(`遇到挑战: ${lessons.failures[0]}`);
     return parts.join(' | ') || '执行完成';
   }
 
@@ -462,12 +533,10 @@ ${JSON.stringify(executionData, null, 2)}
   // ============================================
 
   static formatMemoryContext(memories: RetrievedMemory[]): string {
-    if (memories.length === 0) {
-      return '';
-    }
+    if (memories.length === 0) return '';
 
     let context = '\n\n历史工程记忆参考\n';
-    
+
     context += '相似任务:\n';
     memories.forEach((m, i) => {
       context += `${i + 1}. ${m.memory.prompt.slice(0, 100)}...\n`;
@@ -479,15 +548,12 @@ ${JSON.stringify(executionData, null, 2)}
       if (m.memory.lessons?.successes) allLessons.push(...m.memory.lessons.successes);
       if (m.memory.lessons?.optimizations) allLessons.push(...m.memory.lessons.optimizations);
     });
-    
+
     const uniqueLessons = Array.from(new Set(allLessons)).slice(0, 5);
-    uniqueLessons.forEach(lesson => {
-      context += `- ${lesson}\n`;
-    });
+    uniqueLessons.forEach(lesson => { context += `- ${lesson}\n`; });
 
     context += '\n请参考以上经验指导本次任务\n';
 
-    // Truncate to max length
     if (context.length > MAX_TOKEN_LENGTH) {
       context = context.slice(0, MAX_TOKEN_LENGTH - 100) + '\n...[truncated]\n';
     }
@@ -496,7 +562,7 @@ ${JSON.stringify(executionData, null, 2)}
   }
 
   // ============================================
-  // MEMORY METRICS
+  // MEMORY METRICS (REAL, NOT PLACEHOLDER)
   // ============================================
 
   static async getMemoryMetrics(): Promise<{
@@ -506,12 +572,7 @@ ${JSON.stringify(executionData, null, 2)}
     planner_adaptation_rate: number;
   }> {
     if (!isSupabaseConfigured()) {
-      return {
-        total_memories: 0,
-        recall_count: 0,
-        reuse_success_rate: 0,
-        planner_adaptation_rate: 0
-      };
+      return { total_memories: 0, recall_count: 0, reuse_success_rate: 0, planner_adaptation_rate: 0 };
     }
 
     const supabase = getSupabaseServer();
@@ -520,23 +581,36 @@ ${JSON.stringify(executionData, null, 2)}
     }
 
     try {
-      const { count } = await supabase
+      // 真实统计数据
+      const { count: totalMemories } = await supabase
         .from('agent_memory')
         .select('*', { count: 'exact', head: true });
 
+      const { count: hasEmbedding } = await supabase
+        .from('agent_memory')
+        .select('*', { count: 'exact', head: true })
+        .not('embedding', 'is', null);
+
+      const { count: highImportance } = await supabase
+        .from('agent_memory')
+        .select('*', { count: 'exact', head: true })
+        .gte('importance_score', 0.7);
+
+      const total = totalMemories || 0;
+      const withEmbedding = hasEmbedding || 0;
+      const important = highImportance || 0;
+
       return {
-        total_memories: count || 0,
-        recall_count: count || 0,
-        reuse_success_rate: 0.75, // Placeholder
-        planner_adaptation_rate: 0.6 // Placeholder
+        total_memories: total,
+        recall_count: withEmbedding,
+        // 有用记忆占比 = 高重要性记忆 / 总数
+        reuse_success_rate: total > 0 ? Math.round((important / total) * 100) / 100 : 0,
+        // 向量化率 = 有 embedding 的记忆 / 总数
+        planner_adaptation_rate: total > 0 ? Math.round((withEmbedding / total) * 100) / 100 : 0,
       };
     } catch (error) {
-      return {
-        total_memories: 0,
-        recall_count: 0,
-        reuse_success_rate: 0,
-        planner_adaptation_rate: 0
-      };
+      console.error('[Memory] Metrics retrieval failed:', error);
+      return { total_memories: 0, recall_count: 0, reuse_success_rate: 0, planner_adaptation_rate: 0 };
     }
   }
 }

@@ -15,6 +15,13 @@ build_output*.txt
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.local
+
+# Eval artifacts
+eval-results/
+
+# Release packaging output
+release/
 
 # Vercel
 .vercel/

@@ -97,12 +97,12 @@ function generateMetrics() {
       decisionVisualization: true,
     },
     metrics: {
-      totalExecutions: 1247,
-      averageQualityScore: 92.4,
-      memoryHitRate: 0.87,
-      autoRetrySuccessRate: 0.94,
-      averageResponseTime: '8.2s',
-      memoryEntries: 500,
+      totalExecutions: 0,   // 接入真实数据后自动统计
+      averageQualityScore: 0,
+      memoryHitRate: 0,
+      autoRetrySuccessRate: 0,
+      averageResponseTime: 'N/A',
+      memoryEntries: 0,
     },
     techStack: {
       framework: 'Next.js 14',
@@ -170,7 +170,7 @@ AgentForge 是一个 Memory-Augmented Adaptive Engineering OS，能够：
 2. 任务分类为「optimize」类型
 3. 召回 2 条相关记忆
 4. 动态编排 Architect → Coding → Debug Agent
-5. 质量验证通过（92.4/100）
+5. 质量验证通过
 
 ### 3. 电商系统设计
 
@@ -182,22 +182,17 @@ AgentForge 是一个 Memory-Augmented Adaptive Engineering OS，能够：
 3. 动态编排 Architect → Coding → Deploy Agent
 4. 生成完整工程产物
 
-## 质量指标
+## 质量说明（诚实口径）
 
-| 维度 | 评分 |
-|------|------|
-| 中文输出率 | 98% |
-| 结构完整度 | 95% |
-| 代码完整性 | 90% |
-| 场景贴合度 | 94% |
-| 工程可执行性 | 88% |
+质量分来自规则化门禁（中文占比 / 结构 / 代码围栏等），不是运营注水指标。
+请运行 \`npm run eval\` 查看可复现的 fixture 评测结果。
 
-## 系统健康
+## 系统检查清单
 
-- ✅ Runtime: Online
-- ✅ Memory: Active
-- ✅ API: Healthy
-- ✅ Observability: OK
+- Runtime / SSE agent API
+- Memory write + pgvector retrieve（需配置 Supabase）
+- Rate limit on public APIs
+- CI: typecheck / test / eval / build
 `;
 
   fs.writeFileSync(path.join(RELEASE_DIR, 'demo-report.md'), content, 'utf-8');

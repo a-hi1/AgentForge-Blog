@@ -1,14 +1,23 @@
 import { safeParseLLMJson } from '@/lib/utils/safeJson';
 
-const API_URL = `${process.env.OPENAI_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4'}/chat/completions`;
-const API_KEY = process.env.OPENAI_API_KEY || '635dcc8632034607ac10426542c991f5.4biUondwITYglFFV';
-const MODEL = process.env.OPENAI_MODEL || 'glm-4.5-air';
+const API_URL = `${process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1'}/chat/completions`;
+const MODEL = process.env.OPENAI_MODEL || 'deepseek-chat';
+
+function getApiKey(): string {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) {
+    throw new Error('未配置 OPENAI_API_KEY，请在 .env.local 中设置（切勿把密钥写进代码）');
+  }
+  return key;
+}
 
 export async function callLLMWithJSON<T>(
   messages: { role: string; content: string }[],
   maxRetries: number = 2,
   temperature: number = 0.3
 ): Promise<T> {
+  const apiKey = getApiKey();
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
@@ -16,7 +25,7 @@ export async function callLLMWithJSON<T>(
 
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: MODEL,
           messages,
